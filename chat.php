@@ -149,7 +149,7 @@ if (data_submitted() && confirm_sesskey()) {
                 'question' => $displayquestion,
                 'answer' => $answer,
                 'illustration_url' => !empty($response['illustration_url'])
-                    ? (new \\local_ragassistant\\local\\api_client())->get_base_url() . (string) $response['illustration_url']
+                    ? (new \local_ragassistant\local\api_client())->get_base_url() . (string) $response['illustration_url']
                     : null,
                 'sources' => is_array($response['sources'] ?? null)
                     ? $response['sources']
@@ -172,7 +172,7 @@ if (data_submitted() && confirm_sesskey()) {
                     'display_question' => $displayquestion,
                     'answer_html' => markdown_renderer::render($answer, $context),
                     'illustration_url' => !empty($response['illustration_url'])
-                        ? (new \\local_ragassistant\\local\\api_client())->get_base_url() . (string) $response['illustration_url']
+                        ? (new \local_ragassistant\local\api_client())->get_base_url() . (string) $response['illustration_url']
                         : null,
                     'sources' => is_array($response['sources'] ?? null)
                         ? $response['sources']
