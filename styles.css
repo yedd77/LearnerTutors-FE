@@ -1,0 +1,848 @@
+.ragassistant-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 1rem;
+    margin: 1.25rem 0;
+}
+
+.ragassistant-card,
+.ragassistant-chat-shell {
+    border: 1px solid var(--bs-border-color, #dee2e6);
+    border-radius: .75rem;
+    padding: 1.25rem;
+    background: var(--bs-body-bg, #fff);
+}
+
+.ragassistant-card h3 {
+    font-size: 1.15rem;
+    margin-bottom: .65rem;
+}
+
+.ragassistant-chat-welcome {
+    border-radius: .5rem;
+    background: var(--bs-secondary-bg, #f8f9fa);
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+.ragassistant-documents td,
+.ragassistant-documents th {
+    vertical-align: middle;
+}
+
+.ragassistant-documents {
+    width: 100%;
+    max-width: none;
+    table-layout: auto;
+}
+
+.ragassistant-documents th:last-child,
+.ragassistant-documents td:last-child {
+    min-width: 10rem;
+}
+
+.ragassistant-document-name {
+    display: block;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
+.ragassistant-document-date {
+    display: block;
+    min-width: 7.5rem;
+    white-space: nowrap;
+}
+
+.ragassistant-document-actions {
+    display: flex;
+    flex-direction: column;
+    gap: .35rem;
+    align-items: stretch;
+}
+
+.ragassistant-document-action {
+    display: block;
+    width: 100%;
+    margin: 0;
+}
+
+.ragassistant-document-action .btn {
+    width: 100%;
+    white-space: nowrap;
+}
+
+.ragassistant-answer {
+    border: 1px solid var(--bs-border-color, #dee2e6);
+    border-radius: .75rem;
+    padding: 1.25rem;
+}
+
+.ragassistant-sources td {
+    vertical-align: top;
+    overflow-wrap: anywhere;
+}
+
+.ragassistant-policy-form {
+    max-width: 780px;
+    border: 1px solid var(--bs-border-color, #dee2e6);
+    border-radius: .75rem;
+    padding: 1.25rem;
+}
+
+.ragassistant-policy-option {
+    display: flex;
+    align-items: center;
+    gap: .65rem;
+    font-weight: 600;
+    margin-top: .75rem;
+}
+
+.ragassistant-policy-option input {
+    width: 1.1rem;
+    height: 1.1rem;
+}
+
+.ragassistant-chat-app {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    width: 100%;
+    align-self: flex-start;
+    box-sizing: border-box;
+    height: fit-content;
+    min-height: fit-content;    
+    border: 1px solid var(--bs-border-color, #dee2e6);
+    border-radius: 1rem;
+    padding: 1rem;
+    background: var(--bs-body-bg, #fff);
+}
+
+.ragassistant-chat-transcript {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    flex: 0 0 auto;
+    overflow-y: visible;
+    overscroll-behavior: contain;
+    scroll-behavior: smooth;
+    padding: 1rem 0.25rem;
+}
+
+#id_submitbutton {
+    display: block;
+    margin-left: auto;
+}
+
+.ragassistant-message {
+    display: flex;
+    gap: .7rem;
+    max-width: 92%;
+}
+
+.ragassistant-message-user {
+    align-self: flex-end;
+}
+
+.ragassistant-message-user .ragassistant-message-content {
+    background: var(--ragassistant-subtle, #e9e6f3);
+    border-radius: 1rem 1rem .25rem 1rem;
+}
+
+.ragassistant-message-assistant {
+    align-self: flex-start;
+}
+
+.ragassistant-message-assistant .ragassistant-message-content {
+    background: var(--bs-secondary-bg, #f8f9fa);
+    border-radius: .25rem 1rem 1rem 1rem;
+}
+
+.ragassistant-message-content {
+    padding: .85rem 1rem;
+    overflow-wrap: anywhere;
+    min-width: 0;
+}
+
+.ragassistant-message-content> :last-child {
+    margin-bottom: 0;
+}
+
+.ragassistant-assistant-avatar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 2rem;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 50%;
+    background: var(--ragassistant-primary, #270089);
+    color: #fff;
+    font-weight: 700;
+}
+
+.ragassistant-chat-composer {
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: .6rem;
+    border-top: 1px solid var(--bs-border-color, #dee2e6);
+    padding-top: 1rem;
+}
+
+.ragassistant-chat-input {
+    align-self: start;
+    height: auto;
+    max-height: 3.25rem;
+    resize: none;
+    border-radius: .7rem;
+}
+
+#fitem_id_submitbutton .col-md-9 {
+    display: flex;
+    justify-content: flex-end;
+}
+
+.ragassistant-send-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 3rem;
+    height: 3rem;
+    padding: 0;
+    background-color: var(--ragassistant-primary, #270089);
+    color: #fff;
+    align-self: center;
+    border-radius: 50%;
+}
+
+.ragassistant-send-icon {
+    width: 1.25rem;
+    height: 1.25rem;
+}
+
+.ragassistant-send-button:hover {
+    background-color: #1f006e;
+    color: #fff;
+}
+
+.ragassistant-chat-hint {
+    grid-column: 1 / -1;
+}
+
+.ragassistant-sources-details {
+    margin-top: .75rem;
+    font-size: .9rem;
+}
+
+.ragassistant-source-list {
+    padding-left: 1.25rem;
+    margin-top: .5rem;
+}
+
+.ragassistant-source-list li {
+    margin-bottom: .5rem;
+}
+
+.ragassistant-source-list p {
+    margin: .25rem 0 0;
+    color: var(--bs-secondary-color, #6c757d);
+}
+
+@media (max-width: 575px) {
+    .ragassistant-message {
+        max-width: 100%;
+    }
+
+    .ragassistant-chat-composer {
+        grid-template-columns: 1fr;
+    }
+
+    .ragassistant-send-button {
+        justify-self: end;
+        color: #fff;
+    }
+}
+
+.form-filetypes {
+    display: none !important;
+}
+
+/* Keep Moodle's accepted_types configuration active, but hide its visible type/restriction summary. */
+#fitem_id_documents .filemanager .fp-restrictions,
+#fitem_id_documents .filemanager .acceptedtypes,
+#fitem_id_documents .filemanager .fp-acceptedtypes {
+    display: none !important;
+}
+
+#fitem_id_documents .filemanager {
+    margin-top: .35rem;
+}
+
+.ragassistant-review-heading {
+    margin: 1.75rem 0 .8rem;
+}
+
+.ragassistant-section-title {
+    margin: 0 0 .35rem;
+    font-size: 1.1rem;
+    font-weight: 650;
+    color: #212529;
+}
+
+.ragassistant-section-description {
+    margin: 0;
+    color: #6c757d;
+    line-height: 1.5;
+}
+
+.ragassistant-review-wrap {
+    overflow: hidden;
+    margin-bottom: 1.25rem;
+    border: 1px solid #dce3ea;
+    border-radius: .7rem;
+    background: #fff;
+}
+
+.ragassistant-review-table {
+    width: 100%;
+    margin: 0;
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+.ragassistant-review-table thead th {
+    padding: .85rem 1rem;
+    border-bottom: 1px solid #dce3ea;
+    background: #f7f9fc;
+    color: #344054;
+    font-size: .82rem;
+    font-weight: 700;
+    vertical-align: middle;
+}
+
+.ragassistant-review-table tbody td {
+    padding: .85rem 1rem;
+    border-bottom: 1px solid #edf0f3;
+    vertical-align: middle;
+}
+
+.ragassistant-review-table tbody tr:last-child td {
+    border-bottom: 0;
+}
+
+.ragassistant-filename-cell {
+    min-width: 200px;
+    overflow-wrap: anywhere;
+}
+
+@media (max-width: 767.98px) {
+
+    .ragassistant-review-table,
+    .ragassistant-review-table tbody,
+    .ragassistant-review-table tr,
+    .ragassistant-review-table td {
+        display: block;
+        width: 100%;
+    }
+
+    .ragassistant-review-table thead {
+        display: none;
+    }
+
+    .ragassistant-review-table tbody tr {
+        padding: .6rem 0;
+        border-bottom: 1px solid #dce3ea;
+    }
+
+    .ragassistant-review-table tbody tr:last-child {
+        border-bottom: 0;
+    }
+
+    .ragassistant-review-table tbody td {
+        padding: .6rem .9rem;
+        border-bottom: 0;
+    }
+
+    .ragassistant-filename-cell {
+        min-width: 0;
+    }
+
+    .ragassistant-note-input {
+        min-width: 0;
+    }
+}
+
+/* Hide the displayed accepted file format information only. */
+#fitem_id_documents .form-filetypes-descriptions,
+.filetypes-descriptions-intro {
+    display: none !important;
+}
+
+/* Main form spacing */
+#page-local-ragassistant-documents .mform,
+#page-local-ragassistant-documents form.mform {
+    --ragassistant-primary: #270089;
+    --ragassistant-primary-light: #edf4ff;
+    --ragassistant-border: #dfe5ee;
+    --ragassistant-text: #253247;
+    --ragassistant-muted: #69778b;
+    --ragassistant-surface: #ffffff;
+    --ragassistant-background: #f7f9fc;
+    --ragassistant-radius: 14px;
+    --ragassistant-subtle: #e9e6f3;
+    color: var(--ragassistant-text);
+}
+
+/* Section header */
+#page-local-ragassistant-documents #fitem_id_uploadheader,
+#page-local-ragassistant-documents .fitem_fheader {
+    margin-bottom: 18px;
+}
+
+#page-local-ragassistant-documents #fitem_id_uploadheader legend,
+#page-local-ragassistant-documents #fitem_id_uploadheader .col-form-label,
+#page-local-ragassistant-documents .fitem_fheader .col-form-label {
+    color: var(--ragassistant-text);
+    font-size: 1.35rem;
+    font-weight: 700;
+}
+
+/* Upload card introduction */
+.ragassistant-card-intro {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    margin: 20px 0 12px;
+}
+
+.ragassistant-step-number {
+    display: inline-flex;
+    flex: 0 0 38px;
+    width: 38px;
+    height: 38px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 11px;
+    background: var(--ragassistant-primary-light, #edf4ff);
+    color: var(--ragassistant-primary, #356fba);
+    font-size: 0.9rem;
+    font-weight: 800;
+}
+
+.ragassistant-card-heading {
+    min-width: 0;
+    margin-bottom: 12px;
+}
+
+.ragassistant-card-title {
+    margin: 0 0 6px;
+    color: var(--ragassistant-text, #253247);
+    font-size: 1.08rem;
+    font-weight: 700;
+    line-height: 1.4;
+}
+
+.ragassistant-card-description {
+    margin: 0;
+    color: var(--ragassistant-muted, #69778b);
+    font-size: 0.92rem;
+    line-height: 1.6;
+}
+
+/* File upload area: Moodle's native filemanager stays functional */
+#fitem_id_documents {
+    display: block;
+    margin: 0 0 12px;
+    padding: 20px;
+    border: 1px solid var(--ragassistant-border, #dfe5ee);
+    border-radius: var(--ragassistant-radius, 14px);
+    background: var(--ragassistant-surface, #fff);
+    box-shadow: 0 3px 12px rgb(25 45 75 / 4%);
+}
+
+#fitem_id_documents>.col-form-label,
+#fitem_id_documents>.col-md-3,
+#fitem_id_documents>.col-md-9,
+#fitem_id_documents>.col-sm-3,
+#fitem_id_documents>.col-sm-9 {
+    width: 100%;
+    max-width: 100%;
+    flex: 0 0 100%;
+}
+
+#fitem_id_documents .col-form-label {
+    display: block;
+    margin-bottom: 12px;
+    color: var(--ragassistant-text, #253247);
+    font-weight: 700;
+}
+
+#fitem_id_documents .form-filetypes-descriptions {
+    display: none !important;
+}
+
+/* Keep Moodle's file restrictions; hide only the displayed format list */
+#fitem_id_documents .filemanager .fp-restrictions,
+#fitem_id_documents .filemanager .fp-acceptedtypes,
+#fitem_id_documents .filemanager .acceptedtypes {
+    display: none !important;
+}
+
+/* Moodle filemanager drop area */
+#fitem_id_documents .filemanager {
+    width: 100%;
+    max-width: 100%;
+}
+
+#fitem_id_documents .filemanager .fm-empty-container,
+#fitem_id_documents .filemanager .dndupload-message {
+    border-radius: 10px;
+}
+
+#fitem_id_documents .filemanager .dndupload-message {
+    padding: 24px 16px;
+}
+
+#fitem_id_documents .filemanager .fp-content {
+    border-radius: 10px;
+}
+
+/* File upload limits */
+.ragassistant-upload-limits {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 12px 0 28px;
+}
+
+.ragassistant-limit-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 7px 11px;
+    border: 1px solid var(--ragassistant-border, #dfe5ee);
+    border-radius: 999px;
+    background: var(--ragassistant-background, #f7f9fc);
+    color: var(--ragassistant-muted, #69778b);
+    font-size: 0.8rem;
+    font-weight: 600;
+    line-height: 1.3;
+}
+
+/* Review section */
+#ragassistant-file-review {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+    margin: 14px 0 28px;
+}
+
+/* Individual uploaded file card */
+.ragassistant-file-card {
+    min-width: 0;
+    padding: 18px;
+    border: 1px solid var(--ragassistant-border, #dfe5ee);
+    border-radius: var(--ragassistant-radius, 14px);
+    background: var(--ragassistant-surface, #fff);
+    box-shadow: 0 3px 12px rgb(25 45 75 / 4%);
+    transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.ragassistant-file-card:hover {
+    border-color: #b9cde8;
+    box-shadow: 0 6px 18px rgb(25 45 75 / 7%);
+}
+
+.ragassistant-file-card-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+    margin-bottom: 18px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid #edf0f5;
+}
+
+.ragassistant-file-icon {
+    display: inline-flex;
+    flex: 0 0 46px;
+    width: 46px;
+    height: 50px;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    margin-right: .7rem;
+    padding: .25rem .4rem;
+    border: 1px solid #d9e6fb;
+    border-radius: 9px;
+    background: var(--ragassistant-primary-light, #edf4ff);
+    color: var(--ragassistant-primary, #356fba);
+    font-size: 0.67rem;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    vertical-align: middle;
+}
+
+.ragassistant-file-details {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 5px;
+    min-width: 0;
+}
+
+.ragassistant-filename {
+    display: block;
+    overflow-wrap: anywhere;
+    color: var(--ragassistant-text, #253247);
+    font-size: 0.94rem;
+    font-weight: 700;
+    line-height: 1.45;
+}
+
+.ragassistant-file-number {
+    color: var(--ragassistant-muted, #69778b);
+    font-size: 0.78rem;
+}
+
+.ragassistant-remove-file {
+    flex: 0 0 auto;
+    margin-left: auto;
+    white-space: nowrap;
+}
+
+/* Lecturer note */
+.ragassistant-note-label {
+    display: block;
+    margin-bottom: 8px;
+    color: var(--ragassistant-text, #253247);
+    font-size: 0.86rem;
+    font-weight: 700;
+}
+
+.ragassistant-note-input {
+    width: 100%;
+    min-width: 220px;
+    min-height: 88px;
+    padding: 11px 12px;
+    border: 1px solid #d7dee8;
+    border-radius: 9px;
+    background: #fff;
+    color: var(--ragassistant-text, #253247);
+    font-size: 0.9rem;
+    line-height: 1.55;
+    resize: vertical;
+    resize: vertical;
+    transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.ragassistant-note-input::placeholder {
+    color: #98a3b3;
+}
+
+.ragassistant-note-input:focus {
+    border-color: var(--ragassistant-primary, #356fba);
+    outline: none;
+    box-shadow: 0 0 0 3px rgb(53 111 186 / 13%);
+}
+
+/* Form validation messages */
+#fitem_id_documents .form-control-feedback,
+#fitem_id_documents .invalid-feedback {
+    margin-top: 8px;
+}
+
+/* Submit action area */
+#page-local-ragassistant-documents #fgroup_id_buttonar {
+    margin-top: 24px;
+    padding: 18px 20px;
+    border: 1px solid var(--ragassistant-border, #dfe5ee);
+    border-radius: var(--ragassistant-radius, 14px);
+    background: var(--ragassistant-surface, #fff);
+}
+
+#page-local-ragassistant-documents #fgroup_id_buttonar .btn-primary {
+    padding: 10px 22px;
+    border-radius: 9px;
+    font-weight: 700;
+    box-shadow: 0 3px 8px rgb(25 45 75 / 10%);
+}
+
+#page-local-ragassistant-documents #fgroup_id_buttonar .btn-primary:focus {
+    box-shadow: 0 0 0 3px rgb(53 111 186 / 20%);
+}
+
+/* Responsive layout */
+@media (max-width: 767px) {
+    .ragassistant-card-intro {
+        gap: 11px;
+    }
+
+    #fitem_id_documents {
+        padding: 14px;
+    }
+
+    #ragassistant-file-review {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 12px;
+    }
+
+    .ragassistant-file-card {
+        padding: 14px;
+    }
+
+    .ragassistant-upload-limits {
+        gap: 6px;
+    }
+
+    .ragassistant-limit-chip {
+        font-size: 0.76rem;
+    }
+
+    #page-local-ragassistant-documents #fgroup_id_buttonar {
+        padding: 14px;
+    }
+
+    #page-local-ragassistant-documents form.mform,
+    #page-local-ragassistant-documents .ragassistant-uploaded-card {
+        padding: 14px;
+    }
+}
+
+/* Respect reduced-motion preferences */
+@media (prefers-reduced-motion: reduce) {
+
+    .ragassistant-file-card,
+    .ragassistant-note-input {
+        transition: none;
+    }
+}
+
+
+/* Keep the upload form and document list visually consistent. */
+#page-local-ragassistant-documents form.mform,
+#page-local-ragassistant-documents .ragassistant-uploaded-card {
+    padding: 24px;
+    border: none;
+    border-radius: 14px;
+    background: #fff;
+}
+
+#page-local-ragassistant-documents .ragassistant-uploaded-card {
+    margin-top: 24px;
+}
+
+#page-local-ragassistant-documents .ragassistant-uploaded-card .ragassistant-card-heading {
+    margin-bottom: 18px;
+}
+
+/* Remove nested card appearance from the file manager */
+#page-local-ragassistant-documents #fitem_id_documents {
+    padding: 0;
+    border: none;
+    box-shadow: none;
+    background: transparent;
+}
+
+/* Keep the button inside the unified form card */
+#page-local-ragassistant-documents #fgroup_id_buttonar {
+    margin-top: 20px !important;
+    padding-top: 18px !important;
+    border-top: 1px solid #edf0f5 !important;
+}
+
+form.mform #fgroup_id_buttonar>.felement,
+form.mform #fgroup_id_buttonar .felement.fgroup {
+    display: flex !important;
+    width: 100%;
+    align-items: center;
+    justify-content: flex-end !important;
+    gap: .5rem;
+}
+
+
+/* Slash-command autocomplete for the AI chat composer. */
+.ragassistant-composer-input-wrap {
+    position: relative;
+    flex: 1 1 auto;
+    min-width: 0;
+    align-self: start;
+}
+
+.ragassistant-command-menu {
+    position: absolute;
+    z-index: 1050;
+    right: 0;
+    top: calc(100% + 8px);
+    left: 0;
+    max-height: 320px;
+    overflow-y: auto;
+    padding: .35rem;
+    border: 1px solid var(--bs-border-color, #d9e0e8);
+    border-radius: .75rem;
+    background: var(--bs-body-bg, #fff);
+    box-shadow: 0 10px 28px rgb(20 35 55 / 16%);
+}
+
+.ragassistant-command-menu[hidden] {
+    display: none !important;
+}
+
+.ragassistant-command-option {
+    display: flex;
+    width: 100%;
+    flex-direction: column;
+    gap: .15rem;
+    padding: .65rem .75rem;
+    border: 0;
+    border-radius: .5rem;
+    background: transparent;
+    color: var(--bs-body-color, #212529);
+    text-align: left;
+    cursor: pointer;
+}
+
+.ragassistant-command-option:hover,
+.ragassistant-command-option[aria-selected="true"] {
+    background: var(--bs-tertiary-bg, #f1f4f8);
+}
+
+.ragassistant-command-title {
+    font-weight: 650;
+}
+
+.ragassistant-command-description {
+    color: var(--bs-secondary-color, #6c757d);
+    font-size: .82rem;
+    line-height: 1.4;
+}
+
+.ragassistant-chat-input {
+    height: 4.5rem;
+    min-height: 4.5rem;
+    max-height: 12rem;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    cursor: text;
+}
+
+.ragassistant-chat-input:focus {
+box-shadow: 0 0 0 0.1rem rgb(53 111 186 / 20%);
+}
+
+.ragassistant-chat-input[data-empty="true"]::before {
+    content: attr(data-placeholder);
+    float: left;
+    height: 0;
+    color: #6c757d;
+    pointer-events: none;
+}
+
+.ragassistant-command-mark {
+    font-weight: 600;
+    border-radius: 4px;
+}
+
+.ragassistant-message-error .ragassistant-message-content {
+    color: var(--bs-danger, #dc3545);
+}

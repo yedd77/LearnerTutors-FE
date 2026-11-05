@@ -1,0 +1,303 @@
+<?php
+// Chat conversation page 
+
+require_once(__DIR__ . '/../../config.php');
+require_once($CFG->dirroot . '/local/ragassistant/classes/local/api_client.php');
+require_once($CFG->dirroot . '/local/ragassistant/classes/local/course_policy.php');
+use local_ragassistant\local\markdown_renderer;
+
+/**
+ * Render a user question with its known slash command highlighted.
+ *
+ * @param string $question
+ * @return string
+ */
+function local_ragassistant_render_question(string $question): string
+{
+    $commands = [
+        '/exam' => '#1e88e5',
+        '/notes' => '#1e88e5',
+        '/summarize' => '#1e88e5',
+        '/flashcards' => '#1e88e5',
+        '/explain' => '#1e88e5',
+        '/quiz' => '#1e88e5',
+        '/studyguide' => '#1e88e5',
+        '/extract' => '#1e88e5',
+    ];
+
+    if (!preg_match('/^(\s*)(\/[^\s]*)(?=\s|$)/', $question, $matches)) {
+        return s($question);
+    }
+
+    $command = core_text::strtolower($matches[2]);
+    if (!isset($commands[$command])) {
+        return s($question);
+    }
+
+    $style = 'color: ' . $commands[$command] . '; background-color: ' .
+        $commands[$command] . '26; box-shadow: 0 0 0 2px ' .
+        $commands[$command] . '26;';
+
+    return s($matches[1]) .
+        html_writer::span(s($matches[2]), 'ragassistant-command-mark', [
+            'data-cmd' => $command,
+            'style' => $style,
+        ]) .
+        s(core_text::substr($question, core_text::strlen($matches[0])));
+}
+
+// Input handling and access control setup
+$courseid = required_param('courseid', PARAM_INT);
+$course = get_course($courseid);
+require_login($course);
+$context = context_course::instance($course->id);
+require_capability('local/ragassistant:useassistant', $context);
+$canmanage = has_capability('local/ragassistant:managedocuments', $context);
+$policy = \local_ragassistant\local\course_policy::get($courseid);
+$enabled = (bool) get_config('local_ragassistant', 'enable_chat');
+$allowed = $enabled && ($canmanage || (bool) $policy->allowstudentchat);
+
+// Page setup and metadata
+
+// Moodle only loads MathJax when a filtered string is rendered on the page. This page
+// renders answers through markdown_renderer (and via AJAX), so make sure the filters
+// (filter_mathjaxloader) are set up even when there is no chat history yet.
+\filter_manager::instance()->setup_page_for_filters($PAGE, $context);
+$PAGE->set_url(new moodle_url('/local/ragassistant/chat.php', ['courseid' => $courseid]));
+$PAGE->requires->js(new moodle_url('/local/ragassistant/chat.js'));
+$PAGE->requires->css(new moodle_url('/local/ragassistant/styles.css'));
+
+// Set session history if available
+if (!isset($SESSION->local_ragassistant_history)) {
+    $SESSION->local_ragassistant_history = [];
+}
+if (!isset($SESSION->local_ragassistant_history[$courseid])) {
+    $SESSION->local_ragassistant_history[$courseid] = [];
+}
+
+// Handle form submission and chat logic
+$history =& $SESSION->local_ragassistant_history[$courseid];
+$ajax = optional_param('ajax', 0, PARAM_BOOL);
+$error = '';
+$question = '';
+if (data_submitted() && confirm_sesskey()) {
+    $question = trim(optional_param('question', '', PARAM_TEXT));
+    $toolid = trim(optional_param('tool_id', '', PARAM_ALPHANUMEXT));
+    $displayquestion = trim(optional_param('display_question', '', PARAM_TEXT));
+    if ($displayquestion === '' && $toolid !== '') {
+        $commandnames = [
+            'exam_generation' => '/exam',
+            'note_making' => '/notes',
+            'summarization' => '/summarize',
+            'flashcards' => '/flashcards',
+            'concept_explanation' => '/explain',
+            'practice_quiz' => '/quiz',
+            'study_guide' => '/studyguide',
+            'exact_text_extraction' => '/extract',
+        ];
+        $displayquestion = ($commandnames[$toolid] ?? '') .
+            ($commandnames[$toolid] ?? '' ? ' ' : '') . $question;
+    }
+    if ($displayquestion === '') {
+        $displayquestion = $question;
+    }
+
+    // Check if chat is allowed for the user
+    if (!$allowed) {
+        $error = $enabled ? get_string('studentchatdisabled', 'local_ragassistant') : get_string('chatdisabledreason', 'local_ragassistant');
+
+        // Validate question length between 2 and 4000 characters
+    } else if (core_text::strlen($question) < 2) {
+        $error = get_string('questionrequired', 'local_ragassistant');
+    } else if (core_text::strlen($question) > 4000) {
+        $error = get_string('questiontoolong', 'local_ragassistant');
+    } else {
+
+        // Prepare conversation history for the API request
+        try {
+
+            // Retrieve the last 6 turns of conversation history to provide context for the API.
+            $conversationhistory = [];
+            foreach (array_slice($history, -6) as $turn) {
+                $conversationhistory[] = [
+                    'role' => 'user',
+                    'content' => core_text::substr((string) $turn['question'], 0, 4000)
+                ];
+
+                $conversationhistory[] = [
+                    'role' => 'assistant',
+                    'content' => core_text::substr((string) $turn['answer'], 0, 4000)
+                ];
+            }
+
+            // Retrieve the answer from the RAG Assistant API.
+            $response = (new \local_ragassistant\local\api_client())->post_json('/api/v1/chat', [
+                'question' => $question,
+                'course_id' => (int) $course->id,
+                'user_id' => (int) $USER->id,
+                'include_course_documents' => true,
+                'history' => $conversationhistory,
+                // Explicit tool selection; when blank, the backend routes by intent.
+                'tool_id' => $toolid !== '' ? $toolid : null,
+            ]);
+
+            // Extract the raw Markdown answer from the API response.
+            $answer = (string) ($response['answer'] ?? '');
+
+            // Store the raw Markdown answer and sources in session history.
+            $history[] = [
+                'question' => $displayquestion,
+                'answer' => $answer,
+                'sources' => is_array($response['sources'] ?? null)
+                    ? $response['sources']
+                    : [],
+                'time' => time(),
+            ];
+
+            // Limit the history to the last 20 turns to prevent excessive memory usage.
+            if (count($history) > 20) {
+                $history = array_slice($history, -20);
+            }
+
+            // Return JSON for AJAX request 
+            if ($ajax) {
+                header('Content-Type: application/json');
+
+                echo json_encode([
+                    'success' => true,
+                    'question' => $question,
+                    'display_question' => $displayquestion,
+                    'answer_html' => markdown_renderer::render($answer, $context),
+                    'sources' => is_array($response['sources'] ?? null)
+                        ? $response['sources']
+                        : [],
+                ], JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
+                exit;
+            }
+
+            //preserve the existing question in the input field for non-AJAX requests
+            redirect(new moodle_url('/local/ragassistant/chat.php', ['courseid' => $courseid]));
+
+        } catch (\Throwable $exception) {
+            debugging(
+                'RAG Assistant backend request failed: ' . $exception->getMessage(),
+                DEBUG_DEVELOPER
+            );
+
+            $error = get_string('answerfailed', 'local_ragassistant');
+
+            if ($ajax) {
+                http_response_code(500);
+                header('content-type: application/json; charset=utf-8');
+                echo json_encode([
+                    'success' => false,
+                    'error' => $error,
+                ]);
+                exit;
+            }
+        }
+    }
+}
+
+if ($ajax) {
+    http_response_code(400);
+    header('Content-Type: application/json; charset=utf-8');
+
+    echo json_encode([
+        'success' => false,
+        'error' => $error ?: 'Unable to process your question.',
+    ]);
+
+    exit;
+}
+
+// Render page content
+echo $OUTPUT->header();
+echo $OUTPUT->heading(get_string('askassistant', 'local_ragassistant'));
+echo html_writer::div(get_string('chatprivacyinfo', 'local_ragassistant'), 'alert alert-info');
+
+// Display message based on chat availability and any errors encountered during processing
+if (!$allowed) {
+    echo html_writer::div($enabled ? get_string('studentchatdisabled', 'local_ragassistant') : get_string('chatdisabledreason', 'local_ragassistant'), 'alert alert-warning');
+}
+if ($error !== '') {
+    echo html_writer::div(s($error), 'alert alert-danger');
+}
+
+// Render chat element
+echo html_writer::start_div('ragassistant-chat-app');
+echo html_writer::start_div('ragassistant-chat-transcript', ['id' => 'ragassistant-chat-transcript', 'role' => 'log', 'aria-live' => 'polite']);
+
+// Display chat history or welcome message if no history exists
+if (empty($history)) {
+    echo html_writer::div(html_writer::tag('div', '✦', ['class' => 'ragassistant-assistant-avatar']) . html_writer::tag('div', s(get_string('chatwelcome', 'local_ragassistant')), ['class' => 'ragassistant-message-content']), 'ragassistant-message ragassistant-message-assistant');
+} else {
+    // Render each turn of the conversation history
+    foreach ($history as $turn) {
+        echo html_writer::div(
+            html_writer::div(
+                local_ragassistant_render_question((string) $turn['question']),
+                'ragassistant-message-content'
+            ),
+            'ragassistant-message ragassistant-message-user'
+        );
+        echo html_writer::start_div('ragassistant-message ragassistant-message-assistant');
+        echo html_writer::tag('div', '✦', ['class' => 'ragassistant-assistant-avatar']);
+        echo html_writer::start_div('ragassistant-message-content');
+        echo markdown_renderer::render((string) $turn['answer'], $context);
+
+        // Display sources of cite if available
+        if (!empty($turn['sources'])) {
+            echo html_writer::tag('details', html_writer::tag('summary', get_string('sourcesheading', 'local_ragassistant')) . html_writer::start_tag('ul', ['class' => 'ragassistant-source-list']) . implode('', array_map(function ($source) {
+                $label = (string) ($source['filename'] ?? get_string('unknown', 'local_ragassistant'));
+                if (!empty($source['page'])) {
+                    $label .= ' · ' . get_string('sourcepage', 'local_ragassistant') . ' ' . (int) $source['page'];
+                }
+                $excerpt = trim((string) ($source['excerpt'] ?? ''));
+                return html_writer::tag('li', html_writer::tag('strong', s($label)) . ($excerpt !== '' ? html_writer::tag('p', s($excerpt)) : ''));
+            }, $turn['sources'])) . html_writer::end_tag('ul'), ['class' => 'ragassistant-sources-details']);
+        }
+        echo html_writer::end_div();
+        echo html_writer::end_div();
+    }
+}
+echo html_writer::end_div();
+
+// Render chat input if user is allowed to use the assistant
+if ($allowed) {
+    echo html_writer::start_tag('form', ['method' => 'post', 'action' => (new moodle_url('/local/ragassistant/chat.php', ['courseid' => $courseid]))->out(false), 'class' => 'ragassistant-chat-composer']);
+    echo html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'sesskey', 'value' => sesskey()]);
+    echo html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'tool_id', 'id' => 'ragassistant-tool-id', 'value' => '']);
+    echo html_writer::tag('label', get_string('yourquestion', 'local_ragassistant'), ['for' => 'ragassistant-question', 'class' => 'sr-only']);
+    echo html_writer::start_div('ragassistant-composer-input-wrap');
+    echo html_writer::tag('div', '', ['id' => 'ragassistant-command-menu', 'class' => 'ragassistant-command-menu', 'role' => 'listbox', 'aria-label' => 'Available assistant commands', 'hidden' => 'hidden']);
+    echo html_writer::tag('div', s($question), [
+        'id' => 'ragassistant-question',
+        'class' => 'form-control ragassistant-chat-input',
+        'contenteditable' => 'plaintext-only',
+        'role' => 'textbox',
+        'aria-multiline' => 'true',
+        'aria-labelledby' => 'ragassistant-question-label',
+        'aria-autocomplete' => 'list',
+        'aria-controls' => 'ragassistant-command-menu',
+        'data-placeholder' => get_string('questionplaceholder', 'local_ragassistant'),
+        'data-empty' => $question === '' ? 'true' : 'false',
+    ]);
+    echo html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'question', 'id' => 'ragassistant-question-value', 'value' => $question]);
+
+    echo html_writer::end_div();
+
+    $sendicon = $OUTPUT->pix_icon(
+        'send',
+        "",
+        'local_ragassistant',
+        ['class' => 'ragassistant-send-icon']
+    );
+    echo html_writer::tag('button', $sendicon . html_writer::tag('span', get_string('sendquestion', 'local_ragassistant'), ['class' => 'sr-only']), ['type' => 'submit', 'class' => 'btn btn-primary ragassistant-send-button']);
+    echo html_writer::tag('small', get_string('chatinputhint', 'local_ragassistant'), ['class' => 'text-muted ragassistant-chat-hint']);
+    echo html_writer::end_tag('form');
+}
+echo html_writer::end_div();
+// back to dashboard link
+echo html_writer::div(html_writer::link(new moodle_url('/local/ragassistant/index.php', ['courseid' => $courseid]), get_string('backtodashboard', 'local_ragassistant')), 'mt-3');
+echo $OUTPUT->footer();
