@@ -148,6 +148,9 @@ if (data_submitted() && confirm_sesskey()) {
             $history[] = [
                 'question' => $displayquestion,
                 'answer' => $answer,
+                'illustration_url' => !empty($response['illustration_url'])
+                    ? (new \\local_ragassistant\\local\\api_client())->get_base_url() . (string) $response['illustration_url']
+                    : null,
                 'sources' => is_array($response['sources'] ?? null)
                     ? $response['sources']
                     : [],
@@ -168,6 +171,9 @@ if (data_submitted() && confirm_sesskey()) {
                     'question' => $question,
                     'display_question' => $displayquestion,
                     'answer_html' => markdown_renderer::render($answer, $context),
+                    'illustration_url' => !empty($response['illustration_url'])
+                        ? (new \\local_ragassistant\\local\\api_client())->get_base_url() . (string) $response['illustration_url']
+                        : null,
                     'sources' => is_array($response['sources'] ?? null)
                         ? $response['sources']
                         : [],
@@ -245,6 +251,17 @@ if (empty($history)) {
         echo html_writer::tag('div', '✦', ['class' => 'ragassistant-assistant-avatar']);
         echo html_writer::start_div('ragassistant-message-content');
         echo markdown_renderer::render((string) $turn['answer'], $context);
+        if (!empty($turn['illustration_url'])) {
+            echo html_writer::div(
+                html_writer::tag('img', '', [
+                    'src' => $turn['illustration_url'],
+                    'alt' => get_string('explainillustrationalt', 'local_ragassistant'),
+                    'class' => 'ragassistant-explain-illustration',
+                    'loading' => 'lazy',
+                ]),
+                'ragassistant-illustration-wrap'
+            );
+        }
 
         // Display sources of cite if available
         if (!empty($turn['sources'])) {
