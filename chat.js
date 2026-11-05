@@ -166,6 +166,45 @@ document.addEventListener('DOMContentLoaded', function () {
         content.appendChild(details);
     }
 
+    function appendIllustration(content, imageUrl) {
+        if (!content || typeof imageUrl !== 'string' || imageUrl.trim() === '') {
+            return;
+        }
+
+        let parsedUrl;
+        try {
+            parsedUrl = new URL(imageUrl, window.location.href);
+        } catch (error) {
+            console.warn('RAG Assistant: invalid illustration URL.');
+            return;
+        }
+
+        if (parsedUrl.protocol !== 'https:' && parsedUrl.protocol !== 'http:') {
+            console.warn('RAG Assistant: unsupported illustration URL protocol.');
+            return;
+        }
+
+        const wrapper = document.createElement('figure');
+        wrapper.className = 'ragassistant-illustration-wrap';
+
+        const image = document.createElement('img');
+        image.className = 'ragassistant-explain-illustration';
+        image.src = parsedUrl.href;
+        image.alt = 'Educational illustration for this explanation';
+        image.loading = 'lazy';
+        image.decoding = 'async';
+        image.referrerPolicy = 'no-referrer';
+        image.addEventListener('error', function () {
+            wrapper.remove();
+        }, { once: true });
+
+        const caption = document.createElement('figcaption');
+        caption.textContent = 'Illustration';
+
+        wrapper.append(image, caption);
+        content.appendChild(wrapper);
+    }
+
     function highlightMessageCommand(content) {
         const text = content.textContent;
         const lead = text.match(/^(\s*)(\/[^\s]*)(?=\s|$)/);
@@ -318,8 +357,9 @@ document.addEventListener('DOMContentLoaded', function () {
                     '.ragassistant-message-content'
                 );
 
+                appendIllustration(content, result.illustration_url);
                 appendSources(content, result.sources);
-                
+
                 await typesetMath(content);
 
                 // Keep the new answer in the center of the visible transcript.
