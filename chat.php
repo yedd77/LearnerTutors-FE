@@ -253,9 +253,9 @@ if (empty($history)) {
         echo markdown_renderer::render((string) $turn['answer'], $context);
         if (!empty($turn['illustration_url'])) {
             echo html_writer::div(
-                html_writer::tag('img', '', [
+                html_writer::empty_tag('img', [
                     'src' => $turn['illustration_url'],
-                    'alt' => get_string('explainillustrationalt', 'local_ragassistant'),
+                    'alt' => 'Educational illustration for this explanation',
                     'class' => 'ragassistant-explain-illustration',
                     'loading' => 'lazy',
                 ]),
