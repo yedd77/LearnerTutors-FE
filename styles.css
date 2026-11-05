@@ -846,3 +846,7 @@ box-shadow: 0 0 0 0.1rem rgb(53 111 186 / 20%);
 .ragassistant-message-error .ragassistant-message-content {
     color: var(--bs-danger, #dc3545);
 }
+
+.ragassistant-illustration-wrap{margin:1rem 0 0;max-width:100%}
+.ragassistant-explain-illustration{display:block;width:100%;max-width:720px;height:auto;margin:0 auto;border:1px solid var(--bs-border-color,#dee2e6);border-radius:.75rem;background:var(--bs-body-bg,#fff)}
+.ragassistant-illustration-wrap figcaption{margin-top:.4rem;color:var(--bs-secondary-color,#6c757d);font-size:.8rem;text-align:center}
