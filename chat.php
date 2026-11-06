@@ -46,6 +46,30 @@ function local_ragassistant_render_question(string $question): string
         s(core_text::substr($question, core_text::strlen($matches[0])));
 }
 
+/**
+ * Normalize an illustration URL returned by the backend.
+ *
+ * The backend may return either an absolute signed URL or a path relative
+ * to its configured base URL.
+ *
+ * @param mixed $value
+ * @param string $baseurl
+ * @return string|null
+ */
+function local_ragassistant_illustration_url($value, string $baseurl): ?string
+{
+    $url = trim((string) $value);
+    if ($url === '') {
+        return null;
+    }
+
+    if (preg_match('/^https?:\/\//i', $url)) {
+        return $url;
+    }
+
+    return rtrim($baseurl, '/') . '/' . ltrim($url, '/');
+}
+
 // Input handling and access control setup
 $courseid = required_param('courseid', PARAM_INT);
 $course = get_course($courseid);
@@ -145,12 +169,15 @@ if (data_submitted() && confirm_sesskey()) {
             $answer = (string) ($response['answer'] ?? '');
 
             // Store the raw Markdown answer and sources in session history.
+            $illustrationurl = local_ragassistant_illustration_url(
+                $response['illustration_url'] ?? null,
+                (new \local_ragassistant\local\api_client())->get_base_url()
+            );
+
             $history[] = [
                 'question' => $displayquestion,
                 'answer' => $answer,
-                'illustration_url' => !empty($response['illustration_url'])
-                    ? (new \local_ragassistant\local\api_client())->get_base_url() . (string) $response['illustration_url']
-                    : null,
+                'illustration_url' => $illustrationurl,
                 'sources' => is_array($response['sources'] ?? null)
                     ? $response['sources']
                     : [],
@@ -171,9 +198,7 @@ if (data_submitted() && confirm_sesskey()) {
                     'question' => $question,
                     'display_question' => $displayquestion,
                     'answer_html' => markdown_renderer::render($answer, $context),
-                    'illustration_url' => !empty($response['illustration_url'])
-                        ? (new \local_ragassistant\local\api_client())->get_base_url() . (string) $response['illustration_url']
-                        : null,
+                    'illustration_url' => $illustrationurl,
                     'sources' => is_array($response['sources'] ?? null)
                         ? $response['sources']
                         : [],
@@ -219,9 +244,6 @@ if ($ajax) {
 
 // Render page content
 echo $OUTPUT->header();
-echo $OUTPUT->heading(get_string('askassistant', 'local_ragassistant'));
-echo html_writer::div(get_string('chatprivacyinfo', 'local_ragassistant'), 'alert alert-info');
-
 // Display message based on chat availability and any errors encountered during processing
 if (!$allowed) {
     echo html_writer::div($enabled ? get_string('studentchatdisabled', 'local_ragassistant') : get_string('chatdisabledreason', 'local_ragassistant'), 'alert alert-warning');
@@ -231,9 +253,24 @@ if ($error !== '') {
 }
 
 // Render chat element
-echo html_writer::start_div('ragassistant-chat-app');
-echo html_writer::start_div('ragassistant-chat-transcript', ['id' => 'ragassistant-chat-transcript', 'role' => 'log', 'aria-live' => 'polite']);
+echo html_writer::start_div('ragassistant-chat-app', ['role' => 'log', 'aria-live' => 'polite']);
+echo html_writer::start_div('ragassistant-chat-background');
+echo html_writer::start_div(class: 'ragassistant-chat-blob blob-1'); echo html_writer::end_div();
+echo html_writer::start_div(class: 'ragassistant-chat-blob blob-2'); echo html_writer::end_div();
+echo html_writer::start_div(class: 'ragassistant-chat-blob blob-3'); echo html_writer::end_div();
+echo html_writer::end_div();
 
+// Suggestion Card
+echo html_writer::start_div('ragassistant-suggestion-card');
+echo html_writer::start_div('ragassistant-suggestion-card-grid');
+echo html_writer::start_div('ragassistant-suggestion-card-item');
+echo html_writer::start_div('ragassistant-suggestion-card-item');
+echo html_writer::start_div('ragassistant-suggestion-card-item');
+
+//new chat
+echo html_writer::start_div('ragassistant-chat-default', ['role' => 'log', 'aria-live' => 'polite']);
+
+//echo html_writer::start_div('ragassistant-chat-transcript', ['id' => 'ragassistant-chat-transcript', 'role' => 'log', 'aria-live' => 'polite']);
 // Display chat history or welcome message if no history exists
 if (empty($history)) {
     echo html_writer::div(html_writer::tag('div', '✦', ['class' => 'ragassistant-assistant-avatar']) . html_writer::tag('div', s(get_string('chatwelcome', 'local_ragassistant')), ['class' => 'ragassistant-message-content']), 'ragassistant-message ragassistant-message-assistant');
@@ -305,7 +342,7 @@ if ($allowed) {
     echo html_writer::end_div();
 
     $sendicon = $OUTPUT->pix_icon(
-        'send',
+        '',
         "",
         'local_ragassistant',
         ['class' => 'ragassistant-send-icon']
