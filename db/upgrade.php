@@ -59,7 +59,7 @@ function xmldb_local_ragassistant_upgrade(int $oldversion): bool
             $table->add_field('courseid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
             $table->add_field('documentid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
             $table->add_field('userid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
-            $table->add_field('suggestion', XMLDB_TYPE_CHAR, '500', null, XMLDB_NOTNULL, null, '');
+            $table->add_field('suggestion', XMLDB_TYPE_CHAR, '500', null, XMLDB_NOTNULL, null);
             $table->add_field('timecreated', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
             $table->add_key('primary', XMLDB_KEY_PRIMARY, ['id']);
             $table->add_key('courseid_fk', XMLDB_KEY_FOREIGN, ['courseid'], 'course', ['id']);

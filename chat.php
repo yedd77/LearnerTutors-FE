@@ -347,7 +347,7 @@ if ($allowed && empty($history) && !empty($suggestions)) {
     foreach ($suggestions as $suggestion) {
         echo html_writer::tag(
             'button',
-            html_writer::tag('span', s($suggestion), ['class' => 'ragassistant-suggestion-text']) .
+            html_writer::tag('span', s($suggestion->suggestion), ['class' => 'ragassistant-suggestion-text']) .
             html_writer::tag('span', '↗', ['class' => 'ragassistant-suggestion-arrow', 'aria-hidden' => 'true']),
             [
                 'type' => 'button',
