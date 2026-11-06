@@ -75,6 +75,58 @@ if (!isset($SESSION->local_ragassistant_history[$courseid])) {
     $SESSION->local_ragassistant_history[$courseid] = [];
 }
 
+// Load suggestions only for a new chat. The joined document checks preserve
+// course/personal visibility and exclude deleted, failed, or retrieval-disabled files.
+$suggestions = [];
+if ($allowed && empty($SESSION->local_ragassistant_history[$courseid])) {
+    $available = array_values($DB->get_records_sql(
+        "SELECT s.id, s.suggestion
+           FROM {local_ragassistant_suggestions} s
+           JOIN {local_ragassistant_documents} d ON d.id = s.documentid
+          WHERE s.courseid = :courseid
+            AND d.status = :ready
+            AND d.retrievalenabled = 1
+            AND (d.visibility = :coursevisibility OR d.userid = :userid OR :canmanage = 1)
+          ORDER BY s.id ASC",
+        [
+            'courseid' => $courseid,
+            'ready' => 'ready',
+            'coursevisibility' => 'course',
+            'userid' => $USER->id,
+            'canmanage' => $canmanage ? 1 : 0,
+        ]
+    ));
+
+    if ($available) {
+        $lastids = $SESSION->local_ragassistant_suggestion_last[$courseid] ?? [];
+        $fresh = array_values(array_filter(
+            $available,
+            static fn($item) => !in_array((int) $item->id, $lastids, true)
+        ));
+        shuffle($fresh);
+        $suggestions = array_slice($fresh, 0, 3);
+
+        // If fewer than three unseen suggestions remain, fill from the full pool.
+        if (count($suggestions) < 3) {
+            $selectedids = array_map(static fn($item) => (int) $item->id, $suggestions);
+            $remaining = array_values(array_filter(
+                $available,
+                static fn($item) => !in_array((int) $item->id, $selectedids, true)
+            ));
+            shuffle($remaining);
+            $suggestions = array_merge(
+                $suggestions,
+                array_slice($remaining, 0, 3 - count($suggestions))
+            );
+        }
+
+        $SESSION->local_ragassistant_suggestion_last[$courseid] = array_map(
+            static fn($item) => (int) $item->id,
+            $suggestions
+        );
+    }
+}
+
 // Handle form submission and chat logic
 $history =& $SESSION->local_ragassistant_history[$courseid];
 $ajax = optional_param('ajax', 0, PARAM_BOOL);
@@ -279,6 +331,34 @@ if (empty($history)) {
     }
 }
 echo html_writer::end_div();
+
+// Show up to three stored document suggestions on a new conversation.
+if ($allowed && empty($history) && !empty($suggestions)) {
+    echo html_writer::start_div('ragassistant-suggestions', [
+        'aria-label' => 'Suggested questions based on course documents',
+    ]);
+    echo html_writer::tag('h3', 'Try asking', ['class' => 'ragassistant-suggestions-title']);
+    echo html_writer::tag(
+        'p',
+        'Explore topics from your available course materials.',
+        ['class' => 'ragassistant-suggestions-description']
+    );
+    echo html_writer::start_div('ragassistant-suggestions-grid');
+    foreach ($suggestions as $suggestion) {
+        echo html_writer::tag(
+            'button',
+            html_writer::tag('span', s($suggestion), ['class' => 'ragassistant-suggestion-text']) .
+            html_writer::tag('span', '↗', ['class' => 'ragassistant-suggestion-arrow', 'aria-hidden' => 'true']),
+            [
+                'type' => 'button',
+                'class' => 'ragassistant-suggestion-card',
+                'data-prompt' => $suggestion->suggestion,
+            ]
+        );
+    }
+    echo html_writer::end_div();
+    echo html_writer::end_div();
+}
 
 // Render chat input if user is allowed to use the assistant
 if ($allowed) {
