@@ -213,7 +213,7 @@ if ($action !== '' && $actiondocumentid > 0 && data_submitted()) {
                         (int) $target->userid,
                         $result['suggestions'] ?? []
                     );
-                } catch (\\Throwable $suggestionexception) {
+                } catch (\Throwable $suggestionexception) {
                     debugging('RAG Assistant suggestion storage failed: ' . $suggestionexception->getMessage(), DEBUG_DEVELOPER);
                 }
 
@@ -402,7 +402,7 @@ if ($mform->is_cancelled()) {
                         (int) $USER->id,
                         $result['suggestions'] ?? []
                     );
-                } catch (\\Throwable $suggestionexception) {
+                } catch (\Throwable $suggestionexception) {
                     debugging('RAG Assistant suggestion storage failed: ' . $suggestionexception->getMessage(), DEBUG_DEVELOPER);
                 }
                 $DB->update_record('local_ragassistant_documents', (object) [
