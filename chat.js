@@ -14,6 +14,25 @@ document.addEventListener('DOMContentLoaded', function () {
         return;
     }
 
+    // Clicking a suggestion sends that stored prompt through the normal chat flow.
+    document.addEventListener('click', function (event) {
+        const card = event.target.closest('.ragassistant-suggestion-card');
+        if (!card || !form) {
+            return;
+        }
+
+        const prompt = card.dataset.prompt || '';
+        if (!prompt.trim()) {
+            return;
+        }
+
+        if (toolInput) {
+            toolInput.value = '';
+        }
+        editor.textContent = prompt;
+        editor.dispatchEvent(new Event('input', { bubbles: true }));
+        form.requestSubmit();
+    });
 
     // Resolve with the MathJax object once it is loaded and initialised,
     // or null if it never shows up. Moodle loads MathJax asynchronously, so
