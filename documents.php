@@ -7,6 +7,54 @@ require_once($CFG->dirroot . '/local/ragassistant/classes/local/api_client.php')
 require_once($CFG->dirroot . '/local/ragassistant/classes/local/course_policy.php');
 
 /**
+ * Replace the saved starter suggestions for one indexed document.
+ *
+ * @param int $courseid
+ * @param int $documentid
+ * @param int $userid
+ * @param mixed $suggestions
+ */
+function local_ragassistant_save_document_suggestions(
+    int $courseid,
+    int $documentid,
+    int $userid,
+    $suggestions
+): void {
+    global $DB;
+
+    $DB->delete_records('local_ragassistant_suggestions', ['documentid' => $documentid]);
+
+    if (!is_array($suggestions)) {
+        return;
+    }
+
+    $saved = [];
+    foreach ($suggestions as $suggestion) {
+        if (!is_string($suggestion)) {
+            continue;
+        }
+        $suggestion = trim(clean_param($suggestion, PARAM_TEXT));
+        $suggestion = core_text::substr($suggestion, 0, 500);
+        $key = core_text::strtolower($suggestion);
+        if ($suggestion === '' || isset($saved[$key])) {
+            continue;
+        }
+        $saved[$key] = true;
+        $DB->insert_record('local_ragassistant_suggestions', (object) [
+            'courseid' => $courseid,
+            'documentid' => $documentid,
+            'userid' => $userid,
+            'suggestion' => $suggestion,
+            'timecreated' => time(),
+        ]);
+        if (count($saved) >= 3) {
+            break;
+        }
+    }
+}
+
+
+/**
  * Render a document action form.
  *
  * @param int $courseid
@@ -157,6 +205,18 @@ if ($action !== '' && $actiondocumentid > 0 && data_submitted()) {
                     throw $indexexception;
                 }
 
+                // Store the three local-model suggestions returned by the index operation.
+                try {
+                    local_ragassistant_save_document_suggestions(
+                        (int) $target->courseid,
+                        (int) $target->id,
+                        (int) $target->userid,
+                        $result['suggestions'] ?? []
+                    );
+                } catch (\Throwable $suggestionexception) {
+                    debugging('RAG Assistant suggestion storage failed: ' . $suggestionexception->getMessage(), DEBUG_DEVELOPER);
+                }
+
                 // Update document status to 'ready' after the successful indexing and redirect with a success message
                 $DB->update_record('local_ragassistant_documents', (object) [
                     'id' => $target->id,
@@ -221,6 +281,7 @@ if ($action !== '' && $actiondocumentid > 0 && data_submitted()) {
                 if ($targetfile) {
                     $targetfile->delete();
                 }
+                $DB->delete_records('local_ragassistant_suggestions', ['documentid' => $target->id]);
                 $DB->delete_records('local_ragassistant_documents', ['id' => $target->id]);
                 redirect(
                     $redirecturl,
@@ -334,6 +395,16 @@ if ($mform->is_cancelled()) {
                     (int) $USER->id,
                     $visibility
                 );
+                try {
+                    local_ragassistant_save_document_suggestions(
+                        $courseid,
+                        $documentid,
+                        (int) $USER->id,
+                        $result['suggestions'] ?? []
+                    );
+                } catch (\Throwable $suggestionexception) {
+                    debugging('RAG Assistant suggestion storage failed: ' . $suggestionexception->getMessage(), DEBUG_DEVELOPER);
+                }
                 $DB->update_record('local_ragassistant_documents', (object) [
                     'id' => $documentid,
                     'status' => 'ready',

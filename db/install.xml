@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<XMLDB PATH="local/ragassistant/db" VERSION="2026101402" COMMENT="RAG Assistant local plugin tables">
+<XMLDB PATH="local/ragassistant/db" VERSION="2026110600" COMMENT="RAG Assistant local plugin tables">
   <TABLES>
     <TABLE NAME="local_ragassistant_documents" COMMENT="Uploaded documents available to the RAG Assistant">
       <FIELDS>
@@ -44,6 +44,26 @@
       </KEYS>
       <INDEXES>
         <INDEX NAME="courseid_uix" UNIQUE="true" FIELDS="courseid"/>
+      </INDEXES>
+    </TABLE>
+
+    <TABLE NAME="local_ragassistant_suggestions" COMMENT="Document-grounded chatbot starter suggestions">
+      <FIELDS>
+        <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="courseid" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0"/>
+        <FIELD NAME="documentid" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0"/>
+        <FIELD NAME="userid" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0"/>
+        <FIELD NAME="suggestion" TYPE="char" LENGTH="500" NOTNULL="true"/>
+        <FIELD NAME="timecreated" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+        <KEY NAME="courseid_fk" TYPE="foreign" FIELDS="courseid" REFTABLE="course" REFFIELDS="id"/>
+        <KEY NAME="documentid_fk" TYPE="foreign" FIELDS="documentid" REFTABLE="local_ragassistant_documents" REFFIELDS="id"/>
+        <KEY NAME="userid_fk" TYPE="foreign" FIELDS="userid" REFTABLE="user" REFFIELDS="id"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="course_doc_idx" UNIQUE="false" FIELDS="courseid, documentid"/>
       </INDEXES>
     </TABLE>
   </TABLES>
