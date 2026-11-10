@@ -18,13 +18,13 @@ if (!preg_match('/^[a-zA-Z0-9_-]{8,80}$/', $requestid)) {
 
 header('Content-Type: application/json; charset=utf-8');
 try {
-    $client = new \\local_ragassistant\\local\\api_client();
+    $client = new \local_ragassistant\local\api_client();
     $result = $client->cancel_chat($requestid);
     echo json_encode([
         'success' => true,
         'status' => $result['status'] ?? 'unknown',
     ], JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
-} catch (\\Throwable $exception) {
+} catch (\Throwable $exception) {
     debugging('RAG Assistant cancellation failed: ' . $exception->getMessage(), DEBUG_DEVELOPER);
     http_response_code(502);
     echo json_encode(['success' => false, 'error' => 'The server could not confirm cancellation.']);
