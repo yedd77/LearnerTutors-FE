@@ -59,6 +59,9 @@ class reindex_documents extends \core\task\adhoc_task {
                     );
 
                     $suggestions = $result['suggestions'] ?? [];
+                    // Remove old-model starter questions even if the new model
+                    // cannot produce valid suggestions for this document.
+                    $DB->delete_records('local_ragassistant_suggestions', ['documentid' => $record->id]);
                     if (is_array($suggestions) && !empty($suggestions)) {
                         $cleaned = [];
                         foreach ($suggestions as $suggestion) {
@@ -76,7 +79,6 @@ class reindex_documents extends \core\task\adhoc_task {
                         }
 
                         if ($cleaned) {
-                            $DB->delete_records('local_ragassistant_suggestions', ['documentid' => $record->id]);
                             foreach ($cleaned as $suggestion) {
                                 $DB->insert_record('local_ragassistant_suggestions', (object) [
                                     'courseid' => (int) $record->courseid,
