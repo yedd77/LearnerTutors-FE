@@ -64,11 +64,8 @@ class reindex_documents extends \core\task\adhoc_task {
                     );
 
                     $suggestions = $result['suggestions'] ?? [];
-                    // Remove old-model starter questions even if the new model
-                    // cannot produce valid suggestions for this document.
-                    $DB->delete_records('local_ragassistant_suggestions', ['documentid' => $record->id]);
-                    if (is_array($suggestions) && !empty($suggestions)) {
-                        $cleaned = [];
+                    $cleaned = [];
+                    if (is_array($suggestions)) {
                         foreach ($suggestions as $suggestion) {
                             if (!is_string($suggestion)) {
                                 continue;
@@ -82,8 +79,16 @@ class reindex_documents extends \core\task\adhoc_task {
                                 break;
                             }
                         }
+                    }
 
-                        if ($cleaned) {
+                    // Never erase saved suggestions when generation returns no valid items.
+                    if (empty($cleaned)) {
+                        mtrace('RAG Assistant: no valid suggestions for document ' . $record->id .
+                            '; existing suggestions were preserved.');
+                    } else {
+                        $transaction = $DB->start_delegated_transaction();
+                        try {
+                            $DB->delete_records('local_ragassistant_suggestions', ['documentid' => $record->id]);
                             foreach ($cleaned as $suggestion) {
                                 $DB->insert_record('local_ragassistant_suggestions', (object) [
                                     'courseid' => (int) $record->courseid,
@@ -93,6 +98,12 @@ class reindex_documents extends \core\task\adhoc_task {
                                     'timecreated' => time(),
                                 ]);
                             }
+                            $transaction->allow_commit();
+                            mtrace('RAG Assistant: saved ' . count($cleaned) .
+                                ' suggestion(s) for document ' . $record->id . '.');
+                        } catch (\Throwable $exception) {
+                            $transaction->rollback($exception);
+                            throw $exception;
                         }
                     }
 
