@@ -5,6 +5,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const toolInput = document.getElementById('ragassistant-tool-id');
     const question = document.getElementById('ragassistant-question');
     const transcript = document.getElementById('ragassistant-chat-transcript');
+    const chatApp = editor ? editor.closest('.ragassistant-chat-app') : null;
     const form = editor ? editor.closest('form') : null;
     const sendButton = form ? form.querySelector('.ragassistant-send-button') : null;
     const MAXLEN = 4000;
@@ -12,6 +13,19 @@ document.addEventListener('DOMContentLoaded', function () {
 
     if (!editor) {
         return;
+    }
+
+    function removeSuggestions() {
+        const suggestions = document.querySelector('.ragassistant-suggestions');
+        if (suggestions) {
+            suggestions.remove();
+        }
+    }
+
+    function activateChatBackground() {
+        if (chatApp) {
+            chatApp.classList.add('ragassistant-chat-active');
+        }
     }
 
     // Clicking a suggestion sends that stored prompt through the normal chat flow.
@@ -554,10 +568,18 @@ document.addEventListener('DOMContentLoaded', function () {
     // ---- Events ------------------------------------------------------------
     editor.addEventListener('input', function (event) {
         if (event.isComposing) return;          // don't touch the DOM mid-IME
+        if (getText().trim()) {
+            removeSuggestions();
+            activateChatBackground();
+        }
         updateHighlight();
         renderMenu();
     });
     editor.addEventListener('compositionend', function () {
+        if (getText().trim()) {
+            removeSuggestions();
+            activateChatBackground();
+        }
         updateHighlight();
         renderMenu();
     });

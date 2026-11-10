@@ -305,27 +305,23 @@ if ($error !== '') {
 }
 
 // Render chat element
-echo html_writer::start_div('ragassistant-chat-app', ['role' => 'log', 'aria-live' => 'polite']);
+echo html_writer::start_div('ragassistant-chat-app');
+
+//render chat background blobs
 echo html_writer::start_div('ragassistant-chat-background');
-echo html_writer::start_div(class: 'ragassistant-chat-blob blob-1'); echo html_writer::end_div();
-echo html_writer::start_div(class: 'ragassistant-chat-blob blob-2'); echo html_writer::end_div();
-echo html_writer::start_div(class: 'ragassistant-chat-blob blob-3'); echo html_writer::end_div();
+echo html_writer::div('', 'ragassistant-chat-blob blob-1');
+echo html_writer::div('', 'ragassistant-chat-blob blob-2');
+echo html_writer::div('', 'ragassistant-chat-blob blob-3');
 echo html_writer::end_div();
 
-// Suggestion Card
-echo html_writer::start_div('ragassistant-suggestion-card');
-echo html_writer::start_div('ragassistant-suggestion-card-grid');
-echo html_writer::start_div('ragassistant-suggestion-card-item');
-echo html_writer::start_div('ragassistant-suggestion-card-item');
-echo html_writer::start_div('ragassistant-suggestion-card-item');
+echo html_writer::start_div('ragassistant-chat-transcript', [
+    'id' => 'ragassistant-chat-transcript',
+    'role' => 'log',
+    'aria-live' => 'polite',
+]);
 
-//new chat
-echo html_writer::start_div('ragassistant-chat-default', ['role' => 'log', 'aria-live' => 'polite']);
-
-//echo html_writer::start_div('ragassistant-chat-transcript', ['id' => 'ragassistant-chat-transcript', 'role' => 'log', 'aria-live' => 'polite']);
-// Display chat history or welcome message if no history exists
 if (empty($history)) {
-    echo html_writer::div(html_writer::tag('div', '✦', ['class' => 'ragassistant-assistant-avatar']) . html_writer::tag('div', s(get_string('chatwelcome', 'local_ragassistant')), ['class' => 'ragassistant-message-content']), 'ragassistant-message ragassistant-message-assistant');
+    
 } else {
     // Render each turn of the conversation history
     foreach ($history as $turn) {
@@ -422,12 +418,16 @@ if ($allowed) {
     echo html_writer::end_div();
 
     $sendicon = $OUTPUT->pix_icon(
-        '',
+        'send',
         "",
         'local_ragassistant',
         ['class' => 'ragassistant-send-icon']
     );
-    echo html_writer::tag('button', $sendicon . html_writer::tag('span', get_string('sendquestion', 'local_ragassistant'), ['class' => 'sr-only']), ['type' => 'submit', 'class' => 'btn btn-primary ragassistant-send-button']);
+    echo html_writer::tag('button', $sendicon ,[
+        'type'  => 'submit',
+        'class' => 'btn btn-primary ragassistant-send-button',
+        'aria-label' => 'Send question',
+    ]);
     echo html_writer::tag('small', get_string('chatinputhint', 'local_ragassistant'), ['class' => 'text-muted ragassistant-chat-hint']);
     echo html_writer::end_tag('form');
 }

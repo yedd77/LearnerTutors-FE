@@ -25,10 +25,23 @@ if ($hassiteconfig) {
         PARAM_URL
     ));
 
+    $settings->add(new admin_setting_configselect(
+        'local_ragassistant/llm_model',
+        get_string('llmmodel', 'local_ragassistant'),
+        get_string('llmmodel_desc', 'local_ragassistant'),
+        'openai',
+        [
+            'openai' => 'OpenAI',
+            'gemini' => 'Gemini',
+            'qwen3:1.7b' => 'Local - Qwen3:1.7b',
+            'qwen2.5:7b-instruct' => 'Local - Qwen2.5:7b-instruct'
+        ]
+    ));
+
     $settings->add(new admin_setting_configpasswordunmask(
         'local_ragassistant/llm_api_key',
-        get_string('apikey', 'local_ragassistant'),
-        get_string('apikey_desc', 'local_ragassistant'),
+        get_string('llm_key', 'local_ragassistant'),
+        get_string('llm_key_desc', 'local_ragassistant'),
         ''
     ));
 
