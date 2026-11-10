@@ -5,6 +5,9 @@
 
 defined('MOODLE_INTERNAL') || die();
 
+require_once($CFG->dirroot . '/local/ragassistant/classes/local/api_client.php');
+require_once($CFG->dirroot . '/local/ragassistant/classes/admin_setting_configcheckbox_sync.php');
+
 if ($hassiteconfig) {
     $settings = new admin_settingpage(
         'local_ragassistant_settings',
@@ -84,7 +87,7 @@ if ($hassiteconfig) {
         ''
     ));
 
-    $settings->add(new admin_setting_configcheckbox(
+    $settings->add(new local_ragassistant_admin_setting_configcheckbox_sync(
         'local_ragassistant/enable_chat',
         get_string('enablechat', 'local_ragassistant'),
         get_string('enablechat_desc', 'local_ragassistant'),
