@@ -9,6 +9,10 @@ document.addEventListener('DOMContentLoaded', function () {
     const form = editor ? editor.closest('form') : null;
     const sendButton = form ? form.querySelector('.ragassistant-send-button') : null;
     const sendButtonContent = sendButton ? sendButton.innerHTML : '';
+    const stopButton = form ? form.querySelector('.ragassistant-stop-button') : null;
+    let activeController = null;
+    let activeRequestId = null;
+    let stopRequested = false;
     const MAXLEN = 4000;
     let mathJaxTypesetQueue = Promise.resolve();
 
@@ -276,6 +280,34 @@ document.addEventListener('DOMContentLoaded', function () {
     ).forEach(typesetMath);
 
 
+    // Stop the active request through a separate authenticated Moodle endpoint.
+    if (stopButton && form) {
+        stopButton.addEventListener('click', async function () {
+            if (!activeRequestId || !activeController) return;
+            stopRequested = true;
+            stopButton.disabled = true;
+            stopButton.textContent = 'Stopping…';
+            const cancelData = new FormData();
+            const actionUrl = new URL(form.action, window.location.href);
+            cancelData.set('courseid', actionUrl.searchParams.get('courseid') || '');
+            cancelData.set('request_id', activeRequestId);
+            cancelData.set('sesskey', form.querySelector('input[name="sesskey"]')?.value || '');
+            try {
+                await fetch(M.cfg.wwwroot + '/local/ragassistant/cancel.php', {
+                    method: 'POST',
+                    body: cancelData,
+                    credentials: 'same-origin',
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                    keepalive: true
+                });
+            } catch (error) {
+                console.warn('RAG Assistant: cancellation request could not be confirmed.', error);
+            } finally {
+                activeController.abort();
+            }
+        });
+    }
+
     //intercept the form submission to handle it via AJAX
     if (form && transcript) {
         form.addEventListener('submit', async function (event) {
@@ -313,6 +345,12 @@ document.addEventListener('DOMContentLoaded', function () {
             }
 
             const formData = new FormData(form);
+            activeRequestId = (window.crypto && typeof window.crypto.randomUUID === 'function')
+                ? window.crypto.randomUUID()
+                : 'rag-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2);
+            activeController = new AbortController();
+            stopRequested = false;
+            formData.set('request_id', activeRequestId);
 
             formData.set('question', cleanQuestion);
             formData.set('display_question', originalQuestion);
@@ -352,6 +390,11 @@ document.addEventListener('DOMContentLoaded', function () {
                 sendButton.disabled = true;
                 sendButton.textContent = 'Thinking…';
             }
+            if (stopButton) {
+                stopButton.hidden = false;
+                stopButton.disabled = false;
+                stopButton.textContent = 'Stop';
+            }
 
             editor.textContent = '';
             editor.dispatchEvent(new Event('input', { bubbles: true }));
@@ -367,7 +410,8 @@ document.addEventListener('DOMContentLoaded', function () {
                     credentials: 'same-origin',
                     headers: {
                         'X-Requested-With': 'XMLHttpRequest'
-                    }
+                    },
+                    signal: activeController.signal
                 });
 
                 const result = await response.json();
@@ -401,14 +445,15 @@ document.addEventListener('DOMContentLoaded', function () {
 
             } catch (error) {
                 loadingMessage.remove();
-
-                const errorMessage = createMessage(
-                    'assistant',
-                    error.message || 'A connection error occurred.'
-                );
-
-                errorMessage.classList.add('ragassistant-message-error');
-                centerMessage(errorMessage);
+                if (error.name === 'AbortError' || stopRequested) {
+                    const stoppedMessage = createMessage('assistant', 'Generation stopped. You can send another message.');
+                    stoppedMessage.classList.add('ragassistant-message-stopped');
+                    centerMessage(stoppedMessage);
+                } else {
+                    const errorMessage = createMessage('assistant', error.message || 'A connection error occurred.');
+                    errorMessage.classList.add('ragassistant-message-error');
+                    centerMessage(errorMessage);
+                }
 
             } finally {
                 window.clearInterval(thinkingTimer);
@@ -417,7 +462,14 @@ document.addEventListener('DOMContentLoaded', function () {
                     sendButton.disabled = false;
                     sendButton.innerHTML = sendButtonContent;
                 }
-
+                if (stopButton) {
+                    stopButton.hidden = true;
+                    stopButton.disabled = false;
+                    stopButton.textContent = 'Stop';
+                }
+                activeController = null;
+                activeRequestId = null;
+                stopRequested = false;
                 editor.focus();
             }
         });
