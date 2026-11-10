@@ -6,7 +6,7 @@
 defined('MOODLE_INTERNAL') || die();
 
 $plugin->component = 'local_ragassistant';
-$plugin->version   = 2026111001;
+$plugin->version   = 2026111002;
 $plugin->requires  = 2025101600;
 $plugin->maturity  = MATURITY_ALPHA;
-$plugin->release   = '0.3.4 - Embedding configuration and reindexing';
+$plugin->release   = '0.3.5 - Automatic AI model rebuild';
