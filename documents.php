@@ -298,8 +298,8 @@ if ($action !== '' && $actiondocumentid > 0 && data_submitted()) {
                         ' ' . $savedcount . ' starter suggestion(s) saved.' .
                         ($savedcount === 0 ? ' Backend returned no valid suggestions; check FastAPI logs.' : ''),
                     null,
-                    $savedcount > 0 ? \\core\\output\\notification::NOTIFY_SUCCESS :
-                        \\core\\output\\notification::NOTIFY_WARNING
+                    $savedcount > 0 ? \core\output\\notification::NOTIFY_SUCCESS :
+                        \core\output\\notification::NOTIFY_WARNING
                 );
                 break;
 
