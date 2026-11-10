@@ -159,7 +159,7 @@ if ($action === 'reindexall' && data_submitted()) {
                 'id' => $record->id, 'status' => 'ready', 'timemodified' => time(),
             ]);
             $success++;
-        } catch (\\Throwable $exception) {
+        } catch (\Throwable $exception) {
             $DB->update_record('local_ragassistant_documents', (object) [
                 'id' => $record->id, 'status' => 'failed', 'timemodified' => time(),
             ]);
@@ -169,9 +169,9 @@ if ($action === 'reindexall' && data_submitted()) {
         }
     }
     $message = $success . ' document(s) reindexed; ' . $failed . ' failed.';
-    redirect($redirecturl = new moodle_url('/local/ragassistant/documents.php', ['courseid' => $courseid]),
-        $message, null, $failed ? \\core\\output\\notification::NOTIFY_WARNING :
-        \\core\\output\\notification::NOTIFY_SUCCESS);
+    redirect(new moodle_url('/local/ragassistant/documents.php', ['courseid' => $courseid]),
+        $message, null, $failed ? \core\output\\notification::NOTIFY_WARNING :
+        \core\output\\notification::NOTIFY_SUCCESS);
 }
 
 if ($action !== '' && $actiondocumentid > 0 && data_submitted()) {
