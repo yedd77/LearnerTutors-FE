@@ -568,18 +568,10 @@ document.addEventListener('DOMContentLoaded', function () {
     // ---- Events ------------------------------------------------------------
     editor.addEventListener('input', function (event) {
         if (event.isComposing) return;          // don't touch the DOM mid-IME
-        if (getText().trim()) {
-            removeSuggestions();
-            activateChatBackground();
-        }
         updateHighlight();
         renderMenu();
     });
     editor.addEventListener('compositionend', function () {
-        if (getText().trim()) {
-            removeSuggestions();
-            activateChatBackground();
-        }
         updateHighlight();
         renderMenu();
     });
@@ -612,6 +604,8 @@ document.addEventListener('DOMContentLoaded', function () {
         }
         if (menu && !menu.hidden && event.key === 'Enter' && !event.shiftKey && filtered.length) {
             event.preventDefault();
+            removeSuggestions();
+            activateChatBackground();
             chooseCommand(filtered[Math.max(activeIndex, 0)]);
             return;
         }
@@ -628,6 +622,9 @@ document.addEventListener('DOMContentLoaded', function () {
             editor.focus();
             return;
         }
+        console.log("went to submit");
+        removeSuggestions();//
+        activateChatBackground();
         valueInput.value = text;
     });
 

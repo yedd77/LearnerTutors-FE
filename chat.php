@@ -229,6 +229,7 @@ if (data_submitted() && confirm_sesskey()) {
                 // defaults when either value is intentionally left blank.
                 'provider' => trim((string) get_config('local_ragassistant', 'llm_provider')) ?: 'openai',
                 'model' => trim((string) get_config('local_ragassistant', 'chat_model')) ?: null,
+                'temperature' => (float) get_config('local_ragassistant', 'temperature'),
             ]);
 
             // Extract the raw Markdown answer from the API response.

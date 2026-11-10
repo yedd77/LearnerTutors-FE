@@ -133,13 +133,13 @@
     position: absolute;
     border-linejoin: round;
     border-radius: 50%;
-    transition: transform 2s cubic-bezier(.22, 1, .36, 1), opacity 2s ease;
+    transition: transform 2s cubic-bezier(.22, 1, .36, 1), opacity 1s ease;
 }
 
 .blob-1 {
     width: 500px;
     height: 500px;
-    background: #e2d4f8;
+    background: #fbcfe8;
     top: -100px;
     left: 20%;
 }
@@ -147,7 +147,7 @@
 .blob-2 {
     width: 600px;
     height: 600px;
-    background: #fbcfe8;
+    background: #bbacdf;
     bottom: 43px;
     left: 0%;
 }
@@ -161,7 +161,7 @@
 }
 
 .ragassistant-chat-app.ragassistant-chat-active {
-    background: #f6f7f9;
+    background: #f7f8f9;
 }
 
 .ragassistant-chat-active .blob-1 {

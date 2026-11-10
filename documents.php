@@ -171,8 +171,8 @@ if ($action === 'reindexall' && data_submitted()) {
     }
     $message = $success . ' document(s) reindexed; ' . $failed . ' failed.';
     redirect(new moodle_url('/local/ragassistant/documents.php', ['courseid' => $courseid]),
-        $message, null, $failed ? \core\output\\notification::NOTIFY_WARNING :
-        \core\output\\notification::NOTIFY_SUCCESS);
+        $message, null, $failed ? \core\output\notification::NOTIFY_WARNING :
+        \core\output\notification::NOTIFY_SUCCESS);
 }
 
 if ($action !== '' && $actiondocumentid > 0 && data_submitted()) {

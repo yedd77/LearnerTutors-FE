@@ -114,4 +114,6 @@ $string['apibaseurl'] = 'Server API endpoint';
 $string['apibaseurl_desc'] = 'Endpoint used to invoke the API call.';
 $string['settingsheading'] = 'RAG backend settings';
 $string['settingsintro'] = 'Configure the local FastAPI service. Do not expose this service publicly without authentication and network restrictions.';
+$string['temperature'] = 'Response temperature';
+$string['temperature_desc'] = 'Controls response randomness. Use a value between 0 and 2.';
 $string['reindexpending'] = 'The AI model or embedding configuration has changed. Course documents are being reindexed and starter questions regenerated. Please try again after Moodle scheduled tasks have completed.';

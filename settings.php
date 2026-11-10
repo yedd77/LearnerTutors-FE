@@ -46,7 +46,7 @@ if ($hassiteconfig) {
         'local_ragassistant/chat_model',
         get_string('llm_model', 'local_ragassistant'),
         get_string('llm_model_desc', 'local_ragassistant'),
-        'gpt-4o-luna',
+        'gpt-5.6-sol',
         PARAM_TEXT
     ));
 
@@ -78,6 +78,14 @@ if ($hassiteconfig) {
         get_string('geminiembeddimensions_desc', 'local_ragassistant'),
         '768',
         PARAM_INT
+    ));
+
+    $settings->add(new admin_setting_configtext(
+        'local_ragassistant/temperature',
+        get_string('temperature', 'local_ragassistant'),
+        get_string('temperature_desc', 'local_ragassistant'),
+        '0.2',
+        PARAM_FLOAT
     ));
 
     $settings->add(new admin_setting_configpasswordunmask(
