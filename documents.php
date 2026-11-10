@@ -62,7 +62,7 @@ function local_ragassistant_save_document_suggestions(
             ]);
         }
         $transaction->allow_commit();
-        mtrace('RAG Assistant: saved ' . count($cleaned) . ' suggestion(s) for document ' . $documentid . '.');
+        debugging('RAG Assistant: saved ' . count($cleaned) . ' suggestion(s) for document ' . $documentid . '.', DEBUG_DEVELOPER);
         return count($cleaned);
     } catch (\Throwable $exception) {
         $transaction->rollback($exception);
