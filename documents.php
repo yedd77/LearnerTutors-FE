@@ -19,38 +19,54 @@ function local_ragassistant_save_document_suggestions(
     int $documentid,
     int $userid,
     $suggestions
-): void {
+): int {
     global $DB;
 
-    // Preserve the previous suggestions when generation fails or returns no usable items.
+    // A missing, invalid, or empty response must never erase existing suggestions.
     if (!is_array($suggestions) || !$suggestions) {
-        return;
+        debugging('RAG Assistant: no suggestion array returned for document ' . $documentid, DEBUG_DEVELOPER);
+        return 0;
     }
 
-    $DB->delete_records('local_ragassistant_suggestions', ['documentid' => $documentid]);
-
-    $saved = [];
+    $cleaned = [];
     foreach ($suggestions as $suggestion) {
         if (!is_string($suggestion)) {
             continue;
         }
-        $suggestion = trim(clean_param($suggestion, PARAM_TEXT));
-        $suggestion = core_text::substr($suggestion, 0, 500);
+        $suggestion = core_text::substr(trim(clean_param($suggestion, PARAM_TEXT)), 0, 500);
         $key = core_text::strtolower($suggestion);
-        if ($suggestion === '' || isset($saved[$key])) {
-            continue;
+        if ($suggestion !== '' && !isset($cleaned[$key])) {
+            $cleaned[$key] = $suggestion;
         }
-        $saved[$key] = true;
-        $DB->insert_record('local_ragassistant_suggestions', (object) [
-            'courseid' => $courseid,
-            'documentid' => $documentid,
-            'userid' => $userid,
-            'suggestion' => $suggestion,
-            'timecreated' => time(),
-        ]);
-        if (count($saved) >= 3) {
+        if (count($cleaned) >= 3) {
             break;
         }
+    }
+
+    if (!$cleaned) {
+        debugging('RAG Assistant: no valid suggestions for document ' . $documentid, DEBUG_DEVELOPER);
+        return 0;
+    }
+
+    // Replace only after valid replacements exist; rollback also restores deleted rows.
+    $transaction = $DB->start_delegated_transaction();
+    try {
+        $DB->delete_records('local_ragassistant_suggestions', ['documentid' => $documentid]);
+        foreach ($cleaned as $suggestion) {
+            $DB->insert_record('local_ragassistant_suggestions', (object) [
+                'courseid' => $courseid,
+                'documentid' => $documentid,
+                'userid' => $userid,
+                'suggestion' => $suggestion,
+                'timecreated' => time(),
+            ]);
+        }
+        $transaction->allow_commit();
+        mtrace('RAG Assistant: saved ' . count($cleaned) . ' suggestion(s) for document ' . $documentid . '.');
+        return count($cleaned);
+    } catch (\Throwable $exception) {
+        $transaction->rollback($exception);
+        throw $exception;
     }
 }
 
@@ -138,6 +154,7 @@ if ($action === 'reindexall' && data_submitted()) {
     $records = $DB->get_records('local_ragassistant_documents', ['courseid' => $courseid], 'id ASC');
     $success = 0;
     $failed = 0;
+    $suggestionssaved = 0;
     $fs = get_file_storage();
     foreach ($records as $record) {
         if (!in_array($record->status, ['ready', 'pending', 'failed'], true)) {
@@ -154,8 +171,12 @@ if ($action === 'reindexall' && data_submitted()) {
         try {
             $result = $api->index_file($stored, (int) $record->id, $courseid,
                 (int) $record->userid, $record->visibility, !empty($record->retrievalenabled));
-            local_ragassistant_save_document_suggestions($courseid, (int) $record->id,
-                (int) $record->userid, $result['suggestions'] ?? []);
+            $suggestionssaved += local_ragassistant_save_document_suggestions(
+                $courseid,
+                (int) $record->id,
+                (int) $record->userid,
+                $result['suggestions'] ?? []
+            );
             $DB->update_record('local_ragassistant_documents', (object) [
                 'id' => $record->id, 'status' => 'ready', 'timemodified' => time(),
             ]);
@@ -169,7 +190,8 @@ if ($action === 'reindexall' && data_submitted()) {
             $failed++;
         }
     }
-    $message = $success . ' document(s) reindexed; ' . $failed . ' failed.';
+    $message = $success . ' document(s) reindexed; ' . $failed .
+        ' failed; ' . $suggestionssaved . ' starter suggestion(s) saved.';
     redirect(new moodle_url('/local/ragassistant/documents.php', ['courseid' => $courseid]),
         $message, null, $failed ? \core\output\notification::NOTIFY_WARNING :
         \core\output\notification::NOTIFY_SUCCESS);
@@ -254,17 +276,13 @@ if ($action !== '' && $actiondocumentid > 0 && data_submitted()) {
                     throw $indexexception;
                 }
 
-                // Store the three local-model suggestions returned by the index operation.
-                try {
-                    local_ragassistant_save_document_suggestions(
-                        (int) $target->courseid,
-                        (int) $target->id,
-                        (int) $target->userid,
-                        $result['suggestions'] ?? []
-                    );
-                } catch (\Throwable $suggestionexception) {
-                    debugging('RAG Assistant suggestion storage failed: ' . $suggestionexception->getMessage(), DEBUG_DEVELOPER);
-                }
+                // Save returned suggestions; empty results preserve any existing rows.
+                $savedcount = local_ragassistant_save_document_suggestions(
+                    (int) $target->courseid,
+                    (int) $target->id,
+                    (int) $target->userid,
+                    $result['suggestions'] ?? []
+                );
 
                 // Update document status to 'ready' after the successful indexing and redirect with a success message
                 $DB->update_record('local_ragassistant_documents', (object) [
@@ -276,9 +294,12 @@ if ($action !== '' && $actiondocumentid > 0 && data_submitted()) {
                 // Redirect with success message
                 redirect(
                     $redirecturl,
-                    get_string('indexsuccess', 'local_ragassistant', (int) ($result['indexed_chunks'] ?? 0)),
+                    get_string('indexsuccess', 'local_ragassistant', (int) ($result['indexed_chunks'] ?? 0)) .
+                        ' ' . $savedcount . ' starter suggestion(s) saved.' .
+                        ($savedcount === 0 ? ' Backend returned no valid suggestions; check FastAPI logs.' : ''),
                     null,
-                    \core\output\notification::NOTIFY_SUCCESS
+                    $savedcount > 0 ? \\core\\output\\notification::NOTIFY_SUCCESS :
+                        \\core\\output\\notification::NOTIFY_WARNING
                 );
                 break;
 
@@ -444,15 +465,14 @@ if ($mform->is_cancelled()) {
                     (int) $USER->id,
                     $visibility
                 );
-                try {
-                    local_ragassistant_save_document_suggestions(
-                        $courseid,
-                        $documentid,
-                        (int) $USER->id,
-                        $result['suggestions'] ?? []
-                    );
-                } catch (\Throwable $suggestionexception) {
-                    debugging('RAG Assistant suggestion storage failed: ' . $suggestionexception->getMessage(), DEBUG_DEVELOPER);
+                $uploadsuggestions = local_ragassistant_save_document_suggestions(
+                    $courseid,
+                    $documentid,
+                    (int) $USER->id,
+                    $result['suggestions'] ?? []
+                );
+                if ($uploadsuggestions === 0) {
+                    $messages[] = $filename . ': indexed, but backend returned no valid starter suggestions';
                 }
                 $DB->update_record('local_ragassistant_documents', (object) [
                     'id' => $documentid,
