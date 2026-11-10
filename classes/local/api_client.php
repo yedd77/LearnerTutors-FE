@@ -41,6 +41,21 @@ class api_client
     }
 
     /**
+     * Synchronize the administrator-selected AI configuration with FastAPI.
+     * Provider credentials remain on the backend and are never sent by Moodle.
+     */
+    public function sync_configuration(): array
+    {
+        return $this->post_json('/api/v1/admin/config', [
+            'llm_provider' => trim((string) get_config('local_ragassistant', 'llm_provider')) ?: 'openai',
+            'llm_model' => trim((string) get_config('local_ragassistant', 'chat_model')) ?: 'gpt-4o-luna',
+            'embedding_provider' => trim((string) get_config('local_ragassistant', 'embedding_provider')) ?: 'openai',
+            'embedding_model' => trim((string) get_config('local_ragassistant', 'embedding_model')),
+            'gemini_embed_dimensions' => max(0, (int) (get_config('local_ragassistant', 'gemini_embed_dimensions') ?: 768)),
+        ]);
+    }
+
+    /**
      * Send a JSON POST request.
      */
     public function post_json(string $path, array $payload): array
@@ -156,6 +171,8 @@ class api_client
         int $ownerid,
         string $visibility
     ): array {
+        // Keep backend indexing and query embedding settings synchronized.
+        $this->sync_configuration();
         $temp = $file->copy_content_to_temp();
 
         if (!$temp || !is_file($temp)) {
