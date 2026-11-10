@@ -293,17 +293,26 @@ document.addEventListener('DOMContentLoaded', function () {
             cancelData.set('request_id', activeRequestId);
             cancelData.set('sesskey', form.querySelector('input[name="sesskey"]')?.value || '');
             try {
-                await fetch(M.cfg.wwwroot + '/local/ragassistant/cancel.php', {
+                const cancelResponse = await fetch(M.cfg.wwwroot + '/local/ragassistant/cancel.php', {
                     method: 'POST',
                     body: cancelData,
                     credentials: 'same-origin',
                     headers: { 'X-Requested-With': 'XMLHttpRequest' },
                     keepalive: true
                 });
-            } catch (error) {
-                console.warn('RAG Assistant: cancellation request could not be confirmed.', error);
-            } finally {
+                if (!cancelResponse.ok) {
+                    throw new Error('Cancellation endpoint returned HTTP ' + cancelResponse.status);
+                }
+                const cancelResult = await cancelResponse.json();
+                if (!cancelResult.success) {
+                    throw new Error(cancelResult.error || 'Cancellation was not confirmed.');
+                }
                 activeController.abort();
+            } catch (error) {
+                stopRequested = false;
+                stopButton.disabled = false;
+                stopButton.textContent = 'Stop';
+                console.error('RAG Assistant: cancellation could not be confirmed.', error);
             }
         });
     }
