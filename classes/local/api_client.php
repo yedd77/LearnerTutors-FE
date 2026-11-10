@@ -264,7 +264,7 @@ class api_client
     public function cancel_chat(string $requestid): array
     {
         if (!preg_match('/^[a-zA-Z0-9_-]{8,80}$/', $requestid)) {
-            throw new \\invalid_parameter_exception('Invalid chat request ID.');
+            throw new \invalid_parameter_exception('Invalid chat request ID.');
         }
 
         return $this->post_json(
