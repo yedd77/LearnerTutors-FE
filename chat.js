@@ -304,8 +304,8 @@ document.addEventListener('DOMContentLoaded', function () {
                     throw new Error('Cancellation endpoint returned HTTP ' + cancelResponse.status);
                 }
                 const cancelResult = await cancelResponse.json();
-                if (!cancelResult.success) {
-                    throw new Error(cancelResult.error || 'Cancellation was not confirmed.');
+                if (!cancelResult.success || cancelResult.status !== 'cancelled') {
+                    throw new Error(cancelResult.error || 'The server has not confirmed that generation stopped.');
                 }
                 activeController.abort();
             } catch (error) {
