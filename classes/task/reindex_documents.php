@@ -41,7 +41,12 @@ class reindex_documents extends \core\task\adhoc_task {
                 );
 
                 if (!$stored || $stored->is_directory()) {
-                    mtrace('RAG Assistant: source file missing for document ' . $record->id . '; skipped.');
+                    $DB->update_record('local_ragassistant_documents', (object) [
+                        'id' => $record->id,
+                        'status' => 'failed',
+                        'timemodified' => time(),
+                    ]);
+                    mtrace('RAG Assistant: source file missing for document ' . $record->id . '; marked failed.');
                     $failed++;
                     continue;
                 }
