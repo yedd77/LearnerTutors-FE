@@ -206,8 +206,12 @@ if (data_submitted() && confirm_sesskey()) {
                 ];
             }
 
+            // Synchronize administrator-selected provider/model and embedding settings.
+            $apiclient = new \local_ragassistant\local\api_client();
+            $apiclient->sync_configuration();
+
             // Retrieve the answer from the RAG Assistant API.
-            $response = (new \local_ragassistant\local\api_client())->post_json('/api/v1/chat', [
+            $response = $apiclient->post_json('/api/v1/chat', [
                 'question' => $question,
                 'course_id' => (int) $course->id,
                 'user_id' => (int) $USER->id,
