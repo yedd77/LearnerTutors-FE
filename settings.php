@@ -40,11 +40,11 @@ if ($hassiteconfig) {
     ));
 
     $settings->add(new admin_setting_configtext(
-        'local_ragassistant/llm_model',
+        'local_ragassistant/chat_model',
         get_string('llm_model', 'local_ragassistant'),
         get_string('llm_model_desc', 'local_ragassistant'),
         'gpt-4o-luna',
-        PARAM_ALPHANUMEXT
+        PARAM_TEXT
     ));
 
     $settings->add(new admin_setting_configpasswordunmask(
