@@ -827,32 +827,7 @@ form.mform #fgroup_id_buttonar .felement.fgroup {
 }
 
 .ragassistant-chat-input:focus {
-    border-color: var(--ragassistant-primary, #356fba);
-    outline: none;
-    box-shadow: none;
-    transition: none;
-}
-
-/* Animate the input only while a submitted question is being processed. */
-.ragassistant-chat-input.ragassistant-is-submitting {
-    animation: ragassistant-input-submit-pulse 1.7s cubic-bezier(0.4, 0, 0.2, 1) infinite;
-}
-
-@keyframes ragassistant-input-submit-pulse {
-    0%, 100% {
-        box-shadow: 0 0 0 0 color-mix(in srgb, var(--ragassistant-primary, #356fba) 0%, transparent);
-    }
-    50% {
-        box-shadow: 0 0 0 4px color-mix(in srgb, var(--ragassistant-primary, #356fba) 18%, transparent);
-    }
-}
-
-@media (prefers-reduced-motion: reduce) {
-    .ragassistant-chat-input.ragassistant-is-submitting {
-        animation: none;
-        border-color: var(--ragassistant-primary, #356fba);
-        box-shadow: 0 0 0 2px color-mix(in srgb, var(--ragassistant-primary, #356fba) 18%, transparent);
-    }
+box-shadow: 0 0 0 0.1rem rgb(53 111 186 / 20%);
 }
 
 .ragassistant-chat-input[data-empty="true"]::before {
