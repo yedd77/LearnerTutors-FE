@@ -8,6 +8,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const chatApp = editor ? editor.closest('.ragassistant-chat-app') : null;
     const form = editor ? editor.closest('form') : null;
     const sendButton = form ? form.querySelector('.ragassistant-send-button') : null;
+    const sendButtonContent = sendButton ? sendButton.innerHTML : '';
     const MAXLEN = 4000;
     let mathJaxTypesetQueue = Promise.resolve();
 
@@ -414,7 +415,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
                 if (sendButton) {
                     sendButton.disabled = false;
-                    sendButton.textContent = 'Send ➤';
+                    sendButton.innerHTML = sendButtonContent;
                 }
 
                 editor.focus();
