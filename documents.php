@@ -129,6 +129,51 @@ $PAGE->set_heading(format_string($course->fullname));
 $action = optional_param('action', '', PARAM_ALPHA);
 $actiondocumentid = optional_param('documentid', 0, PARAM_INT);
 
+// Rebuild every stored course document in the currently configured embedding space.
+// Original files remain in Moodle file storage; only their backend vectors are replaced.
+if ($action === 'reindexall' && data_submitted()) {
+    require_sesskey();
+    require_capability('local/ragassistant:managedocuments', $context);
+    $records = $DB->get_records('local_ragassistant_documents', ['courseid' => $courseid], 'id ASC');
+    $success = 0;
+    $failed = 0;
+    $fs = get_file_storage();
+    foreach ($records as $record) {
+        if (!in_array($record->status, ['ready', 'pending', 'failed'], true)) {
+            continue;
+        }
+        $stored = $fs->get_file($record->contextid, 'local_ragassistant', 'documents',
+            $record->fileitemid, $record->filepath, $record->filename);
+        if (!$stored) {
+            $failed++;
+            debugging('RAG Assistant reindex: missing Moodle file for document ' . $record->id, DEBUG_DEVELOPER);
+            continue;
+        }
+        $DB->set_field('local_ragassistant_documents', 'status', 'processing', ['id' => $record->id]);
+        try {
+            $result = $api->index_file($stored, (int) $record->id, $courseid,
+                (int) $record->userid, $record->visibility, !empty($record->retrievalenabled));
+            local_ragassistant_save_document_suggestions($courseid, (int) $record->id,
+                (int) $record->userid, $result['suggestions'] ?? []);
+            $DB->update_record('local_ragassistant_documents', (object) [
+                'id' => $record->id, 'status' => 'ready', 'timemodified' => time(),
+            ]);
+            $success++;
+        } catch (\\Throwable $exception) {
+            $DB->update_record('local_ragassistant_documents', (object) [
+                'id' => $record->id, 'status' => 'failed', 'timemodified' => time(),
+            ]);
+            debugging('RAG Assistant reindex failed for document ' . $record->id . ': ' .
+                $exception->getMessage(), DEBUG_DEVELOPER);
+            $failed++;
+        }
+    }
+    $message = $success . ' document(s) reindexed; ' . $failed . ' failed.';
+    redirect($redirecturl = new moodle_url('/local/ragassistant/documents.php', ['courseid' => $courseid]),
+        $message, null, $failed ? \\core\\output\\notification::NOTIFY_WARNING :
+        \\core\\output\\notification::NOTIFY_SUCCESS);
+}
+
 if ($action !== '' && $actiondocumentid > 0 && data_submitted()) {
     require_sesskey();
 
@@ -173,9 +218,11 @@ if ($action !== '' && $actiondocumentid > 0 && data_submitted()) {
 
             // handle 'index' action
             case 'index':
+            case 'reindex':
 
-                // onlly allow index for document that are pending or failed, and ensure the stored file exists
-                if (!in_array($target->status, ['pending', 'failed'], true)) {
+                // Reindex is reserved for existing ready documents; initial index is pending/failed only.
+                if (($action === 'index' && !in_array($target->status, ['pending', 'failed'], true)) ||
+                    ($action === 'reindex' && $target->status !== 'ready')) {
                     throw new moodle_exception('invalidrequest', 'error');
                 }
                 // validate that the stored file exist
@@ -193,7 +240,8 @@ if ($action !== '' && $actiondocumentid > 0 && data_submitted()) {
                         (int) $target->id,
                         (int) $target->courseid,
                         (int) $target->userid,
-                        $target->visibility
+                        $target->visibility,
+                        !empty($target->retrievalenabled)
                     );
                 } catch (\Throwable $indexexception) {
                     // Do not leave the document stuck in 'processing'.
@@ -448,6 +496,19 @@ if ($mform->is_cancelled()) {
 
 echo $OUTPUT->header();
 echo $OUTPUT->heading(get_string('uploadCardTitle', 'local_ragassistant'));
+if ($canmanage) {
+    echo html_writer::tag('form',
+        html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'sesskey', 'value' => sesskey()]) .
+        html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'courseid', 'value' => $courseid]) .
+        html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'action', 'value' => 'reindexall']) .
+        html_writer::tag('button', 'Reindex all course documents', [
+            'type' => 'submit',
+            'class' => 'btn btn-outline-primary mb-3',
+            'onclick' => 'return confirm("Reindex all course documents using the currently configured embedding model?");',
+        ]),
+        ['method' => 'post', 'action' => (new moodle_url('/local/ragassistant/documents.php', ['courseid' => $courseid]))->out(false)]
+    );
+}
 
 if ($canupload) {
     $mform->display();
@@ -509,6 +570,14 @@ foreach ($documents as $document) {
         );
     }
     if ($document->status === 'ready' && ($canmanage || $isowner)) {
+        $actions[] = local_ragassistant_document_action_form(
+            $courseid,
+            (int) $document->id,
+            'reindex',
+            'Reindex + regenerate suggestions',
+            'btn btn-outline-primary btn-sm',
+            'return confirm("Reindex this document using the current embedding model and regenerate its suggestions?");'
+        );
         $actions[] = local_ragassistant_document_action_form(
             $courseid,
             (int) $document->id,
