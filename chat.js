@@ -277,6 +277,9 @@ document.addEventListener('DOMContentLoaded', function () {
                 return;
             }
 
+            // Start the input animation only after a valid submission.
+            editor.classList.add('ragassistant-is-submitting');
+
             // Treat the selected slash command as a tool selection,
             // not part of the actual question sent to the model.
             const selectedCommand = commands.find(item =>
@@ -396,6 +399,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 centerMessage(errorMessage);
 
             } finally {
+                editor.classList.remove('ragassistant-is-submitting');
                 window.clearInterval(thinkingTimer);
 
                 if (sendButton) {
