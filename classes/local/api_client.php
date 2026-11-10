@@ -259,6 +259,21 @@ class api_client
     }
 
     /**
+     * Request cancellation of an active chat generation.
+     */
+    public function cancel_chat(string $requestid): array
+    {
+        if (!preg_match('/^[a-zA-Z0-9_-]{8,80}$/', $requestid)) {
+            throw new \\invalid_parameter_exception('Invalid chat request ID.');
+        }
+
+        return $this->post_json(
+            '/api/v1/chat/cancel/' . rawurlencode($requestid),
+            []
+        );
+    }
+
+    /**
      * Enable or disable retrieval for a document.
      *
      * The FastAPI endpoint must support:
