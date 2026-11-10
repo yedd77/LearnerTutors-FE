@@ -23,9 +23,9 @@ class local_ragassistant_admin_setting_configcheckbox_sync extends admin_setting
         }
 
         try {
-            $api = new \\local_ragassistant\\local\\api_client();
+            $api = new \local_ragassistant\local\api_client();
             $api->sync_configuration();
-        } catch (\\Throwable $exception) {
+        } catch (\Throwable $exception) {
             // Keep saved settings even if the backend is temporarily offline.
             debugging(
                 'RAG Assistant AI configuration sync will retry on the next chat or indexing request: ' .
