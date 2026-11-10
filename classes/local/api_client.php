@@ -169,7 +169,8 @@ class api_client
         int $documentid,
         int $courseid,
         int $ownerid,
-        string $visibility
+        string $visibility,
+        bool $retrievalenabled = true
     ): array {
         // Keep backend indexing and query embedding settings synchronized.
         $this->sync_configuration();
@@ -208,6 +209,7 @@ class api_client
                 'course_id' => (string) $courseid,
                 'owner_id' => (string) $ownerid,
                 'visibility' => $visibility,
+                'retrieval_enabled' => $retrievalenabled ? '1' : '0',
             ];
 
             curl_setopt_array($handle, [
