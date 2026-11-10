@@ -60,10 +60,10 @@ class api_client
                 !get_config('local_ragassistant', 'reindex_pending')) {
             set_config('reindex_pending', 1, 'local_ragassistant');
             try {
-                \\core\\task\\manager::queue_adhoc_task(
-                    new \\local_ragassistant\\task\\reindex_documents()
+                \core\task\manager::queue_adhoc_task(
+                    new \local_ragassistant\task\reindex_documents()
                 );
-            } catch (\\Throwable $exception) {
+            } catch (\Throwable $exception) {
                 set_config('reindex_pending', 0, 'local_ragassistant');
                 throw $exception;
             }
