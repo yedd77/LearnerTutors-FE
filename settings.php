@@ -28,6 +28,19 @@ if ($hassiteconfig) {
         PARAM_URL
     ));
 
+    $settings->add(new local_ragassistant_admin_setting_configcheckbox_sync(
+        'local_ragassistant/enable_chat',
+        get_string('enablechat', 'local_ragassistant'),
+        get_string('enablechat_desc', 'local_ragassistant'),
+        0
+    ));
+
+    $settings->add(new admin_setting_heading(
+        'local_ragassistant/llm_heading',
+        get_string('llm_heading', 'local_ragassistant'),
+        get_string('llm_heading_desc', 'local_ragassistant')
+    ));
+
     // Chat provider/model are defaults only. The backend remains responsible
     // for API credentials; Moodle must never store provider API keys.
     $settings->add(new admin_setting_configselect(
@@ -84,7 +97,7 @@ if ($hassiteconfig) {
         'local_ragassistant/temperature',
         get_string('temperature', 'local_ragassistant'),
         get_string('temperature_desc', 'local_ragassistant'),
-        '0.2',
+        '0',
         PARAM_FLOAT
     ));
 
@@ -93,13 +106,6 @@ if ($hassiteconfig) {
         get_string('apikey', 'local_ragassistant'),
         get_string('apikey_desc', 'local_ragassistant'),
         ''
-    ));
-
-    $settings->add(new local_ragassistant_admin_setting_configcheckbox_sync(
-        'local_ragassistant/enable_chat',
-        get_string('enablechat', 'local_ragassistant'),
-        get_string('enablechat_desc', 'local_ragassistant'),
-        0
     ));
 
     $ADMIN->add('localplugins', $settings);

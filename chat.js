@@ -21,10 +21,9 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function removeSuggestions() {
-        const suggestions = document.querySelector('.ragassistant-suggestions');
-        if (suggestions) {
+        document.querySelectorAll('.ragassistant-suggestions').forEach(function (suggestions) {
             suggestions.remove();
-        }
+        });
     }
 
     function activateChatBackground() {
@@ -684,8 +683,7 @@ document.addEventListener('DOMContentLoaded', function () {
             editor.focus();
             return;
         }
-        console.log("went to submit");
-        removeSuggestions();//
+        removeSuggestions();
         activateChatBackground();
         valueInput.value = text;
     });

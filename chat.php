@@ -327,7 +327,9 @@ if ($error !== '') {
 }
 
 // Render chat element
-echo html_writer::start_div('ragassistant-chat-app');
+echo html_writer::start_div(
+    'ragassistant-chat-app' . (!empty($history) ? ' ragassistant-chat-active' : '')
+);
 
 //render chat background blobs
 echo html_writer::start_div('ragassistant-chat-background');
@@ -388,7 +390,7 @@ if (empty($history)) {
 echo html_writer::end_div();
 
 // Show up to three stored document suggestions on a new conversation.
-if ($allowed && !empty($suggestions)) {
+if ($allowed && empty($history) && !empty($suggestions)) {
     echo html_writer::start_div('ragassistant-suggestions', [
         'aria-label' => 'Suggested questions based on course documents',
     ]);

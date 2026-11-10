@@ -96,6 +96,21 @@ $string['api_base_url'] = 'FastAPI base URL';
 $string['api_base_url_desc'] = 'Base URL of your RAG backend, without an API path.';
 $string['api_key'] = 'FastAPI API key';
 $string['api_key_desc'] = 'API key used to authenticate requests to the RAG backend.';
+$string['reindexpending'] = 'The AI model or embedding configuration has changed. Course documents are being reindexed and starter questions regenerated. Please try again after Moodle scheduled tasks have completed.';
+
+
+
+// Settings page components
+// Plugin Settings compoments
+$string['settingsheading'] = 'Plugin settings';
+$string['settingsintro'] = 'Configure the local FastAPI service. Do not expose this service publicly without authentication and network restrictions.';
+$string['enablechat'] = 'Enable AI chat';
+$string['enablechat_desc'] = 'Global setting to enable AI chat feature.';
+$string['apibaseurl'] = 'Server API endpoint';
+$string['apibaseurl_desc'] = 'Endpoint used to invoke the API call.';
+// LLM config settings 
+$string['llm_heading'] = 'LLM configuration';
+$string['llm_heading_desc'] = 'Configure the LLM settings for the RAG system.';
 $string['llmprovider'] = 'Chat provider';
 $string['llmprovider_desc'] = 'Default provider used for chat requests when the frontend does not override it. Provider credentials are configured on the backend.';
 $string['llm_model'] = 'Chat model';
@@ -106,14 +121,7 @@ $string['embeddingmodel'] = 'Embedding model';
 $string['embeddingmodel_desc'] = 'Optional model identifier. Leave blank to use the backend default for the selected provider. A change automatically rebuilds all stored documents.';
 $string['geminiembeddimensions'] = 'Gemini embedding dimensions';
 $string['geminiembeddimensions_desc'] = 'Output vector dimensions for Gemini embeddings. Keep this unchanged between indexing and retrieval.';
-$string['enablechat'] = 'Enable AI chat';
-$string['enablechat_desc'] = 'Global setting to enable AI chat feature.';
 $string['apikey'] = 'Application API key';
 $string['apikey_desc'] = 'Must match RAG_API_KEY in the backend .env file generated through the application backend.';
-$string['apibaseurl'] = 'Server API endpoint';
-$string['apibaseurl_desc'] = 'Endpoint used to invoke the API call.';
-$string['settingsheading'] = 'RAG backend settings';
-$string['settingsintro'] = 'Configure the local FastAPI service. Do not expose this service publicly without authentication and network restrictions.';
 $string['temperature'] = 'Response temperature';
 $string['temperature_desc'] = 'Controls response randomness. Use a value between 0 and 2.';
-$string['reindexpending'] = 'The AI model or embedding configuration has changed. Course documents are being reindexed and starter questions regenerated. Please try again after Moodle scheduled tasks have completed.';
