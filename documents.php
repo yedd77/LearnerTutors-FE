@@ -22,11 +22,12 @@ function local_ragassistant_save_document_suggestions(
 ): void {
     global $DB;
 
-    $DB->delete_records('local_ragassistant_suggestions', ['documentid' => $documentid]);
-
-    if (!is_array($suggestions)) {
+    // Preserve the previous suggestions when generation fails or returns no usable items.
+    if (!is_array($suggestions) || !$suggestions) {
         return;
     }
+
+    $DB->delete_records('local_ragassistant_suggestions', ['documentid' => $documentid]);
 
     $saved = [];
     foreach ($suggestions as $suggestion) {
