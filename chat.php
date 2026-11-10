@@ -102,7 +102,7 @@ if (!isset($SESSION->local_ragassistant_history[$courseid])) {
 // Load suggestions only for a new chat. The joined document checks preserve
 // course/personal visibility and exclude deleted, failed, or retrieval-disabled files.
 $suggestions = [];
-if ($allowed && empty($SESSION->local_ragassistant_history[$courseid])) {
+if ($allowed) {
     $available = array_values($DB->get_records_sql(
         "SELECT s.id, s.suggestion
            FROM {local_ragassistant_suggestions} s
@@ -374,7 +374,7 @@ if (empty($history)) {
 echo html_writer::end_div();
 
 // Show up to three stored document suggestions on a new conversation.
-if ($allowed && empty($history) && !empty($suggestions)) {
+if ($allowed && !empty($suggestions)) {
     echo html_writer::start_div('ragassistant-suggestions', [
         'aria-label' => 'Suggested questions based on course documents',
     ]);
