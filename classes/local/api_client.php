@@ -46,13 +46,30 @@ class api_client
      */
     public function sync_configuration(): array
     {
-        return $this->post_json('/api/v1/admin/config', [
+        $result = $this->post_json('/api/v1/admin/config', [
             'llm_provider' => trim((string) get_config('local_ragassistant', 'llm_provider')) ?: 'openai',
             'llm_model' => trim((string) get_config('local_ragassistant', 'chat_model')) ?: 'gpt-4o-luna',
             'embedding_provider' => trim((string) get_config('local_ragassistant', 'embedding_provider')) ?: 'openai',
             'embedding_model' => trim((string) get_config('local_ragassistant', 'embedding_model')),
             'gemini_embed_dimensions' => max(0, (int) (get_config('local_ragassistant', 'gemini_embed_dimensions') ?: 768)),
         ]);
+
+        // A model change invalidates generated suggestions; an embedding change
+        // also switches Chroma collections. Rebuild every Moodle source document.
+        if (!empty($result['reindex_required']) &&
+                !get_config('local_ragassistant', 'reindex_pending')) {
+            set_config('reindex_pending', 1, 'local_ragassistant');
+            try {
+                \\core\\task\\manager::queue_adhoc_task(
+                    new \\local_ragassistant\\task\\reindex_documents()
+                );
+            } catch (\\Throwable $exception) {
+                set_config('reindex_pending', 0, 'local_ragassistant');
+                throw $exception;
+            }
+        }
+
+        return $result;
     }
 
     /**
