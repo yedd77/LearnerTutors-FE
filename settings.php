@@ -25,24 +25,26 @@ if ($hassiteconfig) {
         PARAM_URL
     ));
 
+    // Chat provider/model are defaults only. The backend remains responsible
+    // for API credentials; Moodle must never store provider API keys.
     $settings->add(new admin_setting_configselect(
-        'local_ragassistant/llm_model',
-        get_string('llmmodel', 'local_ragassistant'),
-        get_string('llmmodel_desc', 'local_ragassistant'),
+        'local_ragassistant/llm_provider',
+        get_string('llmprovider', 'local_ragassistant'),
+        get_string('llmprovider_desc', 'local_ragassistant'),
         'openai',
         [
             'openai' => 'OpenAI',
-            'gemini' => 'Gemini',
-            'qwen3:1.7b' => 'Local - Qwen3:1.7b',
-            'qwen2.5:7b-instruct' => 'Local - Qwen2.5:7b-instruct'
+            'gemini' => 'Google Gemini',
+            'ollama' => 'Ollama',
         ]
     ));
 
-    $settings->add(new admin_setting_configpasswordunmask(
-        'local_ragassistant/llm_api_key',
-        get_string('llm_key', 'local_ragassistant'),
-        get_string('llm_key_desc', 'local_ragassistant'),
-        ''
+    $settings->add(new admin_setting_configtext(
+        'local_ragassistant/llm_model',
+        get_string('llm_model', 'local_ragassistant'),
+        get_string('llm_model_desc', 'local_ragassistant'),
+        'gpt-4o-luna',
+        PARAM_ALPHANUMEXT
     ));
 
     $settings->add(new admin_setting_configpasswordunmask(
