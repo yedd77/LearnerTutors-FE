@@ -218,7 +218,7 @@ if (data_submitted() && confirm_sesskey()) {
                 // Site administrator defaults. The backend can still apply its own
                 // defaults when either value is intentionally left blank.
                 'provider' => trim((string) get_config('local_ragassistant', 'llm_provider')) ?: 'openai',
-                'model' => trim((string) get_config('local_ragassistant', 'llm_model')) ?: null,
+                'model' => trim((string) get_config('local_ragassistant', 'chat_model')) ?: null,
             ]);
 
             // Extract the raw Markdown answer from the API response.
