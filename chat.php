@@ -210,6 +210,12 @@ if (data_submitted() && confirm_sesskey()) {
             $apiclient = new \local_ragassistant\local\api_client();
             $apiclient->sync_configuration();
 
+            // Never query an empty/new embedding collection while the automatic
+            // rebuild is queued or running. Moodle cron clears this flag on completion.
+            if (get_config('local_ragassistant', 'reindex_pending')) {
+                throw new \\moodle_exception('reindexpending', 'local_ragassistant');
+            }
+
             // Retrieve the answer from the RAG Assistant API.
             $response = $apiclient->post_json('/api/v1/chat', [
                 'question' => $question,
@@ -275,7 +281,9 @@ if (data_submitted() && confirm_sesskey()) {
                 DEBUG_DEVELOPER
             );
 
-            $error = get_string('answerfailed', 'local_ragassistant');
+            $error = get_config('local_ragassistant', 'reindex_pending')
+                ? get_string('reindexpending', 'local_ragassistant')
+                : get_string('answerfailed', 'local_ragassistant');
 
             if ($ajax) {
                 http_response_code(500);
