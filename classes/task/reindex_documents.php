@@ -7,21 +7,21 @@
  * @package local_ragassistant
  */
 
-namespace local_ragassistant\\task;
+namespace local_ragassistant\task;
 
 defined('MOODLE_INTERNAL') || die();
 
 /**
  * Re-embed documents and regenerate starter suggestions using the selected models.
  */
-class reindex_documents extends \\core\\task\\adhoc_task {
+class reindex_documents extends \core\task\adhoc_task {
     /**
      * Execute the rebuild.
      */
     public function execute(): void {
         global $DB;
 
-        $api = new \\local_ragassistant\\local\\api_client();
+        $api = new \local_ragassistant\local\api_client();
         $fs = get_file_storage();
         $records = $DB->get_records('local_ragassistant_documents', null, 'id ASC');
         $success = 0;
@@ -96,7 +96,7 @@ class reindex_documents extends \\core\\task\\adhoc_task {
                     ]);
                     $success++;
                     mtrace('RAG Assistant: rebuilt document ' . $record->id . ' (' . $record->filename . ').');
-                } catch (\\Throwable $exception) {
+                } catch (\Throwable $exception) {
                     $DB->update_record('local_ragassistant_documents', (object) [
                         'id' => $record->id,
                         'status' => 'failed',
