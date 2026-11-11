@@ -10,6 +10,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const sendButton = form ? form.querySelector('.ragassistant-send-button') : null;
     const sendButtonContent = sendButton ? sendButton.innerHTML : '';
     let activeLoadingMessage = null;
+    let requestInProgress = false;
     let activeThinkingTimer = null;
     const MAXLEN = 4000;
     let mathJaxTypesetQueue = Promise.resolve();
@@ -282,6 +283,11 @@ document.addEventListener('DOMContentLoaded', function () {
         form.addEventListener('submit', async function (event) {
             event.preventDefault();
 
+            // Ignore keyboard or programmatic submissions while a request is running.
+            if (requestInProgress) {
+                return;
+            }
+
             const originalQuestion = getText().trim();
 
             if (!originalQuestion || originalQuestion.length < 2) {
@@ -309,6 +315,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 return;
             }
 
+            requestInProgress = true;
             const formData = new FormData(form);
             formData.set('question', cleanQuestion);
             formData.set('display_question', originalQuestion);
@@ -420,6 +427,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     sendButton.removeAttribute('aria-busy');
                 }
                 activeLoadingMessage = null;
+                requestInProgress = false;
                 editor.focus();
             }
         });
