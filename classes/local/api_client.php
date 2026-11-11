@@ -54,8 +54,8 @@ class api_client
             'gemini_embed_dimensions' => max(0, (int) (get_config('local_ragassistant', 'gemini_embed_dimensions') ?: 768)),
         ]);
 
-        // A model change invalidates generated suggestions; an embedding change
-        // also switches Chroma collections. Rebuild every Moodle source document.
+        // Only embedding changes invalidate stored vectors and require rebuilding
+        // Moodle source documents. Generation-model changes leave embeddings intact.
         if (!empty($result['reindex_required']) &&
                 !get_config('local_ragassistant', 'reindex_pending')) {
             set_config('reindex_pending', 1, 'local_ragassistant');
