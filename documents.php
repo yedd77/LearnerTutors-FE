@@ -63,14 +63,34 @@ function local_ragassistant_save_document_suggestions(
 }
 
 /**
- * Queue document indexing without making the upload or action request wait for AI.
+ * Run document indexing as part of the user's upload or index action.
+ *
+ * Ad-hoc Moodle tasks only run when cron is executing. Running this task here
+ * ensures a newly uploaded document or an explicit Index click is not left
+ * pending indefinitely on sites where cron is not configured.
  *
  * @param int $documentid
  */
-function local_ragassistant_queue_document_index(int $documentid): void {
+function local_ragassistant_index_document_now(int $documentid): void {
+    global $DB;
+
     $task = new \local_ragassistant\task\index_document();
     $task->set_custom_data(['documentid' => $documentid]);
-    \core\task\manager::queue_adhoc_task($task);
+    $task->execute();
+
+    $status = $DB->get_field(
+        'local_ragassistant_documents',
+        'status',
+        ['id' => $documentid]
+    );
+    if ($status !== 'ready') {
+        throw new moodle_exception(
+            'backendrequestfailed',
+            'local_ragassistant',
+            '',
+            'Document indexing did not complete successfully. Current status: ' . ($status ?: 'missing')
+        );
+    }
 }
 
 
@@ -149,30 +169,35 @@ $PAGE->set_heading(format_string($course->fullname));
 $action = optional_param('action', '', PARAM_ALPHA);
 $actiondocumentid = optional_param('documentid', 0, PARAM_INT);
 
-// Queue every stored course document for background reindexing.
+// Reindex every stored course document immediately; this action does not depend on cron.
 if ($action === 'reindexall' && data_submitted()) {
     require_sesskey();
     require_capability('local/ragassistant:managedocuments', $context);
     $records = $DB->get_records('local_ragassistant_documents', ['courseid' => $courseid], 'id ASC');
-    $queued = 0;
+    $indexed = 0;
+    $failed = 0;
     foreach ($records as $record) {
         if (!in_array($record->status, ['ready', 'pending', 'failed'], true)) {
             continue;
         }
         try {
-            local_ragassistant_queue_document_index((int) $record->id);
-            $DB->set_field('local_ragassistant_documents', 'status', 'pending', ['id' => $record->id]);
-            $queued++;
+            local_ragassistant_index_document_now((int) $record->id);
+            $indexed++;
         } catch (\Throwable $exception) {
-            debugging('RAG Assistant: could not queue document ' . $record->id . ': ' .
+            $failed++;
+            debugging('RAG Assistant: reindex failed for document ' . $record->id . ': ' .
                 $exception->getMessage(), DEBUG_DEVELOPER);
         }
     }
+    $message = $indexed . ' document(s) indexed successfully.';
+    if ($failed) {
+        $message .= ' ' . $failed . ' document(s) failed. Check Moodle logs for details.';
+    }
     redirect(
         new moodle_url('/local/ragassistant/documents.php', ['courseid' => $courseid]),
-        $queued . ' document(s) queued for background indexing. Moodle cron will process them.',
+        $message,
         null,
-        \core\output\notification::NOTIFY_SUCCESS
+        $failed ? \core\output\notification::NOTIFY_WARNING : \core\output\notification::NOTIFY_SUCCESS
     );
 }
 
@@ -218,7 +243,7 @@ if ($action !== '' && $actiondocumentid > 0 && data_submitted()) {
         // Handle the action based on the requested type
         switch ($action) {
 
-            // Queue 'index' and 'reindex' actions for background processing.
+            // Run initial indexing and reindexing immediately.
             case 'index':
             case 'reindex':
                 // Reindex is reserved for existing ready documents; initial index is pending/failed only.
@@ -229,15 +254,10 @@ if ($action !== '' && $actiondocumentid > 0 && data_submitted()) {
                 if (!$targetfile) {
                     throw new moodle_exception('storedfilemissing', 'local_ragassistant');
                 }
-                local_ragassistant_queue_document_index((int) $target->id);
-                $DB->update_record('local_ragassistant_documents', (object) [
-                    'id' => $target->id,
-                    'status' => 'pending',
-                    'timemodified' => time(),
-                ]);
+                local_ragassistant_index_document_now((int) $target->id);
                 redirect(
                     $redirecturl,
-                    'Document queued for background indexing. Its status will update after Moodle cron processes it.',
+                    'Document indexed successfully and is ready for retrieval.',
                     null,
                     \core\output\notification::NOTIFY_SUCCESS
                 );
@@ -396,22 +416,22 @@ if ($mform->is_cancelled()) {
                 'timemodified' => time(),
             ]);
 
-            local_ragassistant_queue_document_index((int) $documentid);
+            local_ragassistant_index_document_now((int) $documentid);
             $successcount++;
 
         } catch (\Throwable $exception) {
             debugging('RAG Assistant upload failed for ' . $filename . ': ' . $exception->getMessage(), DEBUG_DEVELOPER);
             $failedcount++;
-            $messages[] = $filename . ': upload failed';
+            $messages[] = $filename . ': upload or indexing failed';
             if ($documentid && $DB->record_exists('local_ragassistant_documents', ['id' => $documentid])) {
                 $DB->set_field('local_ragassistant_documents', 'status', 'failed', ['id' => $documentid]);
             }
         }
     }
 
-    $summary = "$successcount file(s) uploaded and queued for background indexing.";
+    $summary = "$successcount file(s) uploaded and indexed successfully.";
     if ($failedcount) {
-        $summary .= " $failedcount file(s) failed during upload or could not be queued.";
+        $summary .= " $failedcount file(s) failed during upload or indexing.";
     }
     if ($messages) {
         $summary .= ' ' . implode('; ', $messages);
