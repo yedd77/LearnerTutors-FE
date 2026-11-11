@@ -9,9 +9,10 @@ document.addEventListener('DOMContentLoaded', function () {
     const form = editor ? editor.closest('form') : null;
     const sendButton = form ? form.querySelector('.ragassistant-send-button') : null;
     const sendButtonContent = sendButton ? sendButton.innerHTML : '';
-    const stopButton = form ? form.querySelector('.ragassistant-stop-button') : null;
     let activeController = null;
     let activeRequestId = null;
+    let activeLoadingMessage = null;
+    let activeThinkingTimer = null;
     let stopRequested = false;
     const MAXLEN = 4000;
     let mathJaxTypesetQueue = Promise.resolve();
@@ -279,40 +280,56 @@ document.addEventListener('DOMContentLoaded', function () {
     ).forEach(typesetMath);
 
 
-    // Stop the active request through a separate authenticated Moodle endpoint.
-    if (stopButton && form) {
-        stopButton.addEventListener('click', async function () {
-            if (!activeRequestId || !activeController) return;
-            stopRequested = true;
-            stopButton.disabled = true;
-            stopButton.textContent = 'Stopping…';
-            const cancelData = new FormData();
-            const actionUrl = new URL(form.action, window.location.href);
-            cancelData.set('courseid', actionUrl.searchParams.get('courseid') || '');
-            cancelData.set('request_id', activeRequestId);
-            cancelData.set('sesskey', form.querySelector('input[name="sesskey"]')?.value || '');
-            try {
-                const cancelResponse = await fetch(M.cfg.wwwroot + '/local/ragassistant/cancel.php', {
-                    method: 'POST',
-                    body: cancelData,
-                    credentials: 'same-origin',
-                    headers: { 'X-Requested-With': 'XMLHttpRequest' },
-                    keepalive: true
-                });
-                if (!cancelResponse.ok) {
-                    throw new Error('Cancellation endpoint returned HTTP ' + cancelResponse.status);
-                }
-                const cancelResult = await cancelResponse.json();
-                if (!cancelResult.success || cancelResult.status !== 'cancelled') {
-                    throw new Error(cancelResult.error || 'The server has not confirmed that generation stopped.');
-                }
-                activeController.abort();
-            } catch (error) {
-                stopRequested = false;
-                stopButton.disabled = false;
-                stopButton.textContent = 'Stop';
-                console.error('RAG Assistant: cancellation could not be confirmed.', error);
+    // Stop generation immediately in the browser, then request backend cancellation.
+    function stopActiveRequest() {
+        if (!activeRequestId || !activeController || stopRequested) {
+            return;
+        }
+
+        stopRequested = true;
+        const requestId = activeRequestId;
+        const controller = activeController;
+
+        // Abort the browser request immediately so a late response cannot be rendered.
+        controller.abort();
+
+        if (activeLoadingMessage) {
+            activeLoadingMessage.remove();
+        }
+        if (activeThinkingTimer !== null) {
+            window.clearInterval(activeThinkingTimer);
+            activeThinkingTimer = null;
+        }
+
+        if (sendButton) {
+            sendButton.disabled = true;
+            sendButton.textContent = 'Stopping…';
+            sendButton.setAttribute('aria-label', 'Stopping response');
+        }
+
+        // Keep the cancellation request independent from the aborted chat request.
+        const cancelData = new FormData();
+        const actionUrl = new URL(form.action, window.location.href);
+        cancelData.set('courseid', actionUrl.searchParams.get('courseid') || '');
+        cancelData.set('request_id', requestId);
+        cancelData.set('sesskey', form.querySelector('input[name="sesskey"]')?.value || '');
+
+        fetch(M.cfg.wwwroot + '/local/ragassistant/cancel.php', {
+            method: 'POST',
+            body: cancelData,
+            credentials: 'same-origin',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            keepalive: true
+        }).then(async function (response) {
+            if (!response.ok) {
+                throw new Error('Cancellation endpoint returned HTTP ' + response.status);
             }
+            const result = await response.json();
+            if (!result.success) {
+                throw new Error(result.error || 'The backend could not cancel this request.');
+            }
+        }).catch(function (error) {
+            console.error('RAG Assistant: backend cancellation request failed.', error);
         });
     }
 
@@ -321,14 +338,16 @@ document.addEventListener('DOMContentLoaded', function () {
         form.addEventListener('submit', async function (event) {
             event.preventDefault();
 
+            // The same submit button becomes Stop while a request is active.
+            if (activeController && activeRequestId) {
+                stopActiveRequest();
+                return;
+            }
+
             const originalQuestion = getText().trim();
 
             if (!originalQuestion || originalQuestion.length < 2) {
                 question.focus();
-                return;
-            }
-
-            if (sendButton && sendButton.disabled) {
                 return;
             }
 
@@ -380,6 +399,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
             // Show a temporary loading indicator.
             const loadingMessage = createMessage('assistant', 'Thinking for 0s');
+            activeLoadingMessage = loadingMessage;
             const loadingContent = loadingMessage.querySelector(
                 '.ragassistant-message-content'
             );
@@ -393,15 +413,12 @@ document.addEventListener('DOMContentLoaded', function () {
                         elapsedSeconds + 's';
                 }
             }, 1000);
+            activeThinkingTimer = thinkingTimer;
 
             if (sendButton) {
-                sendButton.disabled = true;
-                sendButton.textContent = 'Thinking…';
-            }
-            if (stopButton) {
-                stopButton.hidden = false;
-                stopButton.disabled = false;
-                stopButton.textContent = 'Stop';
+                sendButton.disabled = false;
+                sendButton.textContent = 'Stop';
+                sendButton.setAttribute('aria-label', 'Stop generating response');
             }
 
             editor.textContent = '';
@@ -430,8 +447,14 @@ document.addEventListener('DOMContentLoaded', function () {
                     );
                 }
 
+                // A stop click wins even if the response arrived at nearly the same time.
+                if (stopRequested) {
+                    return;
+                }
+
                 // Replace the loading indicator with the actual answer.
                 loadingMessage.remove();
+                activeLoadingMessage = null;
 
                 const assistantMessage = createMessage(
                     'assistant',
@@ -453,11 +476,10 @@ document.addEventListener('DOMContentLoaded', function () {
 
             } catch (error) {
                 loadingMessage.remove();
-                if (error.name === 'AbortError' || stopRequested) {
-                    const stoppedMessage = createMessage('assistant', 'Generation stopped. You can send another message.');
-                    stoppedMessage.classList.add('ragassistant-message-stopped');
-                    centerMessage(stoppedMessage);
-                } else {
+                activeLoadingMessage = null;
+
+                // A deliberate stop removes the pending assistant transcript entirely.
+                if (!stopRequested && error.name !== 'AbortError') {
                     const errorMessage = createMessage('assistant', error.message || 'A connection error occurred.');
                     errorMessage.classList.add('ragassistant-message-error');
                     centerMessage(errorMessage);
@@ -465,16 +487,14 @@ document.addEventListener('DOMContentLoaded', function () {
 
             } finally {
                 window.clearInterval(thinkingTimer);
+                activeThinkingTimer = null;
 
                 if (sendButton) {
                     sendButton.disabled = false;
                     sendButton.innerHTML = sendButtonContent;
+                    sendButton.setAttribute('aria-label', 'Send question');
                 }
-                if (stopButton) {
-                    stopButton.hidden = true;
-                    stopButton.disabled = false;
-                    stopButton.textContent = 'Stop';
-                }
+                activeLoadingMessage = null;
                 activeController = null;
                 activeRequestId = null;
                 stopRequested = false;

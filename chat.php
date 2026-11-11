@@ -447,12 +447,6 @@ if ($allowed) {
         'local_ragassistant',
         ['class' => 'ragassistant-send-icon']
     );
-    echo html_writer::tag('button', 'Stop', [
-        'type' => 'button',
-        'class' => 'btn btn-outline-danger ragassistant-stop-button',
-        'hidden' => 'hidden',
-        'aria-label' => 'Stop generating response',
-    ]);
     echo html_writer::tag('button', $sendicon ,[
         'type'  => 'submit',
         'class' => 'btn btn-primary ragassistant-send-button',
