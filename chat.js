@@ -9,11 +9,8 @@ document.addEventListener('DOMContentLoaded', function () {
     const form = editor ? editor.closest('form') : null;
     const sendButton = form ? form.querySelector('.ragassistant-send-button') : null;
     const sendButtonContent = sendButton ? sendButton.innerHTML : '';
-    let activeController = null;
-    let activeRequestId = null;
     let activeLoadingMessage = null;
     let activeThinkingTimer = null;
-    let stopRequested = false;
     const MAXLEN = 4000;
     let mathJaxTypesetQueue = Promise.resolve();
 
@@ -280,69 +277,10 @@ document.addEventListener('DOMContentLoaded', function () {
     ).forEach(typesetMath);
 
 
-    // Stop generation immediately in the browser, then request backend cancellation.
-    function stopActiveRequest() {
-        if (!activeRequestId || !activeController || stopRequested) {
-            return;
-        }
-
-        stopRequested = true;
-        const requestId = activeRequestId;
-        const controller = activeController;
-
-        // Abort the browser request immediately so a late response cannot be rendered.
-        controller.abort();
-
-        if (activeLoadingMessage) {
-            activeLoadingMessage.remove();
-        }
-        if (activeThinkingTimer !== null) {
-            window.clearInterval(activeThinkingTimer);
-            activeThinkingTimer = null;
-        }
-
-        if (sendButton) {
-            sendButton.disabled = true;
-            sendButton.textContent = 'Stopping…';
-            sendButton.setAttribute('aria-label', 'Stopping response');
-        }
-
-        // Keep the cancellation request independent from the aborted chat request.
-        const cancelData = new FormData();
-        const actionUrl = new URL(form.action, window.location.href);
-        cancelData.set('courseid', actionUrl.searchParams.get('courseid') || '');
-        cancelData.set('request_id', requestId);
-        cancelData.set('sesskey', form.querySelector('input[name="sesskey"]')?.value || '');
-
-        fetch(M.cfg.wwwroot + '/local/ragassistant/cancel.php', {
-            method: 'POST',
-            body: cancelData,
-            credentials: 'same-origin',
-            headers: { 'X-Requested-With': 'XMLHttpRequest' },
-            keepalive: true
-        }).then(async function (response) {
-            if (!response.ok) {
-                throw new Error('Cancellation endpoint returned HTTP ' + response.status);
-            }
-            const result = await response.json();
-            if (!result.success) {
-                throw new Error(result.error || 'The backend could not cancel this request.');
-            }
-        }).catch(function (error) {
-            console.error('RAG Assistant: backend cancellation request failed.', error);
-        });
-    }
-
     //intercept the form submission to handle it via AJAX
     if (form && transcript) {
         form.addEventListener('submit', async function (event) {
             event.preventDefault();
-
-            // The same submit button becomes Stop while a request is active.
-            if (activeController && activeRequestId) {
-                stopActiveRequest();
-                return;
-            }
 
             const originalQuestion = getText().trim();
 
@@ -372,13 +310,6 @@ document.addEventListener('DOMContentLoaded', function () {
             }
 
             const formData = new FormData(form);
-            activeRequestId = (window.crypto && typeof window.crypto.randomUUID === 'function')
-                ? window.crypto.randomUUID()
-                : 'rag-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2);
-            activeController = new AbortController();
-            stopRequested = false;
-            formData.set('request_id', activeRequestId);
-
             formData.set('question', cleanQuestion);
             formData.set('display_question', originalQuestion);
             formData.set('ajax', '1');
@@ -416,9 +347,9 @@ document.addEventListener('DOMContentLoaded', function () {
             activeThinkingTimer = thinkingTimer;
 
             if (sendButton) {
-                sendButton.disabled = false;
-                sendButton.textContent = 'Stop';
-                sendButton.setAttribute('aria-label', 'Stop generating response');
+                sendButton.disabled = true;
+                sendButton.setAttribute('aria-label', 'Generating response');
+                sendButton.setAttribute('aria-busy', 'true');
             }
 
             editor.textContent = '';
@@ -435,8 +366,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     credentials: 'same-origin',
                     headers: {
                         'X-Requested-With': 'XMLHttpRequest'
-                    },
-                    signal: activeController.signal
+                    }
                 });
 
                 const result = await response.json();
@@ -445,11 +375,6 @@ document.addEventListener('DOMContentLoaded', function () {
                     throw new Error(
                         result.error || 'The assistant could not answer.'
                     );
-                }
-
-                // A stop click wins even if the response arrived at nearly the same time.
-                if (stopRequested) {
-                    return;
                 }
 
                 // Replace the loading indicator with the actual answer.
@@ -478,8 +403,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 loadingMessage.remove();
                 activeLoadingMessage = null;
 
-                // A deliberate stop removes the pending assistant transcript entirely.
-                if (!stopRequested && error.name !== 'AbortError') {
+                if (error.name !== 'AbortError') {
                     const errorMessage = createMessage('assistant', error.message || 'A connection error occurred.');
                     errorMessage.classList.add('ragassistant-message-error');
                     centerMessage(errorMessage);
@@ -493,11 +417,9 @@ document.addEventListener('DOMContentLoaded', function () {
                     sendButton.disabled = false;
                     sendButton.innerHTML = sendButtonContent;
                     sendButton.setAttribute('aria-label', 'Send question');
+                    sendButton.removeAttribute('aria-busy');
                 }
                 activeLoadingMessage = null;
-                activeController = null;
-                activeRequestId = null;
-                stopRequested = false;
                 editor.focus();
             }
         });
