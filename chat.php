@@ -160,10 +160,6 @@ if (data_submitted() && confirm_sesskey()) {
     $question = trim(optional_param('question', '', PARAM_TEXT));
     $toolid = trim(optional_param('tool_id', '', PARAM_ALPHANUMEXT));
     $displayquestion = trim(optional_param('display_question', '', PARAM_TEXT));
-    $requestid = trim(optional_param('request_id', '', PARAM_ALPHANUMEXT));
-    if ($requestid === '' && $ajax) {
-        $requestid = bin2hex(random_bytes(16));
-    }
     if ($displayquestion === '' && $toolid !== '') {
         $commandnames = [
             'exam_generation' => '/exam',
@@ -234,7 +230,6 @@ if (data_submitted() && confirm_sesskey()) {
                 'provider' => trim((string) get_config('local_ragassistant', 'llm_provider')) ?: 'openai',
                 'model' => trim((string) get_config('local_ragassistant', 'chat_model')) ?: null,
                 'temperature' => (float) get_config('local_ragassistant', 'temperature'),
-                'request_id' => $requestid !== '' ? $requestid : null,
             ]);
 
             // Extract the raw Markdown answer from the API response.
