@@ -210,9 +210,9 @@ if (data_submitted() && confirm_sesskey()) {
                 ];
             }
 
-            // Synchronize administrator-selected provider/model and embedding settings.
+            // Configuration is synchronized when administrator settings are saved.
+            // Avoid an extra backend HTTP round-trip on every chat message.
             $apiclient = new \local_ragassistant\local\api_client();
-            $apiclient->sync_configuration();
 
             // Never query an empty/new embedding collection while the automatic
             // rebuild is queued or running. Moodle cron clears this flag on completion.

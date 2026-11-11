@@ -6,7 +6,7 @@
 defined('MOODLE_INTERNAL') || die();
 
 $plugin->component = 'local_ragassistant';
-$plugin->version   = 2026111003;
+$plugin->version   = 2026111100;
 $plugin->requires  = 2025101600;
 $plugin->maturity  = MATURITY_ALPHA;
-$plugin->release   = '0.3.6 - Cancellable chat generation';
+$plugin->release   = '0.3.7 - Background document indexing';

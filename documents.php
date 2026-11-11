@@ -21,13 +21,9 @@ function local_ragassistant_save_document_suggestions(
     $suggestions
 ): int {
     global $DB;
-
-    // A missing, invalid, or empty response must never erase existing suggestions.
     if (!is_array($suggestions) || !$suggestions) {
-        debugging('RAG Assistant: no suggestion array returned for document ' . $documentid, DEBUG_DEVELOPER);
         return 0;
     }
-
     $cleaned = [];
     foreach ($suggestions as $suggestion) {
         if (!is_string($suggestion)) {
@@ -42,13 +38,11 @@ function local_ragassistant_save_document_suggestions(
             break;
         }
     }
-
     if (!$cleaned) {
-        debugging('RAG Assistant: no valid suggestions for document ' . $documentid, DEBUG_DEVELOPER);
         return 0;
     }
-
-    // Replace only after valid replacements exist; rollback also restores deleted rows.
+    // Keep the transaction limited to database writes. Never log after allow_commit()
+    // inside this try block: a post-commit exception cannot be rolled back.
     $transaction = $DB->start_delegated_transaction();
     try {
         $DB->delete_records('local_ragassistant_suggestions', ['documentid' => $documentid]);
@@ -62,12 +56,21 @@ function local_ragassistant_save_document_suggestions(
             ]);
         }
         $transaction->allow_commit();
-        debugging('RAG Assistant: saved ' . count($cleaned) . ' suggestion(s) for document ' . $documentid . '.', DEBUG_DEVELOPER);
-        return count($cleaned);
     } catch (\Throwable $exception) {
         $transaction->rollback($exception);
-        throw $exception;
     }
+    return count($cleaned);
+}
+
+/**
+ * Queue document indexing without making the upload or action request wait for AI.
+ *
+ * @param int $documentid
+ */
+function local_ragassistant_queue_document_index(int $documentid): void {
+    $task = new \local_ragassistant\task\index_document();
+    $task->set_custom_data(['documentid' => $documentid]);
+    \core\task\manager::queue_adhoc_task($task);
 }
 
 
@@ -146,55 +149,31 @@ $PAGE->set_heading(format_string($course->fullname));
 $action = optional_param('action', '', PARAM_ALPHA);
 $actiondocumentid = optional_param('documentid', 0, PARAM_INT);
 
-// Rebuild every stored course document in the currently configured embedding space.
-// Original files remain in Moodle file storage; only their backend vectors are replaced.
+// Queue every stored course document for background reindexing.
 if ($action === 'reindexall' && data_submitted()) {
     require_sesskey();
     require_capability('local/ragassistant:managedocuments', $context);
     $records = $DB->get_records('local_ragassistant_documents', ['courseid' => $courseid], 'id ASC');
-    $success = 0;
-    $failed = 0;
-    $suggestionssaved = 0;
-    $fs = get_file_storage();
+    $queued = 0;
     foreach ($records as $record) {
         if (!in_array($record->status, ['ready', 'pending', 'failed'], true)) {
             continue;
         }
-        $stored = $fs->get_file($record->contextid, 'local_ragassistant', 'documents',
-            $record->fileitemid, $record->filepath, $record->filename);
-        if (!$stored) {
-            $failed++;
-            debugging('RAG Assistant reindex: missing Moodle file for document ' . $record->id, DEBUG_DEVELOPER);
-            continue;
-        }
-        $DB->set_field('local_ragassistant_documents', 'status', 'processing', ['id' => $record->id]);
         try {
-            $result = $api->index_file($stored, (int) $record->id, $courseid,
-                (int) $record->userid, $record->visibility, !empty($record->retrievalenabled));
-            $suggestionssaved += local_ragassistant_save_document_suggestions(
-                $courseid,
-                (int) $record->id,
-                (int) $record->userid,
-                $result['suggestions'] ?? []
-            );
-            $DB->update_record('local_ragassistant_documents', (object) [
-                'id' => $record->id, 'status' => 'ready', 'timemodified' => time(),
-            ]);
-            $success++;
+            local_ragassistant_queue_document_index((int) $record->id);
+            $DB->set_field('local_ragassistant_documents', 'status', 'pending', ['id' => $record->id]);
+            $queued++;
         } catch (\Throwable $exception) {
-            $DB->update_record('local_ragassistant_documents', (object) [
-                'id' => $record->id, 'status' => 'failed', 'timemodified' => time(),
-            ]);
-            debugging('RAG Assistant reindex failed for document ' . $record->id . ': ' .
+            debugging('RAG Assistant: could not queue document ' . $record->id . ': ' .
                 $exception->getMessage(), DEBUG_DEVELOPER);
-            $failed++;
         }
     }
-    $message = $success . ' document(s) reindexed; ' . $failed .
-        ' failed; ' . $suggestionssaved . ' starter suggestion(s) saved.';
-    redirect(new moodle_url('/local/ragassistant/documents.php', ['courseid' => $courseid]),
-        $message, null, $failed ? \core\output\notification::NOTIFY_WARNING :
-        \core\output\notification::NOTIFY_SUCCESS);
+    redirect(
+        new moodle_url('/local/ragassistant/documents.php', ['courseid' => $courseid]),
+        $queued . ' document(s) queued for background indexing. Moodle cron will process them.',
+        null,
+        \core\output\notification::NOTIFY_SUCCESS
+    );
 }
 
 if ($action !== '' && $actiondocumentid > 0 && data_submitted()) {
@@ -239,67 +218,28 @@ if ($action !== '' && $actiondocumentid > 0 && data_submitted()) {
         // Handle the action based on the requested type
         switch ($action) {
 
-            // handle 'index' action
+            // Queue 'index' and 'reindex' actions for background processing.
             case 'index':
             case 'reindex':
-
                 // Reindex is reserved for existing ready documents; initial index is pending/failed only.
                 if (($action === 'index' && !in_array($target->status, ['pending', 'failed'], true)) ||
                     ($action === 'reindex' && $target->status !== 'ready')) {
                     throw new moodle_exception('invalidrequest', 'error');
                 }
-                // validate that the stored file exist
                 if (!$targetfile) {
                     throw new moodle_exception('storedfilemissing', 'local_ragassistant');
                 }
-
-                // Update document status to 'processing' before indexing
-                $DB->set_field('local_ragassistant_documents', 'status', 'processing', ['id' => $target->id]);
-
-                // call API client to index the file
-                try {
-                    $result = $api->index_file(
-                        $targetfile,
-                        (int) $target->id,
-                        (int) $target->courseid,
-                        (int) $target->userid,
-                        $target->visibility,
-                        !empty($target->retrievalenabled)
-                    );
-                } catch (\Throwable $indexexception) {
-                    // Do not leave the document stuck in 'processing'.
-                    $DB->update_record('local_ragassistant_documents', (object) [
-                        'id' => $target->id,
-                        'status' => 'failed',
-                        'timemodified' => time(),
-                    ]);
-                    throw $indexexception;
-                }
-
-                // Save returned suggestions; empty results preserve any existing rows.
-                $savedcount = local_ragassistant_save_document_suggestions(
-                    (int) $target->courseid,
-                    (int) $target->id,
-                    (int) $target->userid,
-                    $result['suggestions'] ?? []
-                );
-
-                // Update document status to 'ready' after the successful indexing and redirect with a success message
+                local_ragassistant_queue_document_index((int) $target->id);
                 $DB->update_record('local_ragassistant_documents', (object) [
                     'id' => $target->id,
-                    'status' => 'ready',
+                    'status' => 'pending',
                     'timemodified' => time(),
                 ]);
-
-                // Redirect with success message
                 redirect(
                     $redirecturl,
-                    get_string('indexsuccess', 'local_ragassistant', (int) ($result['indexed_chunks'] ?? 0)) .
-                        ' ' . $savedcount . ' starter suggestion(s) saved.' .
-                        ($savedcount === 0 ? ' Backend returned no valid suggestions; check FastAPI logs.' : ''),
+                    'Document queued for background indexing. Its status will update after Moodle cron processes it.',
                     null,
-                    $savedcount > 0 ? \core\output\\notification::NOTIFY_SUCCESS :
-                        \core\output\\notification::NOTIFY_WARNING
+                    \core\output\notification::NOTIFY_SUCCESS
                 );
                 break;
 
@@ -456,40 +396,9 @@ if ($mform->is_cancelled()) {
                 'timemodified' => time(),
             ]);
 
-            try {
-                $DB->set_field('local_ragassistant_documents', 'status', 'processing', ['id' => $documentid]);
-                $result = $api->index_file(
-                    $storedfile,
-                    $documentid,
-                    $courseid,
-                    (int) $USER->id,
-                    $visibility
-                );
-                $uploadsuggestions = local_ragassistant_save_document_suggestions(
-                    $courseid,
-                    $documentid,
-                    (int) $USER->id,
-                    $result['suggestions'] ?? []
-                );
-                if ($uploadsuggestions === 0) {
-                    $messages[] = $filename . ': indexed, but backend returned no valid starter suggestions';
-                }
-                $DB->update_record('local_ragassistant_documents', (object) [
-                    'id' => $documentid,
-                    'status' => 'ready',
-                    'timemodified' => time(),
-                ]);
-                $successcount++;
-            } catch (\Throwable $exception) {
-                $DB->update_record('local_ragassistant_documents', (object) [
-                    'id' => $documentid,
-                    'status' => 'failed',
-                    'timemodified' => time(),
-                ]);
-                debugging('RAG Assistant indexing failed for ' . $filename . ': ' . $exception->getMessage(), DEBUG_DEVELOPER);
-                $failedcount++;
-                $messages[] = $filename . ': saved, but indexing failed';
-            }
+            local_ragassistant_queue_document_index((int) $documentid);
+            $successcount++;
+
         } catch (\Throwable $exception) {
             debugging('RAG Assistant upload failed for ' . $filename . ': ' . $exception->getMessage(), DEBUG_DEVELOPER);
             $failedcount++;
@@ -500,9 +409,9 @@ if ($mform->is_cancelled()) {
         }
     }
 
-    $summary = "$successcount file(s) indexed successfully.";
+    $summary = "$successcount file(s) uploaded and queued for background indexing.";
     if ($failedcount) {
-        $summary .= " $failedcount file(s) failed or need re-indexing.";
+        $summary .= " $failedcount file(s) failed during upload or could not be queued.";
     }
     if ($messages) {
         $summary .= ' ' . implode('; ', $messages);
