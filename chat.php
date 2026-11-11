@@ -206,9 +206,10 @@ if (data_submitted() && confirm_sesskey()) {
                 ];
             }
 
-            // Configuration is synchronized when administrator settings are saved.
-            // Avoid an extra backend HTTP round-trip on every chat message.
+            // Synchronize the saved AI configuration before chatting.
+            // Settings are saved locally first, so a wrong API key can always be repaired.
             $apiclient = new \local_ragassistant\local\api_client();
+            $apiclient->sync_configuration();
 
             // Never query an empty/new embedding collection while the automatic
             // rebuild is queued or running. Moodle cron clears this flag on completion.
