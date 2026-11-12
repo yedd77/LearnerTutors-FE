@@ -152,7 +152,21 @@ class index_document extends \core\task\adhoc_task {
             try {
                 $this->queue_suggestion_task($documentid);
             } catch (\Throwable $exception) {
-                $this->update_suggestion_stage($documentid, 'suggestions failed');
+                // Keep the indexed document usable even if Moodle cannot queue
+                // the independent suggestion task.
+                $saved = $this->save_suggestions(
+                    $documentid,
+                    (int) $record->courseid,
+                    (int) $record->userid,
+                    $this->fallback_suggestions(
+                        (string) $record->filename,
+                        (string) ($record->lecturernote ?? '')
+                    )
+                );
+                $this->update_suggestion_stage(
+                    $documentid,
+                    $saved > 0 ? 'complete (local fallback)' : 'suggestions failed'
+                );
                 mtrace('RAG Assistant: could not queue suggestions for document ' . $documentid . ': ' .
                     $exception->getMessage());
             }
