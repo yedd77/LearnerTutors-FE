@@ -11,6 +11,9 @@
         <FIELD NAME="filepath" TYPE="char" LENGTH="255" NOTNULL="true" DEFAULT="/"/>
         <FIELD NAME="fileitemid" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0"/>
         <FIELD NAME="status" TYPE="char" LENGTH="20" NOTNULL="true" DEFAULT="pending"/>
+        <FIELD NAME="progress" TYPE="int" LENGTH="3" NOTNULL="true" DEFAULT="0"/>
+        <FIELD NAME="stage" TYPE="char" LENGTH="40" NOTNULL="true" DEFAULT=""/>
+        <FIELD NAME="jobtype" TYPE="char" LENGTH="20" NOTNULL="true" DEFAULT=""/>
         <FIELD NAME="retrievalenabled" TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="1"/>
         <FIELD NAME="visibility" TYPE="char" LENGTH="20" NOTNULL="true" DEFAULT="personal"/>
         <FIELD NAME="lecturernote" TYPE="text" NOTNULL="false"/>
