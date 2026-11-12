@@ -132,8 +132,6 @@ class api_client
                 JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
             );
         } catch (\JsonException $e) {
-            curl_close($handle);
-
             throw new \moodle_exception(
                 'backendinvalidresponse',
                 'local_ragassistant',
@@ -160,8 +158,6 @@ class api_client
         $error = curl_error($handle);
         $status = (int) curl_getinfo($handle, CURLINFO_HTTP_CODE);
 
-        curl_close($handle);
-
         return $this->decode_response($body, $error, $status);
     }
 
@@ -185,8 +181,6 @@ class api_client
                 JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
             );
         } catch (\JsonException $e) {
-            curl_close($handle);
-
             throw new \moodle_exception(
                 'backendinvalidresponse',
                 'local_ragassistant',
@@ -212,8 +206,6 @@ class api_client
         $body = curl_exec($handle);
         $error = curl_error($handle);
         $status = (int) curl_getinfo($handle, CURLINFO_HTTP_CODE);
-
-        curl_close($handle);
 
         return $this->decode_response($body, $error, $status);
     }
@@ -290,8 +282,6 @@ class api_client
                 CURLINFO_HTTP_CODE
             );
 
-            curl_close($handle);
-
             return $this->decode_response($body, $error, $status);
         } finally {
             if (is_file($temp)) {
@@ -304,21 +294,21 @@ class api_client
     /**
      * Regenerate document-grounded suggestions without reindexing vectors.
      *
-     * @param \\stored_file $file
+     * @param \stored_file $file
      * @param int $documentid
      * @return array
      */
-    public function generate_document_suggestions(\\stored_file $file, int $documentid): array {
+    public function generate_document_suggestions(stored_file $file, int $documentid): array {
         $this->sync_configuration_if_changed();
         $temp = $file->copy_content_to_temp();
         if (!$temp || !is_file($temp)) {
-            throw new \\moodle_exception('filetempfailed', 'local_ragassistant');
+            throw new moodle_exception('filetempfailed', 'local_ragassistant');
         }
 
         try {
             $handle = curl_init($this->get_base_url() . '/api/v1/documents/suggestions');
             if ($handle === false) {
-                throw new \\moodle_exception('backendconnectionfailed', 'local_ragassistant');
+                throw new moodle_exception('backendconnectionfailed', 'local_ragassistant');
             }
             $mime = function_exists('mime_content_type')
                 ? (mime_content_type($temp) ?: 'application/octet-stream')
@@ -333,14 +323,13 @@ class api_client
                     'X-RAG-API-Key: ' . $this->get_api_key(),
                 ],
                 CURLOPT_POSTFIELDS => [
-                    'file' => new \\CURLFile($temp, $mime, $file->get_filename()),
+                    'file' => new CURLFile($temp, $mime, $file->get_filename()),
                     'document_id' => (string) $documentid,
                 ],
             ]);
             $body = curl_exec($handle);
             $error = curl_error($handle);
             $status = (int) curl_getinfo($handle, CURLINFO_HTTP_CODE);
-            curl_close($handle);
             return $this->decode_response($body, $error, $status);
         } finally {
             if (is_file($temp)) {
@@ -401,8 +390,6 @@ class api_client
         $body = curl_exec($handle);
         $error = curl_error($handle);
         $status = (int) curl_getinfo($handle, CURLINFO_HTTP_CODE);
-
-        curl_close($handle);
 
         return $this->decode_response($body, $error, $status);
     }

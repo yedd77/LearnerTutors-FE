@@ -7,14 +7,14 @@
  * @package local_ragassistant
  */
 
-namespace local_ragassistant\\task;
+namespace local_ragassistant\task;
 
 defined('MOODLE_INTERNAL') || die();
 
 /**
  * Process one document outside the user's Moodle request.
  */
-class index_document extends \\core\\task\\adhoc_task {
+class index_document extends \core\task\adhoc_task {
     /**
      * Persist a progress update for the document.
      *
@@ -65,10 +65,10 @@ class index_document extends \\core\\task\\adhoc_task {
                 $record->filename
             );
             if (!$stored || $stored->is_directory()) {
-                throw new \\moodle_exception('storedfilemissing', 'local_ragassistant');
+                throw new \moodle_exception('storedfilemissing', 'local_ragassistant');
             }
 
-            $api = new \\local_ragassistant\\local\\api_client();
+            $api = new \local_ragassistant\local\api_client();
             if ($jobtype === 'suggestions') {
                 $this->update_progress($documentid, 'processing', 25, 'generating suggestions');
                 $result = $api->generate_document_suggestions($stored, $documentid);
@@ -108,7 +108,7 @@ class index_document extends \\core\\task\\adhoc_task {
             }
 
             $this->update_progress($documentid, 'ready', 100, 'complete');
-        } catch (\\Throwable $exception) {
+        } catch (\Throwable $exception) {
             $this->update_progress($documentid, 'failed', 100, 'failed');
             mtrace('RAG Assistant: ' . $jobtype . ' task failed for document ' . $documentid . ': ' .
                 $exception->getMessage());
@@ -135,8 +135,8 @@ class index_document extends \\core\\task\\adhoc_task {
             if (!is_string($suggestion)) {
                 continue;
             }
-            $suggestion = \\core_text::substr(trim(clean_param($suggestion, PARAM_TEXT)), 0, 500);
-            $key = \\core_text::strtolower($suggestion);
+            $suggestion = \core_text::substr(trim(clean_param($suggestion, PARAM_TEXT)), 0, 500);
+            $key = \core_text::strtolower($suggestion);
             if ($suggestion !== '' && !isset($cleaned[$key])) {
                 $cleaned[$key] = $suggestion;
             }
@@ -162,7 +162,7 @@ class index_document extends \\core\\task\\adhoc_task {
                 ]);
             }
             $transaction->allow_commit();
-        } catch (\\Throwable $exception) {
+        } catch (\Throwable $exception) {
             $transaction->rollback($exception);
             throw $exception;
         }
