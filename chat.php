@@ -206,32 +206,45 @@ if (data_submitted() && confirm_sesskey()) {
                 ];
             }
 
-            // Synchronize the saved AI configuration before chatting.
-            // Settings are saved locally first, so a wrong API key can always be repaired.
-            $apiclient = new \local_ragassistant\local\api_client();
-            $apiclient->sync_configuration();
+            // Moodle normally holds a write lock on the user's session for the
+            // entire PHP request. Release it before waiting on the remote AI service
+            // so other Moodle tabs and AJAX requests from this user remain responsive.
+            $sessionclosed = false;
+            try {
+                \core\session\manager::write_close();
+                $sessionclosed = true;
 
-            // Never query an empty/new embedding collection while the automatic
-            // rebuild is queued or running. Moodle cron clears this flag on completion.
-            if (get_config('local_ragassistant', 'reindex_pending')) {
-                throw new \moodle_exception('reindexpending', 'local_ragassistant');
+                $apiclient = new \local_ragassistant\local\api_client();
+                // Configuration is synchronized only when its saved values change.
+                $apiclient->sync_configuration_if_changed();
+
+                // Never query an empty/new embedding collection while the automatic
+                // rebuild is queued or running. Moodle cron clears this flag on completion.
+                if (get_config('local_ragassistant', 'reindex_pending')) {
+                    throw new \moodle_exception('reindexpending', 'local_ragassistant');
+                }
+
+                // Retrieve the answer from the RAG Assistant API.
+                $response = $apiclient->post_json('/api/v1/chat', [
+                    'question' => $question,
+                    'course_id' => (int) $course->id,
+                    'user_id' => (int) $USER->id,
+                    'include_course_documents' => true,
+                    'history' => $conversationhistory,
+                    'tool_id' => $toolid !== '' ? $toolid : null,
+                    'provider' => trim((string) get_config('local_ragassistant', 'llm_provider')) ?: 'openai',
+                    'model' => trim((string) get_config('local_ragassistant', 'chat_model')) ?: null,
+                    'temperature' => (float) get_config('local_ragassistant', 'temperature'),
+                ]);
+            } finally {
+                if ($sessionclosed) {
+                    // Re-open the same Moodle session briefly to persist the answer.
+                    \core\session\manager::start();
+                }
             }
 
-            // Retrieve the answer from the RAG Assistant API.
-            $response = $apiclient->post_json('/api/v1/chat', [
-                'question' => $question,
-                'course_id' => (int) $course->id,
-                'user_id' => (int) $USER->id,
-                'include_course_documents' => true,
-                'history' => $conversationhistory,
-                // Explicit tool selection; when blank, the backend routes by intent.
-                'tool_id' => $toolid !== '' ? $toolid : null,
-                // Site administrator defaults. The backend can still apply its own
-                // defaults when either value is intentionally left blank.
-                'provider' => trim((string) get_config('local_ragassistant', 'llm_provider')) ?: 'openai',
-                'model' => trim((string) get_config('local_ragassistant', 'chat_model')) ?: null,
-                'temperature' => (float) get_config('local_ragassistant', 'temperature'),
-            ]);
+            // Reacquire the session-backed history after write_close/start reloads it.
+            $history =& $SESSION->local_ragassistant_history[$courseid];
 
             // Extract the raw Markdown answer from the API response.
             $answer = (string) ($response['answer'] ?? '');
