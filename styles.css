@@ -985,3 +985,39 @@ form.mform #fgroup_id_buttonar .felement.fgroup {
 .ragassistant-stop-button[hidden] { display: none !important; }
 .ragassistant-stop-button { margin-left: 0.5rem; white-space: nowrap; }
 .ragassistant-message-stopped .ragassistant-message-content { color: var(--bs-secondary-color, #6c757d); font-style: italic; }
+
+
+/* Compact document indexing status and background-job progress. */
+.ragassistant-documents .ragassistant-processing-status {
+    display: flex;
+    flex-direction: column;
+    gap: .25rem;
+    min-width: 10rem;
+    text-transform: capitalize;
+}
+.ragassistant-document-progress {
+    height: .45rem;
+    margin: .15rem 0;
+    overflow: hidden;
+    border-radius: 999px;
+    background: var(--bs-secondary-bg, #e9ecef);
+}
+.ragassistant-document-progress .progress-bar {
+    border-radius: 999px;
+    transition: width .35s ease;
+}
+.ragassistant-progress-label {
+    display: block;
+    font-size: .75rem;
+    text-transform: capitalize;
+}
+.ragassistant-retrieval-state {
+    margin-top: .35rem;
+}
+.ragassistant-document-actions {
+    min-width: 9.5rem;
+}
+.ragassistant-document-actions .btn[disabled] {
+    opacity: .65;
+    cursor: not-allowed;
+}
