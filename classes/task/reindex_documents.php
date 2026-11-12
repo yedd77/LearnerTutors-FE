@@ -44,6 +44,9 @@ class reindex_documents extends \core\task\adhoc_task {
                     $DB->update_record('local_ragassistant_documents', (object) [
                         'id' => $record->id,
                         'status' => 'failed',
+                        'progress' => 100,
+                        'stage' => 'failed',
+                        'jobtype' => '',
                         'timemodified' => time(),
                     ]);
                     mtrace('RAG Assistant: source file missing for document ' . $record->id . '; marked failed.');
@@ -51,7 +54,14 @@ class reindex_documents extends \core\task\adhoc_task {
                     continue;
                 }
 
-                $DB->set_field('local_ragassistant_documents', 'status', 'processing', ['id' => $record->id]);
+                $DB->update_record('local_ragassistant_documents', (object) [
+                    'id' => $record->id,
+                    'status' => 'processing',
+                    'progress' => 20,
+                    'stage' => 'reindexing after configuration change',
+                    'jobtype' => 'reindex',
+                    'timemodified' => time(),
+                ]);
 
                 try {
                     $result = $api->index_file(
@@ -110,6 +120,9 @@ class reindex_documents extends \core\task\adhoc_task {
                     $DB->update_record('local_ragassistant_documents', (object) [
                         'id' => $record->id,
                         'status' => 'ready',
+                        'progress' => 100,
+                        'stage' => 'complete',
+                        'jobtype' => '',
                         'timemodified' => time(),
                     ]);
                     $success++;
