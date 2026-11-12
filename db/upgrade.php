@@ -71,5 +71,20 @@ function xmldb_local_ragassistant_upgrade(int $oldversion): bool
         upgrade_plugin_savepoint(true, 2026110600, 'local', 'ragassistant');
     }
 
+    if ($oldversion < 2026111200) {
+        $table = new xmldb_table('local_ragassistant_documents');
+        $fields = [
+            new xmldb_field('progress', XMLDB_TYPE_INTEGER, '3', null, XMLDB_NOTNULL, null, '0', 'status'),
+            new xmldb_field('stage', XMLDB_TYPE_CHAR, '40', null, XMLDB_NOTNULL, null, '', 'progress'),
+            new xmldb_field('jobtype', XMLDB_TYPE_CHAR, '20', null, XMLDB_NOTNULL, null, '', 'stage'),
+        ];
+        foreach ($fields as $field) {
+            if ($dbman->table_exists($table) && !$dbman->field_exists($table, $field)) {
+                $dbman->add_field($table, $field);
+            }
+        }
+        upgrade_plugin_savepoint(true, 2026111200, 'local', 'ragassistant');
+    }
+
     return true;
 }
