@@ -44,6 +44,44 @@ class api_client
      * Synchronize the administrator-selected AI configuration with FastAPI.
      * Provider credentials remain on the backend and are never sent by Moodle.
      */
+    /**
+     * Synchronize configuration only when administrator-selected values change.
+     *
+     * The backend persists its runtime configuration, so repeating this
+     * network round-trip for every student message is unnecessary.
+     */
+    public function sync_configuration_if_changed(): array
+    {
+        $configuration = [
+            'llm_provider' => trim((string) get_config('local_ragassistant', 'llm_provider')) ?: 'openai',
+            'llm_model' => trim((string) get_config('local_ragassistant', 'chat_model')) ?: 'gpt-4o-luna',
+            'embedding_provider' => trim((string) get_config('local_ragassistant', 'embedding_provider')) ?: 'openai',
+            'embedding_model' => trim((string) get_config('local_ragassistant', 'embedding_model')),
+            'gemini_embed_dimensions' => max(0, (int) (get_config('local_ragassistant', 'gemini_embed_dimensions') ?: 768)),
+        ];
+
+        $fingerprint = hash(
+            'sha256',
+            json_encode($configuration, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR)
+        );
+        $lastfingerprint = (string) get_config(
+            'local_ragassistant',
+            'synced_config_fingerprint'
+        );
+
+        if ($lastfingerprint !== '' && hash_equals($lastfingerprint, $fingerprint)) {
+            return [
+                'synchronized' => false,
+                'reindex_required' => false,
+            ];
+        }
+
+        $result = $this->sync_configuration();
+        set_config('synced_config_fingerprint', $fingerprint, 'local_ragassistant');
+
+        return $result;
+    }
+
     public function sync_configuration(): array
     {
         $result = $this->post_json('/api/v1/admin/config', [
@@ -190,7 +228,7 @@ class api_client
         bool $retrievalenabled = true
     ): array {
         // Keep backend indexing and query embedding settings synchronized.
-        $this->sync_configuration();
+        $this->sync_configuration_if_changed();
         $temp = $file->copy_content_to_temp();
 
         if (!$temp || !is_file($temp)) {
