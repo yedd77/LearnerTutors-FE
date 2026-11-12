@@ -270,7 +270,7 @@ class index_document extends \core\task\adhoc_task {
             }
         }
         // Preserve existing suggestions if the model returns no valid replacements.
-        if (!$cleaned) {
+        if (count($cleaned) < 3) {
             return 0;
         }
 
