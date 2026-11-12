@@ -232,8 +232,8 @@ if (data_submitted() && confirm_sesskey()) {
                     'include_course_documents' => true,
                     'history' => $conversationhistory,
                     'tool_id' => $toolid !== '' ? $toolid : null,
-                    'provider' => trim((string) get_config('local_ragassistant', 'llm_provider')) ?: 'openai',
-                    'model' => trim((string) get_config('local_ragassistant', 'chat_model')) ?: null,
+                    'provider' => trim((string) get_config('local_ragassistant', 'llm_provider')),
+                    'model' => trim((string) get_config('local_ragassistant', 'chat_model')),
                     'temperature' => (float) get_config('local_ragassistant', 'temperature'),
                 ]);
             } finally {
