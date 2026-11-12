@@ -70,7 +70,7 @@ $string['nodocuments'] = 'No documents have been uploaded for this course yet.';
 
 
 
-$string['chatdisabledreason'] = 'Chat is disabled in site settings. Configure and test FastAPI and Ollama before enabling it.';
+$string['chatdisabledreason'] = 'Chat is disabled in site settings. Configure and test FastAPI and the selected AI provider before enabling it.';
 
 
 $string['apikeymissing'] = 'The RAG API key is not configured. Ask a site administrator to configure it.';
@@ -83,7 +83,7 @@ $string['indexsuccess'] = 'Document indexed successfully ({$a} text chunks).';
 $string['indexdocument'] = 'Index';
 $string['actions'] = 'Actions';
 
-$string['answerfailed'] = 'The assistant could not answer right now. Check that the backend and Ollama are running, then try again.';
+$string['answerfailed'] = 'The assistant could not answer right now. Check that the backend and configured AI provider are available, then try again.';
 
 $string['notavailable'] = 'Not available';
 
@@ -112,13 +112,15 @@ $string['apibaseurl_desc'] = 'Endpoint used to invoke the API call.';
 $string['llm_heading'] = 'LLM configuration';
 $string['llm_heading_desc'] = 'Configure the LLM settings for the RAG system.';
 $string['llmprovider'] = 'Chat provider';
-$string['llmprovider_desc'] = 'Default provider used for chat requests when the frontend does not override it. Provider credentials are configured on the backend.';
+$string['llmprovider_desc'] = 'AI provider selected for chat generation. Provider credentials are configured on the backend.';
 $string['llm_model'] = 'Chat model';
-$string['llm_model_desc'] = 'Default model identifier sent with chat requests. Changing the chat provider or model automatically reindexes all stored documents and regenerates their starter questions.';
+$string['llm_model_desc'] = 'Required chat model identifier supplied to the backend. Changing the generation model does not require document reindexing.';
+$string['image_model'] = 'Image generation model';
+$string['image_model_desc'] = 'Model identifier used to generate /explain illustrations. Leave blank to disable illustration generation.';
 $string['embeddingprovider'] = 'Embedding provider';
 $string['embeddingprovider_desc'] = 'Provider used for both document indexing and question embeddings. Changing the provider automatically rebuilds all stored document vectors and regenerates starter questions.';
 $string['embeddingmodel'] = 'Embedding model';
-$string['embeddingmodel_desc'] = 'Optional model identifier. Leave blank to use the backend default for the selected provider. A change automatically rebuilds all stored documents.';
+$string['embeddingmodel_desc'] = 'Optional embedding model identifier. Leave blank to use the configured embedding default. A change automatically rebuilds all stored documents.';
 $string['geminiembeddimensions'] = 'Gemini embedding dimensions';
 $string['geminiembeddimensions_desc'] = 'Output vector dimensions for Gemini embeddings. Keep this unchanged between indexing and retrieval.';
 $string['apikey'] = 'Application API key';
