@@ -523,6 +523,7 @@ $table->head = [
     get_string('documentname', 'local_ragassistant'),
     get_string('lecturernote', 'local_ragassistant'),
     get_string('processingstatus', 'local_ragassistant'),
+    'Retrieval',
     get_string('actions', 'local_ragassistant'),
 ];
 
@@ -602,12 +603,6 @@ foreach ($documents as $document) {
             ['class' => 'text-muted ragassistant-progress-label']
         );
     }
-    $statuscontent .= html_writer::div(
-        $retrievalenabled
-            ? html_writer::span('Retrieval enabled', 'badge badge-success bg-success')
-            : html_writer::span('Retrieval disabled', 'badge badge-secondary bg-secondary'),
-        'ragassistant-retrieval-state'
-    );
     $status = html_writer::div($statuscontent, 'ragassistant-processing-status', [
         'data-document-id' => (int) $document->id,
         'data-status' => $document->status,
@@ -624,6 +619,9 @@ foreach ($documents as $document) {
             ? format_text($document->lecturernote, FORMAT_PLAIN, ['para' => false])
             : get_string('notavailable', 'local_ragassistant'),
         $status,
+        $retrievalenabled
+            ? html_writer::span('Enabled', 'badge badge-success bg-success')
+            : html_writer::span('Disabled', 'badge badge-secondary bg-secondary'),
         html_writer::div(implode('', $actions), 'ragassistant-document-actions'),
     ];
 
