@@ -701,15 +701,6 @@ $polljs = '(function() {
                     completed = true;
                 }
 
-                const retrieval = document.createElement("div");
-                retrieval.className = "ragassistant-retrieval-state";
-                const badge = document.createElement("span");
-                badge.className = doc.retrievalenabled
-                    ? "badge badge-success bg-success"
-                    : "badge badge-secondary bg-secondary";
-                badge.textContent = doc.retrievalenabled ? "Retrieval enabled" : "Retrieval disabled";
-                retrieval.appendChild(badge);
-                box.appendChild(retrieval);
             });
 
             if (completed) {
