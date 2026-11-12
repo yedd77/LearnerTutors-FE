@@ -147,6 +147,18 @@ class index_document extends \core\task\adhoc_task {
             mtrace('RAG Assistant: indexed document ' . $documentid . ' (' .
                 (int) ($result['indexed_chunks'] ?? 0) . ' chunks).');
 
+            // Save usable starter questions immediately after indexing. The
+            // LLM task may take minutes; students should not wait for it.
+            $this->save_suggestions(
+                $documentid,
+                (int) $record->courseid,
+                (int) $record->userid,
+                $this->fallback_suggestions(
+                    (string) $record->filename,
+                    (string) ($record->lecturernote ?? '')
+                )
+            );
+
             // Initial indexing and reindexing both refresh starter suggestions,
             // but suggestion failure must never roll back a successful vector index.
             try {
