@@ -41,10 +41,6 @@ class api_client
     }
 
     /**
-     * Synchronize the administrator-selected AI configuration with FastAPI.
-     * Provider credentials remain on the backend and are never sent by Moodle.
-     */
-    /**
      * Synchronize configuration only when administrator-selected values change.
      *
      * The backend persists its runtime configuration, so repeating this
@@ -82,6 +78,10 @@ class api_client
         return $result;
     }
 
+    /**
+     * Synchronize the administrator-selected AI configuration with FastAPI.
+     * Provider credentials remain on the backend and are never sent by Moodle.
+     */
     public function sync_configuration(): array
     {
         $result = $this->post_json('/api/v1/admin/config', [
