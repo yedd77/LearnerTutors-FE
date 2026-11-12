@@ -96,7 +96,7 @@ $string['api_base_url'] = 'FastAPI base URL';
 $string['api_base_url_desc'] = 'Base URL of your RAG backend, without an API path.';
 $string['api_key'] = 'FastAPI API key';
 $string['api_key_desc'] = 'API key used to authenticate requests to the RAG backend.';
-$string['reindexpending'] = 'The AI model or embedding configuration has changed. Course documents are being reindexed and starter questions regenerated. Please try again after Moodle scheduled tasks have completed.';
+$string['reindexpending'] = 'The embedding configuration has changed. Course documents are being reindexed so their vectors remain compatible. Chat-generation model changes do not require reindexing. Please try again after Moodle scheduled tasks have completed.';
 
 
 
