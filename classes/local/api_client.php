@@ -86,8 +86,9 @@ class api_client
     public function sync_configuration(): array
     {
         $result = $this->post_json('/api/v1/admin/config', [
-            'llm_provider' => trim((string) get_config('local_ragassistant', 'llm_provider')) ?: 'openai',
-            'llm_model' => trim((string) get_config('local_ragassistant', 'chat_model')) ?: 'gpt-4o-luna',
+            'llm_provider' => trim((string) get_config('local_ragassistant', 'llm_provider')),
+            'llm_model' => trim((string) get_config('local_ragassistant', 'chat_model')),
+            'image_model' => trim((string) get_config('local_ragassistant', 'image_model')),
             'embedding_provider' => trim((string) get_config('local_ragassistant', 'embedding_provider')) ?: 'openai',
             'embedding_model' => trim((string) get_config('local_ragassistant', 'embedding_model')),
             'gemini_embed_dimensions' => max(0, (int) (get_config('local_ragassistant', 'gemini_embed_dimensions') ?: 768)),
