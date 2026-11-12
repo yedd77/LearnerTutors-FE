@@ -139,7 +139,7 @@ class reindex_documents extends \core\task\adhoc_task {
                     ]);
                     $DB->set_field('local_ragassistant_documents', 'stage', 'suggestions queued', ['id' => $record->id]);
                     $DB->set_field('local_ragassistant_documents', 'jobtype', 'suggestions', ['id' => $record->id]);
-                    \\core\\task\\manager::queue_adhoc_task($suggestiontask);
+                    \core\task\manager::queue_adhoc_task($suggestiontask);
 
                     $success++;
                     mtrace('RAG Assistant: rebuilt document ' . $record->id . ' (' . $record->filename . ').');
