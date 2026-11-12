@@ -10,9 +10,9 @@
 require_once(__DIR__ . '/../../config.php');
 
 $courseid = required_param('courseid', PARAM_INT);
-require_sesskey();
 $course = get_course($courseid);
 require_login($course);
+require_sesskey();
 $context = context_course::instance($courseid);
 require_capability('local/ragassistant:useassistant', $context);
 
