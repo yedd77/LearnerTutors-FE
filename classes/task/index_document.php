@@ -35,6 +35,40 @@ class index_document extends \core\task\adhoc_task {
     }
 
     /**
+     * Update suggestion progress without changing the document's ready status.
+     *
+     * @param int $documentid
+     * @param string $stage
+     */
+    private function update_suggestion_stage(int $documentid, string $stage): void {
+        global $DB;
+        $DB->update_record('local_ragassistant_documents', (object) [
+            'id' => $documentid,
+            'stage' => $stage,
+            'jobtype' => 'suggestions',
+            'timemodified' => time(),
+        ]);
+    }
+
+    /**
+     * Queue suggestion generation separately from vector indexing.
+     *
+     * @param int $documentid
+     */
+    private function queue_suggestion_task(int $documentid): void {
+        global $DB;
+        $task = new self();
+        $task->set_component('local_ragassistant');
+        $task->set_custom_data([
+            'documentid' => $documentid,
+            'jobtype' => 'suggestions',
+        ]);
+        $DB->set_field('local_ragassistant_documents', 'stage', 'suggestions queued', ['id' => $documentid]);
+        $DB->set_field('local_ragassistant_documents', 'jobtype', 'suggestions', ['id' => $documentid]);
+        \core\task\manager::queue_adhoc_task($task);
+    }
+
+    /**
      * Execute the queued job.
      */
     public function execute(): void {
@@ -54,7 +88,6 @@ class index_document extends \core\task\adhoc_task {
             return;
         }
 
-        $this->update_progress($documentid, 'processing', 5, 'preparing');
         try {
             $stored = get_file_storage()->get_file(
                 (int) $record->contextid,
@@ -70,7 +103,9 @@ class index_document extends \core\task\adhoc_task {
 
             $api = new \local_ragassistant\local\api_client();
             if ($jobtype === 'suggestions') {
-                $this->update_progress($documentid, 'processing', 25, 'generating suggestions');
+                // Suggestion work is independent: keep the indexed document ready
+                // so retrieval and management actions remain available.
+                $this->update_suggestion_stage($documentid, 'generating suggestions');
                 $result = $api->generate_document_suggestions($stored, $documentid);
                 $saved = $this->save_suggestions(
                     $documentid,
@@ -78,41 +113,49 @@ class index_document extends \core\task\adhoc_task {
                     (int) $record->userid,
                     $result['suggestions'] ?? []
                 );
-                mtrace('RAG Assistant: regenerated ' . $saved . ' suggestion(s) for document ' . $documentid . '.');
-            } else {
-                $this->update_progress($documentid, 'processing', 20, 'indexing document');
-                $generatesuggestions = ($jobtype === 'index');
-                $result = $api->index_file(
-                    $stored,
+                $this->update_suggestion_stage(
                     $documentid,
-                    (int) $record->courseid,
-                    (int) $record->userid,
-                    (string) $record->visibility,
-                    !empty($record->retrievalenabled),
-                    $generatesuggestions
+                    $saved > 0 ? 'complete' : 'suggestions unavailable'
                 );
-
-                if ($generatesuggestions) {
-                    $this->update_progress($documentid, 'processing', 90, 'saving suggestions');
-                    $saved = $this->save_suggestions(
-                        $documentid,
-                        (int) $record->courseid,
-                        (int) $record->userid,
-                        $result['suggestions'] ?? []
-                    );
-                } else {
-                    $saved = 0;
-                }
-                mtrace('RAG Assistant: indexed document ' . $documentid . ' (' .
-                    (int) ($result['indexed_chunks'] ?? 0) . ' chunks); saved ' . $saved . ' suggestion(s).');
+                mtrace('RAG Assistant: generated ' . $saved . ' suggestion(s) for document ' . $documentid . '.');
+                return;
             }
 
+            $this->update_progress($documentid, 'processing', 20, 'indexing document');
+            // Keep the indexing request focused on parsing and embeddings only.
+            // The separate suggestion task is queued after the document is ready.
+            $result = $api->index_file(
+                $stored,
+                $documentid,
+                (int) $record->courseid,
+                (int) $record->userid,
+                (string) $record->visibility,
+                !empty($record->retrievalenabled),
+                false
+            );
+
             $this->update_progress($documentid, 'ready', 100, 'complete');
+            mtrace('RAG Assistant: indexed document ' . $documentid . ' (' .
+                (int) ($result['indexed_chunks'] ?? 0) . ' chunks).');
+
+            // Initial indexing and reindexing both refresh starter suggestions,
+            // but suggestion failure must never roll back a successful vector index.
+            try {
+                $this->queue_suggestion_task($documentid);
+            } catch (\Throwable $exception) {
+                $this->update_suggestion_stage($documentid, 'suggestions failed');
+                mtrace('RAG Assistant: could not queue suggestions for document ' . $documentid . ': ' .
+                    $exception->getMessage());
+            }
         } catch (\Throwable $exception) {
-            $this->update_progress($documentid, 'failed', 100, 'failed');
+            if ($jobtype === 'suggestions') {
+                $this->update_suggestion_stage($documentid, 'suggestions failed');
+            } else {
+                $this->update_progress($documentid, 'failed', 100, 'failed');
+            }
             mtrace('RAG Assistant: ' . $jobtype . ' task failed for document ' . $documentid . ': ' .
                 $exception->getMessage());
-            // Do not automatically retry; a lecturer can explicitly queue the job again.
+            // Suggestion errors do not change the ready status or indexed vectors.
         }
     }
 
