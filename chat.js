@@ -34,6 +34,7 @@ document.addEventListener('DOMContentLoaded', function () {
     // Clicking a suggestion sends that stored prompt through the normal chat flow.
     document.addEventListener('click', function (event) {
         const card = event.target.closest('.ragassistant-suggestion-card');
+
         if (!card || !form) {
             return;
         }
@@ -42,6 +43,9 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!prompt.trim()) {
             return;
         }
+
+        removeSuggestions();
+        activateChatBackground();
 
         if (toolInput) {
             toolInput.value = '';
