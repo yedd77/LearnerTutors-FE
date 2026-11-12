@@ -100,7 +100,19 @@ function local_ragassistant_queue_document_task(int $documentid, string $jobtype
     ]);
 
     // The adhoc task is persisted in Moodle's task queue and picked up by cron.
-    \\core\\task\\manager::queue_adhoc_task($task);
+    try {
+        \\core\\task\\manager::queue_adhoc_task($task);
+    } catch (\\Throwable $exception) {
+        $DB->update_record('local_ragassistant_documents', (object) [
+            'id' => $documentid,
+            'status' => 'failed',
+            'progress' => 100,
+            'stage' => 'queue failed',
+            'jobtype' => '',
+            'timemodified' => time(),
+        ]);
+        throw $exception;
+    }
     return true;
 }
 
@@ -182,7 +194,7 @@ $PAGE->set_title(get_string('uploadCardTitle', 'local_ragassistant'));
 $PAGE->set_heading(format_string($course->fullname));
 
 // Handle document actions
-$action = optional_param('action', '', PARAM_ALPHA);
+$action = optional_param('action', '', PARAM_ALPHANUMEXT);
 $actiondocumentid = optional_param('documentid', 0, PARAM_INT);
 
 // Queue a reindex for every eligible course document; cron performs the work.
@@ -252,7 +264,7 @@ if ($action !== '' && $actiondocumentid > 0 && data_submitted()) {
             // Queue indexing/reindexing without holding the Moodle request open.
             case 'index':
             case 'reindex':
-            case 'regenerate_suggestions':
+            case 'regeneratesuggestions':
                 if (!$targetfile) {
                     throw new moodle_exception('storedfilemissing', 'local_ragassistant');
                 }
@@ -262,7 +274,7 @@ if ($action !== '' && $actiondocumentid > 0 && data_submitted()) {
                 if ($action === 'reindex' && !in_array($target->status, ['ready', 'failed'], true)) {
                     throw new moodle_exception('invalidrequest', 'error');
                 }
-                if ($action === 'regenerate_suggestions' && $target->status !== 'ready') {
+                if ($action === 'regeneratesuggestions' && $target->status !== 'ready') {
                     throw new moodle_exception('invalidrequest', 'error');
                 }
                 $jobtype = $action === 'regenerate_suggestions' ? 'suggestions' : $action;
