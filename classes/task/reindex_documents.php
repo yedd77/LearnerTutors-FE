@@ -125,6 +125,22 @@ class reindex_documents extends \core\task\adhoc_task {
                         'jobtype' => '',
                         'timemodified' => time(),
                     ]);
+
+                    // Keep at least three starter questions available while the
+                    // asynchronous LLM refresh runs. Existing suggestions are kept.
+                    if (!$DB->record_exists('local_ragassistant_suggestions', ['documentid' => $record->id])) {
+                        $this->save_fallback_suggestions($record);
+                    }
+                    $suggestiontask = new index_document();
+                    $suggestiontask->set_component('local_ragassistant');
+                    $suggestiontask->set_custom_data([
+                        'documentid' => (int) $record->id,
+                        'jobtype' => 'suggestions',
+                    ]);
+                    $DB->set_field('local_ragassistant_documents', 'stage', 'suggestions queued', ['id' => $record->id]);
+                    $DB->set_field('local_ragassistant_documents', 'jobtype', 'suggestions', ['id' => $record->id]);
+                    \\core\\task\\manager::queue_adhoc_task($suggestiontask);
+
                     $success++;
                     mtrace('RAG Assistant: rebuilt document ' . $record->id . ' (' . $record->filename . ').');
                 } catch (\Throwable $exception) {
@@ -142,5 +158,30 @@ class reindex_documents extends \core\task\adhoc_task {
         }
 
         mtrace('RAG Assistant rebuild complete: ' . $success . ' succeeded, ' . $failed . ' failed.');
+    }    
+    /**
+     * Save deterministic starter questions if this document has none yet.
+     *
+     * @param object $record
+     */
+    private function save_fallback_suggestions($record): void {
+        global $DB;
+        $title = trim(pathinfo((string) $record->filename, PATHINFO_FILENAME));
+        $title = $title !== '' ? $title : 'this document';
+        $questions = [
+            'What are the main concepts covered in ' . $title . '?',
+            'What important details and examples should I understand from ' . $title . '?',
+            'How can I apply the knowledge from ' . $title . ' to a practical situation?',
+        ];
+        foreach ($questions as $question) {
+            $DB->insert_record('local_ragassistant_suggestions', (object) [
+                'courseid' => (int) $record->courseid,
+                'documentid' => (int) $record->id,
+                'userid' => (int) $record->userid,
+                'suggestion' => $question,
+                'timecreated' => time(),
+            ]);
+        }
     }
+
 }
