@@ -78,7 +78,12 @@ function local_ragassistant_queue_document_task(int $documentid, string $jobtype
     }
 
     $document = $DB->get_record('local_ragassistant_documents', ['id' => $documentid], '*', MUST_EXIST);
-    if (
+    if ($jobtype === 'suggestions') {
+        if ($document->status !== 'ready' ||
+                in_array((string) ($document->stage ?? ''), ['suggestions queued', 'generating suggestions'], true)) {
+            return false;
+        }
+    } else if (
         $document->status === 'processing' ||
         ($document->status === 'pending' && ($document->stage ?? '') === 'queued')
     ) {
@@ -92,28 +97,47 @@ function local_ragassistant_queue_document_task(int $documentid, string $jobtype
         'jobtype' => $jobtype,
     ]);
 
-    // Mark the document queued before exposing the task to a cron worker.
-    $DB->update_record('local_ragassistant_documents', (object) [
-        'id' => $documentid,
-        'status' => 'pending',
-        'progress' => 0,
-        'stage' => 'queued',
-        'jobtype' => $jobtype,
-        'timemodified' => time(),
-    ]);
+    // Suggestion generation is independent from document indexing. Keep a
+    // successfully indexed document ready while suggestions are generated.
+    if ($jobtype === 'suggestions') {
+        $DB->update_record('local_ragassistant_documents', (object) [
+            'id' => $documentid,
+            'stage' => 'suggestions queued',
+            'jobtype' => 'suggestions',
+            'timemodified' => time(),
+        ]);
+    } else {
+        // Mark the document queued before exposing the task to a cron worker.
+        $DB->update_record('local_ragassistant_documents', (object) [
+            'id' => $documentid,
+            'status' => 'pending',
+            'progress' => 0,
+            'stage' => 'queued',
+            'jobtype' => $jobtype,
+            'timemodified' => time(),
+        ]);
+    }
 
     // The adhoc task is persisted in Moodle's task queue and picked up by cron.
     try {
         \core\task\manager::queue_adhoc_task($task);
     } catch (\Throwable $exception) {
-        $DB->update_record('local_ragassistant_documents', (object) [
-            'id' => $documentid,
-            'status' => 'failed',
-            'progress' => 100,
-            'stage' => 'queue failed',
-            'jobtype' => '',
-            'timemodified' => time(),
-        ]);
+        if ($jobtype === 'suggestions') {
+            $DB->update_record('local_ragassistant_documents', (object) [
+                'id' => $documentid,
+                'stage' => 'suggestions failed',
+                'timemodified' => time(),
+            ]);
+        } else {
+            $DB->update_record('local_ragassistant_documents', (object) [
+                'id' => $documentid,
+                'status' => 'failed',
+                'progress' => 100,
+                'stage' => 'queue failed',
+                'jobtype' => '',
+                'timemodified' => time(),
+            ]);
+        }
         throw $exception;
     }
     return true;
