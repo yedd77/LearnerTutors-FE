@@ -89,9 +89,7 @@ function local_ragassistant_queue_document_task(int $documentid, string $jobtype
         'jobtype' => $jobtype,
     ]);
 
-    // The adhoc task is persisted in Moodle's task queue and picked up by cron.
-    \\core\\task\\manager::queue_adhoc_task($task);
-
+    // Mark the document queued before exposing the task to a cron worker.
     $DB->update_record('local_ragassistant_documents', (object) [
         'id' => $documentid,
         'status' => 'pending',
@@ -100,6 +98,9 @@ function local_ragassistant_queue_document_task(int $documentid, string $jobtype
         'jobtype' => $jobtype,
         'timemodified' => time(),
     ]);
+
+    // The adhoc task is persisted in Moodle's task queue and picked up by cron.
+    \\core\\task\\manager::queue_adhoc_task($task);
     return true;
 }
 
@@ -469,10 +470,10 @@ if ($canmanage) {
         html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'sesskey', 'value' => sesskey()]) .
         html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'courseid', 'value' => $courseid]) .
         html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'action', 'value' => 'reindexall']) .
-        html_writer::tag('button', 'Reindex all course documents', [
+        html_writer::tag('button', 'Queue reindex for all course documents', [
             'type' => 'submit',
             'class' => 'btn btn-outline-primary mb-3',
-            'onclick' => 'return confirm("Reindex all course documents using the currently configured embedding model?");',
+            'onclick' => 'return confirm("Queue all course documents for reindexing using the current embedding model?");',
         ]),
         ['method' => 'post', 'action' => (new moodle_url('/local/ragassistant/documents.php', ['courseid' => $courseid]))->out(false)]
     );
@@ -568,21 +569,12 @@ foreach ($documents as $document) {
         ]);
     }
 
-    $status = html_writer::div(
-        html_writer::tag('span', get_string('status_' . $document->status, 'local_ragassistant'), [
-            'class' => 'ragassistant-status-label',
-        ]),
-        'ragassistant-processing-status',
-        [
-            'data-document-id' => (int) $document->id,
-            'data-status' => $document->status,
-            'data-progress' => (int) ($document->progress ?? 0),
-            'data-stage' => (string) ($document->stage ?? ''),
-        ]
-    );
+    $progress = max(0, min(100, (int) ($document->progress ?? 0)));
+    $statuscontent = html_writer::tag('span', ucfirst($document->status), [
+        'class' => 'ragassistant-status-label',
+    ]);
     if ($active) {
-        $progress = max(0, min(100, (int) ($document->progress ?? 0)));
-        $status .= html_writer::div(
+        $statuscontent .= html_writer::div(
             html_writer::div('', 'progress-bar', [
                 'role' => 'progressbar',
                 'style' => 'width:' . $progress . '%',
@@ -592,15 +584,24 @@ foreach ($documents as $document) {
             ]),
             'progress ragassistant-document-progress'
         );
-        $status .= html_writer::tag('small', s(ucfirst((string) ($document->stage ?? 'queued'))) .
-            ' · ' . $progress . '%', ['class' => 'text-muted ragassistant-progress-label']);
+        $statuscontent .= html_writer::tag(
+            'small',
+            s(ucfirst((string) ($document->stage ?: 'queued'))) . ' · ' . $progress . '%',
+            ['class' => 'text-muted ragassistant-progress-label']
+        );
     }
-    $status .= html_writer::div(
+    $statuscontent .= html_writer::div(
         $retrievalenabled
             ? html_writer::span('Retrieval enabled', 'badge badge-success bg-success')
             : html_writer::span('Retrieval disabled', 'badge badge-secondary bg-secondary'),
         'ragassistant-retrieval-state'
     );
+    $status = html_writer::div($statuscontent, 'ragassistant-processing-status', [
+        'data-document-id' => (int) $document->id,
+        'data-status' => $document->status,
+        'data-progress' => $progress,
+        'data-stage' => (string) ($document->stage ?? ''),
+    ]);
 
     $table->data[] = [
         html_writer::span(
@@ -632,4 +633,91 @@ echo html_writer::div(
     ),
     'mt-3'
 );
+// Poll document jobs while the table contains queued or running work.
+$statusurl = (new moodle_url('/local/ragassistant/document_status.php', [
+    'courseid' => $courseid,
+    'sesskey' => sesskey(),
+]))->out(false);
+$polljs = '(function() {
+    const url = ' . json_encode($statusurl) . ';
+    async function poll() {
+        try {
+            const response = await fetch(url, {
+                credentials: "same-origin",
+                headers: {"Accept": "application/json"}
+            });
+            if (!response.ok) {
+                window.setTimeout(poll, 5000);
+                return;
+            }
+            const payload = await response.json();
+            let active = false;
+            let completed = false;
+            (payload.documents || []).forEach(function(doc) {
+                const box = document.querySelector(
+                    ".ragassistant-processing-status[data-document-id=\"" + doc.id + "\"]"
+                );
+                if (!box) return;
+                const previous = box.dataset.status;
+                box.dataset.status = doc.status;
+                box.dataset.progress = doc.progress;
+                box.dataset.stage = doc.stage || "";
+                box.replaceChildren();
+
+                const label = document.createElement("span");
+                label.className = "ragassistant-status-label";
+                label.textContent = doc.status.charAt(0).toUpperCase() + doc.status.slice(1);
+                box.appendChild(label);
+
+                if (doc.status === "pending" || doc.status === "processing") {
+                    active = true;
+                    const wrap = document.createElement("div");
+                    wrap.className = "progress ragassistant-document-progress";
+                    const bar = document.createElement("div");
+                    bar.className = "progress-bar";
+                    bar.style.width = doc.progress + "%";
+                    bar.setAttribute("role", "progressbar");
+                    bar.setAttribute("aria-valuenow", doc.progress);
+                    bar.setAttribute("aria-valuemin", "0");
+                    bar.setAttribute("aria-valuemax", "100");
+                    wrap.appendChild(bar);
+                    box.appendChild(wrap);
+
+                    const detail = document.createElement("small");
+                    detail.className = "text-muted ragassistant-progress-label";
+                    detail.textContent = (doc.stage || "queued") + " · " + doc.progress + "%";
+                    box.appendChild(detail);
+                } else if (previous === "pending" || previous === "processing") {
+                    completed = true;
+                }
+
+                const retrieval = document.createElement("div");
+                retrieval.className = "ragassistant-retrieval-state";
+                const badge = document.createElement("span");
+                badge.className = doc.retrievalenabled
+                    ? "badge badge-success bg-success"
+                    : "badge badge-secondary bg-secondary";
+                badge.textContent = doc.retrievalenabled ? "Retrieval enabled" : "Retrieval disabled";
+                retrieval.appendChild(badge);
+                box.appendChild(retrieval);
+            });
+
+            if (completed) {
+                window.location.reload();
+                return;
+            }
+            if (active) window.setTimeout(poll, 2500);
+        } catch (error) {
+            window.setTimeout(poll, 5000);
+        }
+    }
+
+    if (document.querySelector(
+        ".ragassistant-processing-status[data-status=\"pending\"], " +
+        ".ragassistant-processing-status[data-status=\"processing\"]"
+    )) {
+        poll();
+    }
+})();';
+echo html_writer::script($polljs);
 echo $OUTPUT->footer();
