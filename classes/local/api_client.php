@@ -220,7 +220,7 @@ class api_client
         int $ownerid,
         string $visibility,
         bool $retrievalenabled = true,
-        bool $generatesuggestions = true
+        bool $generatesuggestions = false
     ): array {
         // Keep backend indexing and query embedding settings synchronized.
         $this->sync_configuration_if_changed();
@@ -317,7 +317,7 @@ class api_client
                 CURLOPT_POST => true,
                 CURLOPT_RETURNTRANSFER => true,
                 CURLOPT_CONNECTTIMEOUT => 5,
-                CURLOPT_TIMEOUT => 180,
+                CURLOPT_TIMEOUT => 240,
                 CURLOPT_HTTPHEADER => [
                     'Accept: application/json',
                     'X-RAG-API-Key: ' . $this->get_api_key(),
