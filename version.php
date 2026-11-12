@@ -6,7 +6,7 @@
 defined('MOODLE_INTERNAL') || die();
 
 $plugin->component = 'local_ragassistant';
-$plugin->version   = 2026111100;
+$plugin->version   = 2026111200;
 $plugin->requires  = 2025101600;
 $plugin->maturity  = MATURITY_ALPHA;
-$plugin->release   = '0.3.7 - Background document indexing';
+$plugin->release   = '0.3.8 - Queued document processing';
