@@ -57,7 +57,15 @@ if ($hassiteconfig) {
         'local_ragassistant/chat_model',
         get_string('llm_model', 'local_ragassistant'),
         get_string('llm_model_desc', 'local_ragassistant'),
-        'gpt-5.6-sol',
+        '',
+        PARAM_TEXT
+    ));
+
+    $settings->add(new admin_setting_configtext(
+        'local_ragassistant/image_model',
+        get_string('image_model', 'local_ragassistant'),
+        get_string('image_model_desc', 'local_ragassistant'),
+        '',
         PARAM_TEXT
     ));
 
