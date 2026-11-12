@@ -225,7 +225,8 @@ class api_client
         int $courseid,
         int $ownerid,
         string $visibility,
-        bool $retrievalenabled = true
+        bool $retrievalenabled = true,
+        bool $generatesuggestions = true
     ): array {
         // Keep backend indexing and query embedding settings synchronized.
         $this->sync_configuration_if_changed();
@@ -265,6 +266,7 @@ class api_client
                 'owner_id' => (string) $ownerid,
                 'visibility' => $visibility,
                 'retrieval_enabled' => $retrievalenabled ? '1' : '0',
+                'generate_suggestions' => $generatesuggestions ? '1' : '0',
             ];
 
             curl_setopt_array($handle, [
@@ -296,6 +298,53 @@ class api_client
         }
     }
 
+
+    /**
+     * Regenerate document-grounded suggestions without reindexing vectors.
+     *
+     * @param \\stored_file $file
+     * @param int $documentid
+     * @return array
+     */
+    public function generate_document_suggestions(\\stored_file $file, int $documentid): array {
+        $temp = $file->copy_content_to_temp();
+        if (!$temp || !is_file($temp)) {
+            throw new \\moodle_exception('filetempfailed', 'local_ragassistant');
+        }
+
+        try {
+            $handle = curl_init($this->get_base_url() . '/api/v1/documents/suggestions');
+            if ($handle === false) {
+                throw new \\moodle_exception('backendconnectionfailed', 'local_ragassistant');
+            }
+            $mime = function_exists('mime_content_type')
+                ? (mime_content_type($temp) ?: 'application/octet-stream')
+                : 'application/octet-stream';
+            curl_setopt_array($handle, [
+                CURLOPT_POST => true,
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_CONNECTTIMEOUT => 5,
+                CURLOPT_TIMEOUT => 180,
+                CURLOPT_HTTPHEADER => [
+                    'Accept: application/json',
+                    'X-RAG-API-Key: ' . $this->get_api_key(),
+                ],
+                CURLOPT_POSTFIELDS => [
+                    'file' => new \\CURLFile($temp, $mime, $file->get_filename()),
+                    'document_id' => (string) $documentid,
+                ],
+            ]);
+            $body = curl_exec($handle);
+            $error = curl_error($handle);
+            $status = (int) curl_getinfo($handle, CURLINFO_HTTP_CODE);
+            curl_close($handle);
+            return $this->decode_response($body, $error, $status);
+        } finally {
+            if (is_file($temp)) {
+                @unlink($temp);
+            }
+        }
+    }
 
     /**
      * Enable or disable retrieval for a document.
