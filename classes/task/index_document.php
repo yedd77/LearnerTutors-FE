@@ -107,11 +107,20 @@ class index_document extends \core\task\adhoc_task {
                 // so retrieval and management actions remain available.
                 $this->update_suggestion_stage($documentid, 'generating suggestions');
                 $result = $api->generate_document_suggestions($stored, $documentid);
+                $suggestions = $result['suggestions'] ?? [];
+                if (!is_array($suggestions) || count($suggestions) < 3) {
+                    mtrace('RAG Assistant: backend returned incomplete suggestions for document ' .
+                        $documentid . '; using local fallback.');
+                    $suggestions = $this->fallback_suggestions(
+                        (string) $record->filename,
+                        (string) ($record->lecturernote ?? '')
+                    );
+                }
                 $saved = $this->save_suggestions(
                     $documentid,
                     (int) $record->courseid,
                     (int) $record->userid,
-                    $result['suggestions'] ?? []
+                    $suggestions
                 );
                 $this->update_suggestion_stage(
                     $documentid,
@@ -149,7 +158,27 @@ class index_document extends \core\task\adhoc_task {
             }
         } catch (\Throwable $exception) {
             if ($jobtype === 'suggestions') {
-                $this->update_suggestion_stage($documentid, 'suggestions failed');
+                // The indexed vectors are already valid. Never force the lecturer
+                // to reindex just because the LLM or suggestion endpoint failed.
+                try {
+                    $saved = $this->save_suggestions(
+                        $documentid,
+                        (int) $record->courseid,
+                        (int) $record->userid,
+                        $this->fallback_suggestions(
+                            (string) $record->filename,
+                            (string) ($record->lecturernote ?? '')
+                        )
+                    );
+                    $this->update_suggestion_stage(
+                        $documentid,
+                        $saved > 0 ? 'complete (local fallback)' : 'suggestions failed'
+                    );
+                } catch (\\Throwable $fallbackexception) {
+                    $this->update_suggestion_stage($documentid, 'suggestions failed');
+                    mtrace('RAG Assistant: local suggestion fallback failed for document ' .
+                        $documentid . ': ' . $fallbackexception->getMessage());
+                }
             } else {
                 $this->update_progress($documentid, 'failed', 100, 'failed');
             }
@@ -157,6 +186,33 @@ class index_document extends \core\task\adhoc_task {
                 $exception->getMessage());
             // Suggestion errors do not change the ready status or indexed vectors.
         }
+    }
+
+    /**
+     * Create deterministic starter questions when the backend/LLM is unavailable.
+     *
+     * These questions are deliberately based on lecturer-provided document metadata
+     * rather than fabricated document content. They keep the chatbot usable while
+     * allowing the lecturer to retry suggestion generation independently.
+     *
+     * @param string $filename
+     * @param string $lecturernote
+     * @return array
+     */
+    private function fallback_suggestions(string $filename, string $lecturernote): array {
+        $title = trim(pathinfo($filename, PATHINFO_FILENAME));
+        $title = preg_replace('/\\s+/', ' ', $title);
+        $title = $title !== '' ? $title : 'this document';
+        $questions = [
+            'What are the main concepts covered in ' . $title . '?',
+            'What important details and examples should I understand from ' . $title . '?',
+            'How can I apply the knowledge from ' . $title . ' to a practical situation?',
+        ];
+        if (trim($lecturernote) !== '') {
+            $note = \core_text::substr(trim(clean_param($lecturernote, PARAM_TEXT)), 0, 180);
+            $questions[2] = 'How does ' . $title . ' relate to this lecturer note: ' . $note . '?';
+        }
+        return $questions;
     }
 
     /**
