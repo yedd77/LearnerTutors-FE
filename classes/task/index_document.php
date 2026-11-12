@@ -188,7 +188,7 @@ class index_document extends \core\task\adhoc_task {
                         $documentid,
                         $saved > 0 ? 'complete (local fallback)' : 'suggestions failed'
                     );
-                } catch (\\Throwable $fallbackexception) {
+                } catch (\Throwable $fallbackexception) {
                     $this->update_suggestion_stage($documentid, 'suggestions failed');
                     mtrace('RAG Assistant: local suggestion fallback failed for document ' .
                         $documentid . ': ' . $fallbackexception->getMessage());
