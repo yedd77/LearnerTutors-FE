@@ -277,7 +277,7 @@ if ($action !== '' && $actiondocumentid > 0 && data_submitted()) {
                 if ($action === 'regeneratesuggestions' && $target->status !== 'ready') {
                     throw new moodle_exception('invalidrequest', 'error');
                 }
-                $jobtype = $action === 'regenerate_suggestions' ? 'suggestions' : $action;
+                $jobtype = $action === 'regeneratesuggestions' ? 'suggestions' : $action;
                 if (!local_ragassistant_queue_document_task((int) $target->id, $jobtype)) {
                     redirect($redirecturl, 'This document already has a background task queued or running.', null,
                         \\core\\output\\notification::NOTIFY_INFO);
