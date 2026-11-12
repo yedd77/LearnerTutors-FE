@@ -231,7 +231,6 @@ if (data_submitted() && confirm_sesskey()) {
                     'tool_id' => $toolid !== '' ? $toolid : null,
                     'provider' => trim((string) get_config('local_ragassistant', 'llm_provider')),
                     'model' => trim((string) get_config('local_ragassistant', 'chat_model')),
-                    'temperature' => (float) get_config('local_ragassistant', 'temperature'),
                 ]);
             } finally {
                 if ($sessionclosed) {

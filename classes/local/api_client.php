@@ -52,9 +52,6 @@ class api_client
             'llm_provider' => trim((string) get_config('local_ragassistant', 'llm_provider')),
             'llm_model' => trim((string) get_config('local_ragassistant', 'chat_model')),
             'image_model' => trim((string) get_config('local_ragassistant', 'image_model')),
-            'embedding_provider' => trim((string) get_config('local_ragassistant', 'embedding_provider')) ?: 'openai',
-            'embedding_model' => trim((string) get_config('local_ragassistant', 'embedding_model')),
-            'gemini_embed_dimensions' => max(0, (int) (get_config('local_ragassistant', 'gemini_embed_dimensions') ?: 768)),
         ];
 
         $fingerprint = hash(
@@ -89,13 +86,9 @@ class api_client
             'llm_provider' => trim((string) get_config('local_ragassistant', 'llm_provider')),
             'llm_model' => trim((string) get_config('local_ragassistant', 'chat_model')),
             'image_model' => trim((string) get_config('local_ragassistant', 'image_model')),
-            'embedding_provider' => trim((string) get_config('local_ragassistant', 'embedding_provider')) ?: 'openai',
-            'embedding_model' => trim((string) get_config('local_ragassistant', 'embedding_model')),
-            'gemini_embed_dimensions' => max(0, (int) (get_config('local_ragassistant', 'gemini_embed_dimensions') ?: 768)),
         ]);
 
-        // Only embedding changes invalidate stored vectors and require rebuilding
-        // Moodle source documents. Generation-model changes leave embeddings intact.
+        // The backend reports when stored document vectors need rebuilding.
         if (!empty($result['reindex_required'])) {
             // This flag is informational only; it must never block chat requests
             // or prevent a later configuration change from queueing its own rebuild.

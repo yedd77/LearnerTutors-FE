@@ -69,50 +69,12 @@ if ($hassiteconfig) {
         PARAM_TEXT
     ));
 
-    // Embedding configuration is global because every query vector must
-    // use the exact same embedding space as indexed document vectors.
-    $settings->add(new admin_setting_configselect(
-        'local_ragassistant/embedding_provider',
-        get_string('embeddingprovider', 'local_ragassistant'),
-        get_string('embeddingprovider_desc', 'local_ragassistant'),
-        'openai',
-        [
-            'openai' => 'OpenAI',
-            'gemini' => 'Google Gemini',
-            'ollama' => 'Ollama',
-        ]
-    ));
-
-    $settings->add(new admin_setting_configtext(
-        'local_ragassistant/embedding_model',
-        get_string('embeddingmodel', 'local_ragassistant'),
-        get_string('embeddingmodel_desc', 'local_ragassistant'),
-        '',
-        PARAM_TEXT
-    ));
-
-    $settings->add(new admin_setting_configtext(
-        'local_ragassistant/gemini_embed_dimensions',
-        get_string('geminiembeddimensions', 'local_ragassistant'),
-        get_string('geminiembeddimensions_desc', 'local_ragassistant'),
-        '768',
-        PARAM_INT
-    ));
-
-    $settings->add(new admin_setting_configtext(
-        'local_ragassistant/temperature',
-        get_string('temperature', 'local_ragassistant'),
-        get_string('temperature_desc', 'local_ragassistant'),
-        '0',
-        PARAM_FLOAT
-    ));
-
     $settings->add(new admin_setting_configpasswordunmask(
         'local_ragassistant/api_key',
         get_string('apikey', 'local_ragassistant'),
         get_string('apikey_desc', 'local_ragassistant'),
         ''
     ));
-
+ 
     $ADMIN->add('localplugins', $settings);
 }
