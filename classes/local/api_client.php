@@ -307,6 +307,7 @@ class api_client
      * @return array
      */
     public function generate_document_suggestions(\\stored_file $file, int $documentid): array {
+        $this->sync_configuration_if_changed();
         $temp = $file->copy_content_to_temp();
         if (!$temp || !is_file($temp)) {
             throw new \\moodle_exception('filetempfailed', 'local_ragassistant');
