@@ -298,17 +298,17 @@ class api_client
      * @param int $documentid
      * @return array
      */
-    public function generate_document_suggestions(stored_file $file, int $documentid): array {
+    public function generate_document_suggestions(\\stored_file $file, int $documentid): array {
         $this->sync_configuration_if_changed();
         $temp = $file->copy_content_to_temp();
         if (!$temp || !is_file($temp)) {
-            throw new moodle_exception('filetempfailed', 'local_ragassistant');
+            throw new \\moodle_exception('filetempfailed', 'local_ragassistant');
         }
 
         try {
             $handle = curl_init($this->get_base_url() . '/api/v1/documents/suggestions');
             if ($handle === false) {
-                throw new moodle_exception('backendconnectionfailed', 'local_ragassistant');
+                throw new \\moodle_exception('backendconnectionfailed', 'local_ragassistant');
             }
             $mime = function_exists('mime_content_type')
                 ? (mime_content_type($temp) ?: 'application/octet-stream')
@@ -323,7 +323,7 @@ class api_client
                     'X-RAG-API-Key: ' . $this->get_api_key(),
                 ],
                 CURLOPT_POSTFIELDS => [
-                    'file' => new CURLFile($temp, $mime, $file->get_filename()),
+                    'file' => new \\CURLFile($temp, $mime, $file->get_filename()),
                     'document_id' => (string) $documentid,
                 ],
             ]);
