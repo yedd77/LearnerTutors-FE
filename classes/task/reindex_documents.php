@@ -131,15 +131,22 @@ class reindex_documents extends \core\task\adhoc_task {
                     if (!$DB->record_exists('local_ragassistant_suggestions', ['documentid' => $record->id])) {
                         $this->save_fallback_suggestions($record);
                     }
-                    $suggestiontask = new index_document();
-                    $suggestiontask->set_component('local_ragassistant');
-                    $suggestiontask->set_custom_data([
-                        'documentid' => (int) $record->id,
-                        'jobtype' => 'suggestions',
-                    ]);
-                    $DB->set_field('local_ragassistant_documents', 'stage', 'suggestions queued', ['id' => $record->id]);
-                    $DB->set_field('local_ragassistant_documents', 'jobtype', 'suggestions', ['id' => $record->id]);
-                    \core\task\manager::queue_adhoc_task($suggestiontask);
+                    try {
+                        $suggestiontask = new index_document();
+                        $suggestiontask->set_component('local_ragassistant');
+                        $suggestiontask->set_custom_data([
+                            'documentid' => (int) $record->id,
+                            'jobtype' => 'suggestions',
+                        ]);
+                        $DB->set_field('local_ragassistant_documents', 'stage', 'suggestions queued', ['id' => $record->id]);
+                        $DB->set_field('local_ragassistant_documents', 'jobtype', 'suggestions', ['id' => $record->id]);
+                        \core\task\manager::queue_adhoc_task($suggestiontask);
+                    } catch (\Throwable $suggestionexception) {
+                        // A suggestion queue failure must not mark valid vectors failed.
+                        $DB->set_field('local_ragassistant_documents', 'stage', 'complete (local fallback)', ['id' => $record->id]);
+                        mtrace('RAG Assistant: could not queue suggestion refresh for document ' .
+                            $record->id . ': ' . $suggestionexception->getMessage());
+                    }
 
                     $success++;
                     mtrace('RAG Assistant: rebuilt document ' . $record->id . ' (' . $record->filename . ').');
