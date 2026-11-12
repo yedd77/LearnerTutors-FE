@@ -63,34 +63,44 @@ function local_ragassistant_save_document_suggestions(
 }
 
 /**
- * Run document indexing as part of the user's upload or index action.
- *
- * Ad-hoc Moodle tasks only run when cron is executing. Running this task here
- * ensures a newly uploaded document or an explicit Index click is not left
- * pending indefinitely on sites where cron is not configured.
+ * Queue a durable Moodle background task for document processing.
  *
  * @param int $documentid
+ * @param string $jobtype index, reindex or suggestions
+ * @return bool Whether a new task was queued.
  */
-function local_ragassistant_index_document_now(int $documentid): void {
+function local_ragassistant_queue_document_task(int $documentid, string $jobtype = 'index'): bool {
     global $DB;
 
-    $task = new \local_ragassistant\task\index_document();
-    $task->set_custom_data(['documentid' => $documentid]);
-    $task->execute();
-
-    $status = $DB->get_field(
-        'local_ragassistant_documents',
-        'status',
-        ['id' => $documentid]
-    );
-    if ($status !== 'ready') {
-        throw new moodle_exception(
-            'backendrequestfailed',
-            'local_ragassistant',
-            '',
-            'Document indexing did not complete successfully. Current status: ' . ($status ?: 'missing')
-        );
+    if (!in_array($jobtype, ['index', 'reindex', 'suggestions'], true)) {
+        throw new coding_exception('Invalid document task type.');
     }
+
+    $document = $DB->get_record('local_ragassistant_documents', ['id' => $documentid], '*', MUST_EXIST);
+    if ($document->status === 'processing' ||
+            ($document->status === 'pending' && ($document->stage ?? '') === 'queued')) {
+        return false;
+    }
+
+    $task = new \\local_ragassistant\\task\\index_document();
+    $task->set_component('local_ragassistant');
+    $task->set_custom_data([
+        'documentid' => $documentid,
+        'jobtype' => $jobtype,
+    ]);
+
+    // The adhoc task is persisted in Moodle's task queue and picked up by cron.
+    \\core\\task\\manager::queue_adhoc_task($task);
+
+    $DB->update_record('local_ragassistant_documents', (object) [
+        'id' => $documentid,
+        'status' => 'pending',
+        'progress' => 0,
+        'stage' => 'queued',
+        'jobtype' => $jobtype,
+        'timemodified' => time(),
+    ]);
+    return true;
 }
 
 
@@ -112,7 +122,8 @@ function local_ragassistant_document_action_form(
     string $label,
     string $class,
     ?string $onclick = null,
-    array $extra = []
+    array $extra = [],
+    bool $disabled = false
 ): string {
     $attributes = [
         'type' => 'submit',
@@ -120,6 +131,10 @@ function local_ragassistant_document_action_form(
     ];
     if ($onclick !== null) {
         $attributes['onclick'] = $onclick;
+    }
+    if ($disabled) {
+        $attributes['disabled'] = 'disabled';
+        $attributes['aria-disabled'] = 'true';
     }
 
     $extrafields = '';
@@ -169,35 +184,25 @@ $PAGE->set_heading(format_string($course->fullname));
 $action = optional_param('action', '', PARAM_ALPHA);
 $actiondocumentid = optional_param('documentid', 0, PARAM_INT);
 
-// Reindex every stored course document immediately; this action does not depend on cron.
+// Queue a reindex for every eligible course document; cron performs the work.
 if ($action === 'reindexall' && data_submitted()) {
     require_sesskey();
     require_capability('local/ragassistant:managedocuments', $context);
     $records = $DB->get_records('local_ragassistant_documents', ['courseid' => $courseid], 'id ASC');
-    $indexed = 0;
-    $failed = 0;
+    $queued = 0;
     foreach ($records as $record) {
-        if (!in_array($record->status, ['ready', 'pending', 'failed'], true)) {
+        if (!in_array($record->status, ['ready', 'failed'], true)) {
             continue;
         }
-        try {
-            local_ragassistant_index_document_now((int) $record->id);
-            $indexed++;
-        } catch (\Throwable $exception) {
-            $failed++;
-            debugging('RAG Assistant: reindex failed for document ' . $record->id . ': ' .
-                $exception->getMessage(), DEBUG_DEVELOPER);
+        if (local_ragassistant_queue_document_task((int) $record->id, 'reindex')) {
+            $queued++;
         }
-    }
-    $message = $indexed . ' document(s) indexed successfully.';
-    if ($failed) {
-        $message .= ' ' . $failed . ' document(s) failed. Check Moodle logs for details.';
     }
     redirect(
         new moodle_url('/local/ragassistant/documents.php', ['courseid' => $courseid]),
-        $message,
+        $queued . ' document(s) queued for reindexing. You can continue using Moodle while they process.',
         null,
-        $failed ? \core\output\notification::NOTIFY_WARNING : \core\output\notification::NOTIFY_SUCCESS
+        \\core\\output\\notification::NOTIFY_SUCCESS
     );
 }
 
@@ -243,23 +248,34 @@ if ($action !== '' && $actiondocumentid > 0 && data_submitted()) {
         // Handle the action based on the requested type
         switch ($action) {
 
-            // Run initial indexing and reindexing immediately.
+            // Queue indexing/reindexing without holding the Moodle request open.
             case 'index':
             case 'reindex':
-                // Reindex is reserved for existing ready documents; initial index is pending/failed only.
-                if (($action === 'index' && !in_array($target->status, ['pending', 'failed'], true)) ||
-                    ($action === 'reindex' && $target->status !== 'ready')) {
-                    throw new moodle_exception('invalidrequest', 'error');
-                }
+            case 'regenerate_suggestions':
                 if (!$targetfile) {
                     throw new moodle_exception('storedfilemissing', 'local_ragassistant');
                 }
-                local_ragassistant_index_document_now((int) $target->id);
+                if ($action === 'index' && !in_array($target->status, ['pending', 'failed'], true)) {
+                    throw new moodle_exception('invalidrequest', 'error');
+                }
+                if ($action === 'reindex' && !in_array($target->status, ['ready', 'failed'], true)) {
+                    throw new moodle_exception('invalidrequest', 'error');
+                }
+                if ($action === 'regenerate_suggestions' && $target->status !== 'ready') {
+                    throw new moodle_exception('invalidrequest', 'error');
+                }
+                $jobtype = $action === 'regenerate_suggestions' ? 'suggestions' : $action;
+                if (!local_ragassistant_queue_document_task((int) $target->id, $jobtype)) {
+                    redirect($redirecturl, 'This document already has a background task queued or running.', null,
+                        \\core\\output\\notification::NOTIFY_INFO);
+                }
                 redirect(
                     $redirecturl,
-                    'Document indexed successfully and is ready for retrieval.',
+                    $jobtype === 'suggestions'
+                        ? 'Suggestion regeneration queued. You can continue using Moodle.'
+                        : 'Document indexing queued. You can continue using Moodle.',
                     null,
-                    \core\output\notification::NOTIFY_SUCCESS
+                    \\core\\output\\notification::NOTIFY_SUCCESS
                 );
                 break;
 
@@ -416,7 +432,9 @@ if ($mform->is_cancelled()) {
                 'timemodified' => time(),
             ]);
 
-            local_ragassistant_index_document_now((int) $documentid);
+            if (!local_ragassistant_queue_document_task((int) $documentid, 'index')) {
+                throw new moodle_exception('backendrequestfailed', 'local_ragassistant', '', 'Unable to queue indexing task.');
+            }
             $successcount++;
 
         } catch (\Throwable $exception) {
@@ -429,9 +447,9 @@ if ($mform->is_cancelled()) {
         }
     }
 
-    $summary = "$successcount file(s) uploaded and indexed successfully.";
+    $summary = "$successcount file(s) uploaded and queued for indexing.";
     if ($failedcount) {
-        $summary .= " $failedcount file(s) failed during upload or indexing.";
+        $summary .= " $failedcount file(s) failed during upload or queueing.";
     }
     if ($messages) {
         $summary .= ' ' . implode('; ', $messages);
@@ -491,10 +509,7 @@ $table->attributes['class'] = 'generaltable ragassistant-documents';
 $table->head = [
     get_string('documentname', 'local_ragassistant'),
     get_string('lecturernote', 'local_ragassistant'),
-    get_string('dateuploaded', 'local_ragassistant'),
-    get_string('visibility', 'local_ragassistant'),
     get_string('processingstatus', 'local_ragassistant'),
-    'Retrieval',
     get_string('actions', 'local_ragassistant'),
 ];
 
@@ -508,66 +523,97 @@ foreach ($documents as $document) {
         continue;
     }
     $retrievalenabled = !empty($document->retrievalenabled);
-
+    $active = in_array($document->status, ['pending', 'processing'], true);
     $actions = [];
-    if (in_array($document->status, ['pending', 'failed'], true) && ($canmanage || $isowner)) {
+
+    if (($canmanage || $isowner) && !$active) {
+        if (in_array($document->status, ['pending', 'failed'], true)) {
+            $actions[] = local_ragassistant_document_action_form(
+                $courseid, (int) $document->id, 'index',
+                get_string('indexdocument', 'local_ragassistant'),
+                'btn btn-outline-secondary btn-sm'
+            );
+        } else if ($document->status === 'ready') {
+            $actions[] = local_ragassistant_document_action_form(
+                $courseid, (int) $document->id, 'reindex',
+                'Reindex',
+                'btn btn-outline-primary btn-sm',
+                'return confirm("Queue reindexing for this document?");'
+            );
+            $actions[] = local_ragassistant_document_action_form(
+                $courseid, (int) $document->id, 'regenerate_suggestions',
+                'Regenerate suggestions',
+                'btn btn-outline-secondary btn-sm',
+                'return confirm("Regenerate starter suggestions without reindexing the document?");'
+            );
+        }
+        if ($document->status === 'ready') {
+            $actions[] = local_ragassistant_document_action_form(
+                $courseid, (int) $document->id, 'retrieval',
+                $retrievalenabled ? 'Disable retrieval' : 'Enable retrieval',
+                $retrievalenabled ? 'btn btn-outline-warning btn-sm' : 'btn btn-success btn-sm',
+                null,
+                ['enable' => $retrievalenabled ? 0 : 1]
+            );
+        }
         $actions[] = local_ragassistant_document_action_form(
-            $courseid,
-            (int) $document->id,
-            'index',
-            get_string('indexdocument', 'local_ragassistant'),
-            'btn btn-outline-secondary btn-sm'
-        );
-    }
-    if ($document->status === 'ready' && ($canmanage || $isowner)) {
-        $actions[] = local_ragassistant_document_action_form(
-            $courseid,
-            (int) $document->id,
-            'reindex',
-            'Reindex + regenerate suggestions',
-            'btn btn-outline-primary btn-sm',
-            'return confirm("Reindex this document using the current embedding model and regenerate its suggestions?");'
-        );
-        $actions[] = local_ragassistant_document_action_form(
-            $courseid,
-            (int) $document->id,
-            'retrieval',
-            $retrievalenabled ? 'Disable retrieval' : 'Enable retrieval',
-            $retrievalenabled ? 'btn btn-outline-warning btn-sm' : 'btn btn-success btn-sm',
-            null,
-            ['enable' => $retrievalenabled ? 0 : 1]
-        );
-    }
-    if ($canmanage || $isowner) {
-        $actions[] = local_ragassistant_document_action_form(
-            $courseid,
-            (int) $document->id,
-            'delete',
+            $courseid, (int) $document->id, 'delete',
             'Delete',
             'btn btn-outline-danger btn-sm',
             'return confirm("Delete this document and its indexed content permanently?");'
         );
+    } else if ($active) {
+        $actions[] = html_writer::tag('button', 'Processing…', [
+            'type' => 'button', 'class' => 'btn btn-outline-secondary btn-sm', 'disabled' => 'disabled',
+        ]);
     }
+
+    $status = html_writer::div(
+        html_writer::tag('span', get_string('status_' . $document->status, 'local_ragassistant'), [
+            'class' => 'ragassistant-status-label',
+        ]),
+        'ragassistant-processing-status',
+        [
+            'data-document-id' => (int) $document->id,
+            'data-status' => $document->status,
+            'data-progress' => (int) ($document->progress ?? 0),
+            'data-stage' => (string) ($document->stage ?? ''),
+        ]
+    );
+    if ($active) {
+        $progress = max(0, min(100, (int) ($document->progress ?? 0)));
+        $status .= html_writer::div(
+            html_writer::div('', 'progress-bar', [
+                'role' => 'progressbar',
+                'style' => 'width:' . $progress . '%',
+                'aria-valuenow' => $progress,
+                'aria-valuemin' => 0,
+                'aria-valuemax' => 100,
+            ]),
+            'progress ragassistant-document-progress'
+        );
+        $status .= html_writer::tag('small', s(ucfirst((string) ($document->stage ?? 'queued'))) .
+            ' · ' . $progress . '%', ['class' => 'text-muted ragassistant-progress-label']);
+    }
+    $status .= html_writer::div(
+        $retrievalenabled
+            ? html_writer::span('Retrieval enabled', 'badge badge-success bg-success')
+            : html_writer::span('Retrieval disabled', 'badge badge-secondary bg-secondary'),
+        'ragassistant-retrieval-state'
+    );
 
     $table->data[] = [
         html_writer::span(
             s($document->filename ?: get_string('pendingfilename', 'local_ragassistant')),
             'ragassistant-document-name'
         ),
-        trim((string) ($document->lecturernote ?? '')) !== '' ? format_text($document->lecturernote, FORMAT_PLAIN, ['para' => false]) : get_string('notavailable', 'local_ragassistant'),
-        html_writer::span(
-            userdate($document->timecreated, '%d/%m/%y, %H%M'),
-            'ragassistant-document-date'
-        ),
-        get_string($document->visibility, 'local_ragassistant'),
-        get_string('status_' . $document->status, 'local_ragassistant'),
-        $document->status !== 'ready'
-        ? html_writer::span('Not indexed', 'text-muted')
-        : ($retrievalenabled
-            ? html_writer::span('Enabled', 'badge badge-success bg-success')
-            : html_writer::span('Disabled', 'badge badge-secondary bg-secondary')),
+        trim((string) ($document->lecturernote ?? '')) !== ''
+            ? format_text($document->lecturernote, FORMAT_PLAIN, ['para' => false])
+            : get_string('notavailable', 'local_ragassistant'),
+        $status,
         html_writer::div(implode('', $actions), 'ragassistant-document-actions'),
     ];
+
 }
 
 if (empty($table->data)) {
