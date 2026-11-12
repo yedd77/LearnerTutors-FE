@@ -79,7 +79,7 @@ function local_ragassistant_queue_document_task(int $documentid, string $jobtype
 
     $document = $DB->get_record('local_ragassistant_documents', ['id' => $documentid], '*', MUST_EXIST);
     if ($jobtype === 'suggestions') {
-        if ($document->status !== 'ready' ||
+        if (!in_array($document->status, ['ready', 'failed'], true) ||
                 in_array((string) ($document->stage ?? ''), ['suggestions queued', 'generating suggestions'], true)) {
             return false;
         }
@@ -306,7 +306,7 @@ if ($action !== '' && $actiondocumentid > 0 && data_submitted()) {
                     throw new moodle_exception('invalidrequest', 'error');
                 }
 
-                if ($action === 'regenerate_suggestions' && $target->status !== 'ready') {
+                if ($action === 'regenerate_suggestions' && !in_array($target->status, ['ready', 'failed'], true)) {
                     throw new moodle_exception('invalidrequest', 'error');
                 }
 
@@ -599,6 +599,8 @@ foreach ($documents as $document) {
                 'btn btn-outline-primary btn-sm',
                 'return confirm("Queue reindexing for this document?");'
             );
+        }
+        if (in_array($document->status, ['ready', 'failed'], true)) {
             $actions[] = local_ragassistant_document_action_form(
                 $courseid,
                 (int) $document->id,
