@@ -2,29 +2,49 @@
 // This file is part of Moodle - https://moodle.org/
 
 /**
- * Index one Moodle document in the background and generate its starter suggestions.
+ * Background document indexing and suggestion-generation task.
  *
  * @package local_ragassistant
  */
 
-namespace local_ragassistant\task;
+namespace local_ragassistant\\task;
 
 defined('MOODLE_INTERNAL') || die();
 
 /**
- * Process one uploaded or manually re-indexed document.
+ * Process one document outside the user's Moodle request.
  */
-class index_document extends \core\task\adhoc_task {
+class index_document extends \\core\\task\\adhoc_task {
     /**
-     * Execute background indexing.
+     * Persist a progress update for the document.
+     *
+     * @param int $documentid
+     * @param string $status
+     * @param int $progress
+     * @param string $stage
+     */
+    private function update_progress(int $documentid, string $status, int $progress, string $stage): void {
+        global $DB;
+        $DB->update_record('local_ragassistant_documents', (object) [
+            'id' => $documentid,
+            'status' => $status,
+            'progress' => max(0, min(100, $progress)),
+            'stage' => $stage,
+            'timemodified' => time(),
+        ]);
+    }
+
+    /**
+     * Execute the queued job.
      */
     public function execute(): void {
         global $DB;
 
         $customdata = $this->get_custom_data();
         $documentid = (int) ($customdata->documentid ?? 0);
-        if ($documentid <= 0) {
-            mtrace('RAG Assistant: indexing task has no valid document ID.');
+        $jobtype = (string) ($customdata->jobtype ?? 'index');
+        if ($documentid <= 0 || !in_array($jobtype, ['index', 'reindex', 'suggestions'], true)) {
+            mtrace('RAG Assistant: document task has invalid data.');
             return;
         }
 
@@ -34,55 +54,65 @@ class index_document extends \core\task\adhoc_task {
             return;
         }
 
-        $fs = get_file_storage();
-        $stored = $fs->get_file(
-            (int) $record->contextid,
-            'local_ragassistant',
-            'documents',
-            (int) $record->fileitemid,
-            $record->filepath,
-            $record->filename
-        );
-        if (!$stored || $stored->is_directory()) {
-            $DB->update_record('local_ragassistant_documents', (object) [
-                'id' => $documentid, 'status' => 'failed', 'timemodified' => time(),
-            ]);
-            mtrace('RAG Assistant: source file missing for document ' . $documentid . '.');
-            return;
-        }
-
-        $DB->update_record('local_ragassistant_documents', (object) [
-            'id' => $documentid, 'status' => 'processing', 'timemodified' => time(),
-        ]);
-
+        $this->update_progress($documentid, 'processing', 5, 'preparing');
         try {
-            $api = new \local_ragassistant\local\api_client();
-            $result = $api->index_file(
-                $stored,
-                $documentid,
-                (int) $record->courseid,
-                (int) $record->userid,
-                (string) $record->visibility,
-                !empty($record->retrievalenabled)
+            $stored = get_file_storage()->get_file(
+                (int) $record->contextid,
+                'local_ragassistant',
+                'documents',
+                (int) $record->fileitemid,
+                $record->filepath,
+                $record->filename
             );
-            $saved = $this->save_suggestions(
-                $documentid,
-                (int) $record->courseid,
-                (int) $record->userid,
-                $result['suggestions'] ?? []
-            );
-            $DB->update_record('local_ragassistant_documents', (object) [
-                'id' => $documentid, 'status' => 'ready', 'timemodified' => time(),
-            ]);
-            mtrace('RAG Assistant: indexed document ' . $documentid . ' (' .
-                (int) ($result['indexed_chunks'] ?? 0) . ' chunks); saved ' . $saved . ' suggestion(s).');
-        } catch (\Throwable $exception) {
-            $DB->update_record('local_ragassistant_documents', (object) [
-                'id' => $documentid, 'status' => 'failed', 'timemodified' => time(),
-            ]);
-            mtrace('RAG Assistant: indexing failed for document ' . $documentid . ': ' .
+            if (!$stored || $stored->is_directory()) {
+                throw new \\moodle_exception('storedfilemissing', 'local_ragassistant');
+            }
+
+            $api = new \\local_ragassistant\\local\\api_client();
+            if ($jobtype === 'suggestions') {
+                $this->update_progress($documentid, 'processing', 25, 'generating suggestions');
+                $result = $api->generate_document_suggestions($stored, $documentid);
+                $saved = $this->save_suggestions(
+                    $documentid,
+                    (int) $record->courseid,
+                    (int) $record->userid,
+                    $result['suggestions'] ?? []
+                );
+                mtrace('RAG Assistant: regenerated ' . $saved . ' suggestion(s) for document ' . $documentid . '.');
+            } else {
+                $this->update_progress($documentid, 'processing', 20, 'indexing document');
+                $generatesuggestions = ($jobtype === 'index');
+                $result = $api->index_file(
+                    $stored,
+                    $documentid,
+                    (int) $record->courseid,
+                    (int) $record->userid,
+                    (string) $record->visibility,
+                    !empty($record->retrievalenabled),
+                    $generatesuggestions
+                );
+
+                if ($generatesuggestions) {
+                    $this->update_progress($documentid, 'processing', 90, 'saving suggestions');
+                    $saved = $this->save_suggestions(
+                        $documentid,
+                        (int) $record->courseid,
+                        (int) $record->userid,
+                        $result['suggestions'] ?? []
+                    );
+                } else {
+                    $saved = 0;
+                }
+                mtrace('RAG Assistant: indexed document ' . $documentid . ' (' .
+                    (int) ($result['indexed_chunks'] ?? 0) . ' chunks); saved ' . $saved . ' suggestion(s).');
+            }
+
+            $this->update_progress($documentid, 'ready', 100, 'complete');
+        } catch (\\Throwable $exception) {
+            $this->update_progress($documentid, 'failed', 100, 'failed');
+            mtrace('RAG Assistant: ' . $jobtype . ' task failed for document ' . $documentid . ': ' .
                 $exception->getMessage());
-            // Mark failed and allow a lecturer to queue it again; avoid automatic retry storms.
+            // Do not automatically retry; a lecturer can explicitly queue the job again.
         }
     }
 
@@ -105,8 +135,8 @@ class index_document extends \core\task\adhoc_task {
             if (!is_string($suggestion)) {
                 continue;
             }
-            $suggestion = \core_text::substr(trim(clean_param($suggestion, PARAM_TEXT)), 0, 500);
-            $key = \core_text::strtolower($suggestion);
+            $suggestion = \\core_text::substr(trim(clean_param($suggestion, PARAM_TEXT)), 0, 500);
+            $key = \\core_text::strtolower($suggestion);
             if ($suggestion !== '' && !isset($cleaned[$key])) {
                 $cleaned[$key] = $suggestion;
             }
@@ -114,10 +144,11 @@ class index_document extends \core\task\adhoc_task {
                 break;
             }
         }
-        // Preserve previously saved suggestions if generation returned no valid items.
+        // Preserve existing suggestions if the model returns no valid replacements.
         if (!$cleaned) {
             return 0;
         }
+
         $transaction = $DB->start_delegated_transaction();
         try {
             $DB->delete_records('local_ragassistant_suggestions', ['documentid' => $documentid]);
@@ -131,8 +162,9 @@ class index_document extends \core\task\adhoc_task {
                 ]);
             }
             $transaction->allow_commit();
-        } catch (\Throwable $exception) {
+        } catch (\\Throwable $exception) {
             $transaction->rollback($exception);
+            throw $exception;
         }
         return count($cleaned);
     }
