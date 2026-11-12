@@ -96,8 +96,9 @@ class api_client
 
         // Only embedding changes invalidate stored vectors and require rebuilding
         // Moodle source documents. Generation-model changes leave embeddings intact.
-        if (!empty($result['reindex_required']) &&
-                !get_config('local_ragassistant', 'reindex_pending')) {
+        if (!empty($result['reindex_required'])) {
+            // This flag is informational only; it must never block chat requests
+            // or prevent a later configuration change from queueing its own rebuild.
             set_config('reindex_pending', 1, 'local_ragassistant');
             try {
                 \core\task\manager::queue_adhoc_task(
