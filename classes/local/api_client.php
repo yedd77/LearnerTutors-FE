@@ -62,7 +62,9 @@ class api_client
         $configuration = [
             'llm_provider' => trim((string) get_config('local_ragassistant', 'llm_provider')),
             'llm_model' => trim((string) get_config('local_ragassistant', 'chat_model')),
+            'image_provider' => trim((string) get_config('local_ragassistant', 'image_provider')) ?: 'openai',
             'image_model' => trim((string) get_config('local_ragassistant', 'image_model')),
+            'reuse_chat_api_key' => (bool) get_config('local_ragassistant', 'reuse_chat_api_key'),
         ];
 
         // Provider keys are included only in the server-to-server sync payload.
@@ -71,9 +73,15 @@ class api_client
             'openai_api_key' => secret_store::get_provider_api_key('openai'),
             'gemini_api_key' => secret_store::get_provider_api_key('gemini'),
         ];
+        $imageproviderkeys = [
+            'openai_image_api_key' => secret_store::get_image_provider_api_key('openai'),
+            'gemini_image_api_key' => secret_store::get_image_provider_api_key('gemini'),
+        ];
         $fingerprintdata = $configuration + [
             'openai_api_key_fingerprint' => hash('sha256', $providerkeys['openai_api_key']),
             'gemini_api_key_fingerprint' => hash('sha256', $providerkeys['gemini_api_key']),
+            'openai_image_api_key_fingerprint' => hash('sha256', $imageproviderkeys['openai_image_api_key']),
+            'gemini_image_api_key_fingerprint' => hash('sha256', $imageproviderkeys['gemini_image_api_key']),
         ];
         $fingerprint = hash(
             'sha256',
@@ -107,11 +115,15 @@ class api_client
         $result = $this->post_json('/api/v1/admin/config', [
             'llm_provider' => trim((string) get_config('local_ragassistant', 'llm_provider')),
             'llm_model' => trim((string) get_config('local_ragassistant', 'chat_model')),
+            'image_provider' => trim((string) get_config('local_ragassistant', 'image_provider')) ?: 'openai',
             'image_model' => trim((string) get_config('local_ragassistant', 'image_model')),
-            // Keys are decrypted only in PHP and transmitted over the authenticated
+            'reuse_chat_api_key' => (bool) get_config('local_ragassistant', 'reuse_chat_api_key'),
+            // Credentials are decrypted only in PHP and transmitted over the authenticated
             // Moodle-to-FastAPI connection. FastAPI encrypts them before persistence.
             'openai_api_key' => secret_store::get_provider_api_key('openai'),
             'gemini_api_key' => secret_store::get_provider_api_key('gemini'),
+            'openai_image_api_key' => secret_store::get_image_provider_api_key('openai'),
+            'gemini_image_api_key' => secret_store::get_image_provider_api_key('gemini'),
         ]);
 
         // The backend reports when stored document vectors need rebuilding.
