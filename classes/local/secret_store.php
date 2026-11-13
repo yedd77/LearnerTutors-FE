@@ -1,7 +1,7 @@
 <?php
 // This file is part of Moodle - https://moodle.org/
 
-namespace local_ragassistant\\local;
+namespace local_ragassistant\local;
 
 defined('MOODLE_INTERNAL') || die();
 
@@ -18,7 +18,7 @@ final class secret_store {
         $encoded = $CFG->local_ragassistant_encryption_key ?? getenv('LOCAL_RAGASSISTANT_ENCRYPTION_KEY');
         $key = is_string($encoded) ? base64_decode($encoded, true) : false;
         if (!is_string($key) || strlen($key) !== 32) {
-            throw new \\moodle_exception('encryptionkeymissing', 'local_ragassistant');
+            throw new \moodle_exception('encryptionkeymissing', 'local_ragassistant');
         }
         return $key;
     }
@@ -29,7 +29,7 @@ final class secret_store {
 
     public static function encrypt(string $plaintext, string $purpose = 'api_key'): string {
         if ($plaintext === '') {
-            throw new \\coding_exception('Cannot encrypt an empty secret.');
+            throw new \coding_exception('Cannot encrypt an empty secret.');
         }
         $iv = random_bytes(12);
         $tag = '';
@@ -38,7 +38,7 @@ final class secret_store {
             OPENSSL_RAW_DATA, $iv, $tag, self::aad($purpose), 16
         );
         if ($ciphertext === false || strlen($tag) !== 16) {
-            throw new \\moodle_exception('secretencryptionfailed', 'local_ragassistant');
+            throw new \moodle_exception('secretencryptionfailed', 'local_ragassistant');
         }
         return self::PREFIX . base64_encode($iv . $tag . $ciphertext);
     }
@@ -49,7 +49,7 @@ final class secret_store {
         }
         $payload = base64_decode(substr($stored, strlen(self::PREFIX)), true);
         if (!is_string($payload) || strlen($payload) < 29) {
-            throw new \\moodle_exception('secretdecryptionfailed', 'local_ragassistant');
+            throw new \moodle_exception('secretdecryptionfailed', 'local_ragassistant');
         }
         $plaintext = openssl_decrypt(
             substr($payload, 28), self::CIPHER, self::encryption_key(),
@@ -57,7 +57,7 @@ final class secret_store {
             self::aad($purpose)
         );
         if (!is_string($plaintext)) {
-            throw new \\moodle_exception('secretdecryptionfailed', 'local_ragassistant');
+            throw new \moodle_exception('secretdecryptionfailed', 'local_ragassistant');
         }
         return $plaintext;
     }
@@ -65,7 +65,7 @@ final class secret_store {
     public static function get_api_key(): string {
         $stored = (string) get_config('local_ragassistant', 'api_key');
         if ($stored === '') {
-            throw new \\moodle_exception('apikeymissing', 'local_ragassistant');
+            throw new \moodle_exception('apikeymissing', 'local_ragassistant');
         }
         if (!str_starts_with($stored, self::PREFIX)) {
             set_config('api_key', self::encrypt($stored), 'local_ragassistant');
@@ -79,7 +79,7 @@ final class secret_store {
      */
     public static function get_provider_api_key(string $provider): string {
         if (!in_array($provider, ['openai', 'gemini'], true)) {
-            throw new \\invalid_parameter_exception('Unsupported provider.');
+            throw new \invalid_parameter_exception('Unsupported provider.');
         }
         $name = $provider . '_api_key';
         $stored = (string) get_config('local_ragassistant', $name);
