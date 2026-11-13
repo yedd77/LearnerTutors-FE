@@ -19,9 +19,21 @@ class local_ragassistant_admin_setting_configencryptedpassword extends admin_set
             return '';
         }
 
-        // Moodle setting names use component/setting notation.
         $parts = explode('/', $this->name);
         $settingname = end($parts);
+        $purpose = $settingname;
+
+        // The single provider key field stores the credential for the provider
+        // selected immediately above it in the Moodle settings page.
+        if ($settingname === 'provider_api_key') {
+            $provider = (string) get_config('local_ragassistant', 'llm_provider');
+            if (!in_array($provider, ['openai', 'gemini'], true)) {
+                return get_string('providerkeynotrequired', 'local_ragassistant');
+            }
+            $settingname = $provider . '_api_key';
+            $purpose = $settingname;
+        }
+
         $minimumlength = $settingname === 'api_key' ? 32 : 20;
         if (!in_array($settingname, ['api_key', 'openai_api_key', 'gemini_api_key'], true)
                 || strlen($value) < $minimumlength) {
@@ -32,7 +44,7 @@ class local_ragassistant_admin_setting_configencryptedpassword extends admin_set
         }
 
         try {
-            $encrypted = \local_ragassistant\local\secret_store::encrypt($value, $settingname);
+            $encrypted = \local_ragassistant\local\secret_store::encrypt($value, $purpose);
             set_config($settingname, $encrypted, 'local_ragassistant');
         } catch (\Throwable $exception) {
             debugging('Could not securely store an API credential: ' . $exception->getMessage(), DEBUG_DEVELOPER);
