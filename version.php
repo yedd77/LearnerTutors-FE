@@ -6,7 +6,7 @@
 defined('MOODLE_INTERNAL') || die();
 
 $plugin->component = 'local_ragassistant';
-$plugin->version   = 2026111305;
+$plugin->version   = 2026111306;
 $plugin->requires  = 2025101600;
 $plugin->maturity  = MATURITY_ALPHA;
-$plugin->release   = '0.4.4 - Automatic credential encryption key provisioning';
+$plugin->release   = '0.4.5 - Encrypted credential status indicators';
