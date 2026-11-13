@@ -49,9 +49,9 @@ The OpenAI and Gemini keys are separate from the shared `RAG_API_KEY`.
 2. Generate it with:
    `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`
 3. Install the updated backend dependencies (`pip install -r requirements.txt`).
-4. In Moodle Site administration → Plugins → Local plugins → Course Learning Assistant, enter the OpenAI API key and/or Google Gemini API key and save.
+4. In Moodle Site administration → Plugins → Local plugins → Course Learning Assistant, select the Chat provider, then enter that provider's key in the single Provider API key field and save. The field saves the credential against the selected provider; existing credentials for the other provider are retained.
 5. The next chat request or document indexing request synchronizes changed settings to FastAPI. The backend encrypts provider credentials before saving them in `storage/runtime_config.json`; no FastAPI restart is required.
-6. The saved Moodle fields remain blank in the browser. Entering a new value rotates that provider credential; leaving the field blank keeps the current value.
+6. The saved Moodle fields remain blank in the browser. Entering a new value rotates the selected provider credential; leaving the field blank keeps its current value. Switching between OpenAI and Gemini does not delete the other provider's saved credential.
 
 The backend runtime encryption key must remain stable and must be backed up securely. If it is lost or changed, previously synchronized provider keys cannot be decrypted. Re-enter the provider keys in Moodle after restoring or replacing the encryption key.
 
