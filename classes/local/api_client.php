@@ -23,13 +23,13 @@ class api_client
         if (!is_array($parts) || empty($parts['scheme']) || empty($parts['host'])
                 || isset($parts['user']) || isset($parts['pass'])
                 || isset($parts['query']) || isset($parts['fragment'])) {
-            throw new \\moodle_exception('backendconnectionfailed', 'local_ragassistant');
+            throw new \moodle_exception('backendconnectionfailed', 'local_ragassistant');
         }
 
         $host = strtolower($parts['host']);
         $isloopback = in_array($host, ['localhost', '127.0.0.1', '::1'], true);
         if (strtolower($parts['scheme']) !== 'https' && !$isloopback) {
-            throw new \\moodle_exception('backendhttpsrequired', 'local_ragassistant');
+            throw new \moodle_exception('backendhttpsrequired', 'local_ragassistant');
         }
 
         return $url;
