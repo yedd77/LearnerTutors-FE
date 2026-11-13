@@ -28,7 +28,48 @@ document.addEventListener('DOMContentLoaded', function () {
     function activateChatBackground() {
         if (chatApp) {
             chatApp.classList.add('ragassistant-chat-active');
+            ensureNewChatButton();
         }
+    }
+
+    function ensureNewChatButton() {
+        if (!chatApp || chatApp.querySelector('.ragassistant-new-chat-form')) {
+            return;
+        }
+
+        const newChatForm = document.createElement('form');
+        newChatForm.method = 'post';
+        newChatForm.action = form.action;
+        newChatForm.className = 'ragassistant-new-chat-form';
+
+        const sesskeyInput = form.querySelector('input[name="sesskey"]');
+        if (sesskeyInput) {
+            const sesskey = document.createElement('input');
+            sesskey.type = 'hidden';
+            sesskey.name = 'sesskey';
+            sesskey.value = sesskeyInput.value;
+            newChatForm.appendChild(sesskey);
+        }
+
+        const clearInput = document.createElement('input');
+        clearInput.type = 'hidden';
+        clearInput.name = 'clear_history';
+        clearInput.value = '1';
+        newChatForm.appendChild(clearInput);
+
+        const button = document.createElement('button');
+        button.type = 'submit';
+        button.className = 'ragassistant-new-chat-btn';
+        button.title = 'Start a new conversation';
+
+        const icon = document.createElement('span');
+        icon.setAttribute('aria-hidden', 'true');
+        icon.textContent = '+';
+
+        button.append(icon, document.createTextNode(' New chat'));
+        newChatForm.appendChild(button);
+
+        chatApp.prepend(newChatForm);
     }
 
     // Clicking a suggestion sends that stored prompt through the normal chat flow.

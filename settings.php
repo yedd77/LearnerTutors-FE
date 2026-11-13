@@ -26,6 +26,13 @@ if ($hassiteconfig) {
         PARAM_URL
     ));
 
+    $settings->add(new admin_setting_configpasswordunmask(
+        'local_ragassistant/api_key',
+        get_string('apikey', 'local_ragassistant'),
+        get_string('apikey_desc', 'local_ragassistant'),
+        ''
+    ));
+
     $settings->add(new admin_setting_configcheckbox(
         'local_ragassistant/enable_chat',
         get_string('enablechat', 'local_ragassistant'),
@@ -39,8 +46,8 @@ if ($hassiteconfig) {
         get_string('llm_heading_desc', 'local_ragassistant')
     ));
 
-    // Chat provider/model are defaults only. The backend remains responsible
-    // for API credentials; Moodle must never store provider API keys.
+    // Chat provider/model and credentials are synchronized with the trusted
+    // backend configuration endpoint when chat or document processing runs.
     $settings->add(new admin_setting_configselect(
         'local_ragassistant/llm_provider',
         get_string('llmprovider', 'local_ragassistant'),
@@ -61,6 +68,13 @@ if ($hassiteconfig) {
         PARAM_TEXT
     ));
 
+    $settings->add(new admin_setting_configpasswordunmask(
+        'local_ragassistant/llm_api_key',
+        get_string('llm_api_key', 'local_ragassistant'),
+        get_string('llm_api_key_desc', 'local_ragassistant'),
+        ''
+    ));
+
     $settings->add(new admin_setting_configtext(
         'local_ragassistant/image_model',
         get_string('image_model', 'local_ragassistant'),
@@ -70,11 +84,11 @@ if ($hassiteconfig) {
     ));
 
     $settings->add(new admin_setting_configpasswordunmask(
-        'local_ragassistant/api_key',
-        get_string('apikey', 'local_ragassistant'),
-        get_string('apikey_desc', 'local_ragassistant'),
+        'local_ragassistant/image_api_key',
+        get_string('image_api_key', 'local_ragassistant'),
+        get_string('image_api_key_desc', 'local_ragassistant'),
         ''
     ));
- 
+    
     $ADMIN->add('localplugins', $settings);
 }

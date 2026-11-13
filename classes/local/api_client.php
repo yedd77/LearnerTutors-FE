@@ -51,7 +51,9 @@ class api_client
         $configuration = [
             'llm_provider' => trim((string) get_config('local_ragassistant', 'llm_provider')),
             'llm_model' => trim((string) get_config('local_ragassistant', 'chat_model')),
+            'llm_api_key' => (string) get_config('local_ragassistant', 'llm_api_key'),
             'image_model' => trim((string) get_config('local_ragassistant', 'image_model')),
+            'image_api_key' => (string) get_config('local_ragassistant', 'image_api_key'),
         ];
 
         $fingerprint = hash(
@@ -78,14 +80,17 @@ class api_client
 
     /**
      * Synchronize the administrator-selected AI configuration with FastAPI.
-     * Provider credentials remain on the backend and are never sent by Moodle.
+     * Provider credentials are sent only to the trusted backend configuration
+     * endpoint and are never included in ordinary chat requests.
      */
     public function sync_configuration(): array
     {
         $result = $this->post_json('/api/v1/admin/config', [
             'llm_provider' => trim((string) get_config('local_ragassistant', 'llm_provider')),
             'llm_model' => trim((string) get_config('local_ragassistant', 'chat_model')),
+            'llm_api_key' => (string) get_config('local_ragassistant', 'llm_api_key'),
             'image_model' => trim((string) get_config('local_ragassistant', 'image_model')),
+            'image_api_key' => (string) get_config('local_ragassistant', 'image_api_key'),
         ]);
 
         // The backend reports when stored document vectors need rebuilding.
