@@ -80,4 +80,10 @@ if ($hassiteconfig) {
     ));
 
     $ADMIN->add('localplugins', $settings);
+
+    $ADMIN->add('localplugins', new admin_externalpage(
+        'local_ragassistant_testconnection',
+        get_string('testconnection', 'local_ragassistant'),
+        new moodle_url('/local/ragassistant/test_connection.php')
+    ));
 }
