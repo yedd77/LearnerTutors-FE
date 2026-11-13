@@ -134,10 +134,8 @@ $string['backendhttpsrequired'] = 'The FastAPI URL must use HTTPS. HTTP is allow
 
 // AI provider credential settings
 
-$string['openai_api_key'] = 'OpenAI API key';
-$string['openai_api_key_desc'] = 'Optional OpenAI credential used for chat, embeddings, and /explain image generation when OpenAI is selected. Enter a new key to rotate it. The saved value is encrypted and never shown again; leave blank to keep the existing key. It is synchronized to FastAPI on the next chat or document indexing request.';
-$string['gemini_api_key'] = 'Google Gemini API key';
-$string['gemini_api_key_desc'] = 'Optional Gemini credential used for chat and embeddings when Gemini is selected. Enter a new key to rotate it. The saved value is encrypted and never shown again; leave blank to keep the existing key. It is synchronized to FastAPI on the next chat or document indexing request.';
-$string['providerkeytoolong'] = 'Enter a valid provider API key with at least 20 characters.';
-$string['providerkeysheading'] = 'AI provider credentials';
-$string['providerkeysheading_desc'] = 'Manage OpenAI and Gemini credentials here without editing backend source code. Credentials are encrypted in Moodle and on the FastAPI server.';
+
+// Combined provider credential setting
+$string['provider_api_key'] = 'Provider API key';
+$string['provider_api_key_desc'] = 'Enter the API key for the provider selected above (OpenAI or Google Gemini). The key is encrypted in Moodle and synchronized securely to FastAPI. The field stays blank after saving; leave it blank to keep the selected provider’s existing key. Switching providers does not delete the other provider’s saved key. Ollama does not require an API key.';
+$string['providerkeynotrequired'] = 'Ollama does not require an API key. Select OpenAI or Google Gemini to save a provider credential.';
