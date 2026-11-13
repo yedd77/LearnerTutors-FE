@@ -131,3 +131,13 @@ $string['testconnectionintro'] = 'Send a server-to-server authentication test us
 $string['testconnectionsuccess'] = 'FastAPI connection and API-key authentication succeeded.';
 $string['testconnectionfailed'] = 'The connection test failed: {$a}';
 $string['backendhttpsrequired'] = 'The FastAPI URL must use HTTPS. HTTP is allowed only for localhost or loopback development addresses.';
+
+// AI provider credential settings
+
+$string['openai_api_key'] = 'OpenAI API key';
+$string['openai_api_key_desc'] = 'Optional OpenAI credential used for chat, embeddings, and /explain image generation when OpenAI is selected. Enter a new key to rotate it. The saved value is encrypted and never shown again; leave blank to keep the existing key. It is synchronized to FastAPI on the next chat or document indexing request.';
+$string['gemini_api_key'] = 'Google Gemini API key';
+$string['gemini_api_key_desc'] = 'Optional Gemini credential used for chat and embeddings when Gemini is selected. Enter a new key to rotate it. The saved value is encrypted and never shown again; leave blank to keep the existing key. It is synchronized to FastAPI on the next chat or document indexing request.';
+$string['providerkeytoolong'] = 'Enter a valid provider API key with at least 20 characters.';
+$string['providerkeysheading'] = 'AI provider credentials';
+$string['providerkeysheading_desc'] = 'Manage OpenAI and Gemini credentials here without editing backend source code. Credentials are encrypted in Moodle and on the FastAPI server.';
