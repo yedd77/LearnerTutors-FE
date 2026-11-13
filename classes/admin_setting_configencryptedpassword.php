@@ -32,10 +32,17 @@ class local_ragassistant_admin_setting_configencryptedpassword extends admin_set
             }
             $settingname = $provider . '_api_key';
             $purpose = $settingname;
+        } else if ($settingname === 'image_provider_api_key') {
+            $provider = (string) get_config('local_ragassistant', 'image_provider');
+            if (!in_array($provider, ['openai', 'gemini'], true)) {
+                return get_string('providerkeynotrequired', 'local_ragassistant');
+            }
+            $settingname = 'image_' . $provider . '_api_key';
+            $purpose = $settingname;
         }
 
         $minimumlength = $settingname === 'api_key' ? 32 : 20;
-        if (!in_array($settingname, ['api_key', 'openai_api_key', 'gemini_api_key'], true)
+        if (!in_array($settingname, ['api_key', 'openai_api_key', 'gemini_api_key', 'image_openai_api_key', 'image_gemini_api_key'], true)
                 || strlen($value) < $minimumlength) {
             return get_string(
                 $settingname === 'api_key' ? 'apikeytoolong' : 'providerkeytoolong',
