@@ -98,7 +98,7 @@ final class secret_store {
      */
     public static function get_image_provider_api_key(string $provider): string {
         if (!in_array($provider, ['openai', 'gemini'], true)) {
-            throw new \\invalid_parameter_exception('Unsupported image provider.');
+            throw new \invalid_parameter_exception('Unsupported image provider.');
         }
         $name = 'image_' . $provider . '_api_key';
         $stored = (string) get_config('local_ragassistant', $name);
