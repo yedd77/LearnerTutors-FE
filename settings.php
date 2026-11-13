@@ -63,12 +63,45 @@ if ($hassiteconfig) {
         PARAM_TEXT
     ));
 
+    // Image generation has an independent provider and model.
+    $settings->add(new admin_setting_heading(
+        'local_ragassistant/image_heading',
+        get_string('image_heading', 'local_ragassistant'),
+        get_string('image_heading_desc', 'local_ragassistant')
+    ));
+
+    $settings->add(new admin_setting_configselect(
+        'local_ragassistant/image_provider',
+        get_string('image_provider', 'local_ragassistant'),
+        get_string('image_provider_desc', 'local_ragassistant'),
+        'openai',
+        [
+            'openai' => 'OpenAI',
+            'gemini' => 'Google Gemini',
+        ]
+    ));
+
     $settings->add(new admin_setting_configtext(
         'local_ragassistant/image_model',
         get_string('image_model', 'local_ragassistant'),
         get_string('image_model_desc', 'local_ragassistant'),
-        '',
+        'gpt-image-1',
         PARAM_TEXT
+    ));
+
+    $settings->add(new admin_setting_configcheckbox(
+        'local_ragassistant/reuse_chat_api_key',
+        get_string('reuse_chat_api_key', 'local_ragassistant'),
+        get_string('reuse_chat_api_key_desc', 'local_ragassistant'),
+        0
+    ));
+
+    // Separate encrypted credential used only when the image key is not reused.
+    $settings->add(new local_ragassistant_admin_setting_configencryptedpassword(
+        'local_ragassistant/image_provider_api_key',
+        get_string('image_provider_api_key', 'local_ragassistant'),
+        get_string('image_provider_api_key_desc', 'local_ragassistant'),
+        ''
     ));
 
     // One credential field follows the provider selector. The setting class
