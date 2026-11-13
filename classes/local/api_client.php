@@ -65,9 +65,19 @@ class api_client
             'image_model' => trim((string) get_config('local_ragassistant', 'image_model')),
         ];
 
+        // Provider keys are included only in the server-to-server sync payload.
+        // Fingerprint their hashes, never store plaintext credentials as sync metadata.
+        $providerkeys = [
+            'openai_api_key' => secret_store::get_provider_api_key('openai'),
+            'gemini_api_key' => secret_store::get_provider_api_key('gemini'),
+        ];
+        $fingerprintdata = $configuration + [
+            'openai_api_key_fingerprint' => hash('sha256', $providerkeys['openai_api_key']),
+            'gemini_api_key_fingerprint' => hash('sha256', $providerkeys['gemini_api_key']),
+        ];
         $fingerprint = hash(
             'sha256',
-            json_encode($configuration, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR)
+            json_encode($fingerprintdata, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR)
         );
         $lastfingerprint = (string) get_config(
             'local_ragassistant',
@@ -97,6 +107,10 @@ class api_client
             'llm_provider' => trim((string) get_config('local_ragassistant', 'llm_provider')),
             'llm_model' => trim((string) get_config('local_ragassistant', 'chat_model')),
             'image_model' => trim((string) get_config('local_ragassistant', 'image_model')),
+            // Keys are decrypted only in PHP and transmitted over the authenticated
+            // Moodle-to-FastAPI connection. FastAPI encrypts them before persistence.
+            'openai_api_key' => secret_store::get_provider_api_key('openai'),
+            'gemini_api_key' => secret_store::get_provider_api_key('gemini'),
         ]);
 
         // The backend reports when stored document vectors need rebuilding.
