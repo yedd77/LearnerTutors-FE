@@ -93,4 +93,23 @@ final class secret_store {
         }
         return self::decrypt($stored, $name);
     }
+    /**
+     * Read an optional Moodle-managed image-provider key. Never expose it to a page.
+     */
+    public static function get_image_provider_api_key(string $provider): string {
+        if (!in_array($provider, ['openai', 'gemini'], true)) {
+            throw new \\invalid_parameter_exception('Unsupported image provider.');
+        }
+        $name = 'image_' . $provider . '_api_key';
+        $stored = (string) get_config('local_ragassistant', $name);
+        if ($stored === '') {
+            return '';
+        }
+        if (!str_starts_with($stored, self::PREFIX)) {
+            $encrypted = self::encrypt($stored, $name);
+            set_config($name, $encrypted, 'local_ragassistant');
+            return $stored;
+        }
+        return self::decrypt($stored, $name);
+    }
 }
