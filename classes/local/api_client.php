@@ -99,7 +99,8 @@ class api_client
 
     /**
      * Synchronize the administrator-selected AI configuration with FastAPI.
-     * Provider credentials remain on the backend and are never sent by Moodle.
+     * Provider credentials are decrypted only in PHP and sent only over this
+     * authenticated server-to-server request; they are never sent to browsers.
      */
     public function sync_configuration(): array
     {
