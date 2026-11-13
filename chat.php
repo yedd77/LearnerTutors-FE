@@ -99,7 +99,7 @@ if (!isset($SESSION->local_ragassistant_history[$courseid])) {
     $SESSION->local_ragassistant_history[$courseid] = [];
 }
 
- // Clear the current course conversation and return to a new chat.
+// Clear the current course conversation and return to a new chat.
 if (data_submitted() && optional_param('clear_history', 0, PARAM_BOOL) && confirm_sesskey()) {
     $SESSION->local_ragassistant_history[$courseid] = [];
 
@@ -341,7 +341,7 @@ echo html_writer::start_div(
     'ragassistant-chat-app' . (!empty($history) ? ' ragassistant-chat-active' : '')
 );
 
- // Display the new chat button only when conversation history exists.
+// Display the new chat button only when conversation history exists.
 if (!empty($history)) {
     echo html_writer::start_tag('form', [
         'method' => 'post',
