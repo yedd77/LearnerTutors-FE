@@ -71,18 +71,13 @@ if ($hassiteconfig) {
         PARAM_TEXT
     ));
 
-    // Provider credentials are encrypted at rest and never shown after saving.
+    // One credential field follows the provider selector. The setting class
+    // stores the submitted key against the selected provider while retaining
+    // previously saved credentials for the other provider.
     $settings->add(new local_ragassistant_admin_setting_configencryptedpassword(
-        'local_ragassistant/openai_api_key',
-        get_string('openai_api_key', 'local_ragassistant'),
-        get_string('openai_api_key_desc', 'local_ragassistant'),
-        ''
-    ));
-
-    $settings->add(new local_ragassistant_admin_setting_configencryptedpassword(
-        'local_ragassistant/gemini_api_key',
-        get_string('gemini_api_key', 'local_ragassistant'),
-        get_string('gemini_api_key_desc', 'local_ragassistant'),
+        'local_ragassistant/provider_api_key',
+        get_string('provider_api_key', 'local_ragassistant'),
+        get_string('provider_api_key_desc', 'local_ragassistant'),
         ''
     ));
 
