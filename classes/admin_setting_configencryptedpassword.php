@@ -25,6 +25,12 @@ class local_ragassistant_admin_setting_configencryptedpassword extends admin_set
         );
         $status = $this->get_credential_status();
 
+        // Keep actionable states visible, but avoid a redundant "Configured" badge.
+        // The saved credential remains available without displaying a success badge.
+        if ($status['string'] === 'credentialconfigured') {
+            return $html;
+        }
+
         $statushtml = html_writer::tag(
             'span',
             get_string($status['string'], 'local_ragassistant'),
