@@ -6,7 +6,7 @@
 defined('MOODLE_INTERNAL') || die();
 
 $plugin->component = 'local_ragassistant';
-$plugin->version   = 2026111300;
+$plugin->version   = 2026111301;
 $plugin->requires  = 2025101600;
 $plugin->maturity  = MATURITY_ALPHA;
-$plugin->release   = '0.3.9 - Encrypted API credential storage';
+$plugin->release   = '0.4.0 - Secure API key management';
