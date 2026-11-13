@@ -6,7 +6,7 @@
 defined('MOODLE_INTERNAL') || die();
 
 $plugin->component = 'local_ragassistant';
-$plugin->version   = 2026111308;
+$plugin->version   = 2026111309;
 $plugin->requires  = 2025101600;
 $plugin->maturity  = MATURITY_ALPHA;
-$plugin->release   = '0.4.7 - Hide configured credential badge';
+$plugin->release   = '0.4.8 - Custom API key password input';
