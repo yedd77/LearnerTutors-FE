@@ -24,20 +24,11 @@ class api_client
     }
 
     /**
-     * Return the secret configured by a site administrator.
+     * Return the shared secret, decrypting it only inside Moodle PHP.
      */
     private function get_api_key(): string
     {
-        $key = (string) get_config('local_ragassistant', 'api_key');
-
-        if ($key === '') {
-            throw new \moodle_exception(
-                'apikeymissing',
-                'local_ragassistant'
-            );
-        }
-
-        return $key;
+        return secret_store::get_api_key();
     }
 
     /**
@@ -151,6 +142,7 @@ class api_client
         $body = curl_exec($handle);
         $error = curl_error($handle);
         $status = (int) curl_getinfo($handle, CURLINFO_HTTP_CODE);
+        curl_close($handle);
 
         return $this->decode_response($body, $error, $status);
     }
@@ -200,6 +192,7 @@ class api_client
         $body = curl_exec($handle);
         $error = curl_error($handle);
         $status = (int) curl_getinfo($handle, CURLINFO_HTTP_CODE);
+        curl_close($handle);
 
         return $this->decode_response($body, $error, $status);
     }
@@ -275,6 +268,7 @@ class api_client
                 $handle,
                 CURLINFO_HTTP_CODE
             );
+            curl_close($handle);
 
             return $this->decode_response($body, $error, $status);
         } finally {
@@ -284,13 +278,8 @@ class api_client
         }
     }
 
-
     /**
      * Regenerate document-grounded suggestions without reindexing vectors.
-     *
-     * @param \stored_file $file
-     * @param int $documentid
-     * @return array
      */
     public function generate_document_suggestions(\stored_file $file, int $documentid): array {
         $this->sync_configuration_if_changed();
@@ -324,6 +313,7 @@ class api_client
             $body = curl_exec($handle);
             $error = curl_error($handle);
             $status = (int) curl_getinfo($handle, CURLINFO_HTTP_CODE);
+            curl_close($handle);
             return $this->decode_response($body, $error, $status);
         } finally {
             if (is_file($temp)) {
@@ -334,18 +324,10 @@ class api_client
 
     /**
      * Enable or disable retrieval for a document.
-     *
-     * The FastAPI endpoint must support:
-     * PATCH /api/v1/documents/{documentid}/retrieval
      */
-    public function set_document_retrieval(
-        int $documentid,
-        bool $enabled
-    ): array {
+    public function set_document_retrieval(int $documentid, bool $enabled): array {
         return $this->patch_json(
-            '/api/v1/documents/' .
-            rawurlencode((string) $documentid) .
-            '/retrieval',
+            '/api/v1/documents/' . rawurlencode((string) $documentid) . '/retrieval',
             ['enabled' => $enabled]
         );
     }
@@ -384,6 +366,7 @@ class api_client
         $body = curl_exec($handle);
         $error = curl_error($handle);
         $status = (int) curl_getinfo($handle, CURLINFO_HTTP_CODE);
+        curl_close($handle);
 
         return $this->decode_response($body, $error, $status);
     }
@@ -391,11 +374,8 @@ class api_client
     /**
      * Validate HTTP status and decode the backend response.
      */
-    private function decode_response(
-        $body,
-        string $error,
-        int $status
-    ): array {
+    private function decode_response($body, string $error, int $status): array
+    {
         if ($body === false || $error !== '') {
             throw new \moodle_exception(
                 'backendconnectionfailed',
