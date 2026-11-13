@@ -15,12 +15,79 @@ final class secret_store {
 
     private static function encryption_key(): string {
         global $CFG;
+
+        // Explicit deployment configuration takes precedence. This preserves
+        // compatibility with installations that already use config.php/env.
         $encoded = $CFG->local_ragassistant_encryption_key ?? getenv('LOCAL_RAGASSISTANT_ENCRYPTION_KEY');
-        $key = is_string($encoded) ? base64_decode($encoded, true) : false;
-        if (!is_string($key) || strlen($key) !== 32) {
-            throw new \moodle_exception('encryptionkeymissing', 'local_ragassistant');
+        if (is_string($encoded) && $encoded !== '') {
+            $key = base64_decode($encoded, true);
+            if (!is_string($key) || strlen($key) !== 32) {
+                throw new \\moodle_exception('encryptionkeyinvalid', 'local_ragassistant');
+            }
+            return $key;
         }
-        return $key;
+
+        // Automatically provision a persistent key under Moodle's protected
+        // dataroot, so ordinary installations need no manual server setup.
+        return self::load_or_create_key_file();
+    }
+
+    /**
+     * Load or provision the Moodle-side encryption key in moodledata.
+     *
+     * The lock prevents concurrent first requests from creating competing keys
+     * on multi-worker installations. A missing/corrupt existing key is never
+     * replaced silently because that would make saved credentials unreadable.
+     */
+    private static function load_or_create_key_file(): string {
+        global $CFG;
+
+        if (empty($CFG->dataroot) || !is_dir($CFG->dataroot)) {
+            throw new \\moodle_exception('encryptionkeymissing', 'local_ragassistant');
+        }
+
+        $directory = rtrim($CFG->dataroot, DIRECTORY_SEPARATOR)
+            . DIRECTORY_SEPARATOR . 'local_ragassistant';
+        if (!is_dir($directory) && !@mkdir($directory, 0700, true) && !is_dir($directory)) {
+            throw new \\moodle_exception('encryptionkeymissing', 'local_ragassistant');
+        }
+        @chmod($directory, 0700);
+
+        $keyfile = $directory . DIRECTORY_SEPARATOR . 'encryption.key';
+        $lockfile = $directory . DIRECTORY_SEPARATOR . '.encryption-key.lock';
+        if (is_link($keyfile) || is_link($lockfile)) {
+            throw new \\moodle_exception('encryptionkeymissing', 'local_ragassistant');
+        }
+
+        $lock = @fopen($lockfile, 'c');
+        if ($lock === false) {
+            throw new \\moodle_exception('encryptionkeymissing', 'local_ragassistant');
+        }
+
+        try {
+            if (!flock($lock, LOCK_EX)) {
+                throw new \\moodle_exception('encryptionkeymissing', 'local_ragassistant');
+            }
+
+            if (!is_file($keyfile)) {
+                $encoded = base64_encode(random_bytes(32)) . PHP_EOL;
+                if (file_put_contents($keyfile, $encoded, LOCK_EX) === false) {
+                    throw new \\moodle_exception('encryptionkeymissing', 'local_ragassistant');
+                }
+                @chmod($keyfile, 0600);
+            }
+
+            $encoded = @file_get_contents($keyfile);
+            $key = is_string($encoded) ? base64_decode(trim($encoded), true) : false;
+            if (!is_string($key) || strlen($key) !== 32) {
+                throw new \\moodle_exception('encryptionkeyinvalid', 'local_ragassistant');
+            }
+
+            return $key;
+        } finally {
+            flock($lock, LOCK_UN);
+            fclose($lock);
+        }
     }
 
     private static function aad(string $purpose): string {
