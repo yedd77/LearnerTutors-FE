@@ -17,10 +17,22 @@ class api_client
     {
         $url = get_config('local_ragassistant', 'api_base_url');
 
-        return rtrim(
-            (string) ($url ?: 'http://127.0.0.1:8000'),
-            '/'
-        );
+        $url = rtrim((string) ($url ?: 'http://127.0.0.1:8000'), '/');
+        $parts = parse_url($url);
+
+        if (!is_array($parts) || empty($parts['scheme']) || empty($parts['host'])
+                || isset($parts['user']) || isset($parts['pass'])
+                || isset($parts['query']) || isset($parts['fragment'])) {
+            throw new \\moodle_exception('backendconnectionfailed', 'local_ragassistant');
+        }
+
+        $host = strtolower($parts['host']);
+        $isloopback = in_array($host, ['localhost', '127.0.0.1', '::1'], true);
+        if (strtolower($parts['scheme']) !== 'https' && !$isloopback) {
+            throw new \\moodle_exception('backendhttpsrequired', 'local_ragassistant');
+        }
+
+        return $url;
     }
 
     /**
@@ -29,6 +41,14 @@ class api_client
     private function get_api_key(): string
     {
         return secret_store::get_api_key();
+    }
+
+    /**
+     * Verify that FastAPI is reachable and accepts the configured shared key.
+     */
+    public function test_connection(): array
+    {
+        return $this->post_json('/api/v1/admin/connection-test', []);
     }
 
     /**
@@ -130,6 +150,8 @@ class api_client
             CURLOPT_POST => true,
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_CONNECTTIMEOUT => 5,
+            CURLOPT_SSL_VERIFYPEER => true,
+            CURLOPT_SSL_VERIFYHOST => 2,
             CURLOPT_TIMEOUT => 420,
             CURLOPT_HTTPHEADER => [
                 'Content-Type: application/json',
