@@ -878,7 +878,7 @@ form.mform #fgroup_id_buttonar .felement.fgroup {
     position: absolute;
     z-index: 1050;
     right: 0;
-    top: calc(100% + 8px);
+    bottom: calc(100% - 15px);
     left: 0;
     max-height: 320px;
     overflow-y: auto;
