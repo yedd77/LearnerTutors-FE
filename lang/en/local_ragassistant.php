@@ -149,3 +149,10 @@ $string['provider_api_key'] = 'Provider API key';
 $string['provider_api_key_desc'] = 'Enter the API key for the provider selected above (OpenAI or Google Gemini). The key is encrypted in Moodle and synchronized securely to FastAPI. The field stays blank after saving; leave it blank to keep the selected provider’s existing key. Switching providers does not delete the other provider’s saved key. Ollama does not require an API key.';
 $string['providerkeynotrequired'] = 'Ollama does not require an API key. Select OpenAI or Google Gemini to save a provider credential.';
 $string['providerkeytoolong'] = 'Use a provider API key with at least 20 characters.';
+
+
+// Encrypted credential status labels (never display credential values).
+$string['credentialconfigured'] = 'Configured — saved credential is available';
+$string['credentialnotconfigured'] = 'Not configured — enter an API key';
+$string['credentialnotrequired'] = 'Not required for the selected provider';
+$string['credentialverificationfailed'] = 'A saved credential exists but could not be verified. Check the encryption key and restore it from backup if necessary.';
