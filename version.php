@@ -6,7 +6,7 @@
 defined('MOODLE_INTERNAL') || die();
 
 $plugin->component = 'local_ragassistant';
-$plugin->version   = 2026111304;
+$plugin->version   = 2026111305;
 $plugin->requires  = 2025101600;
 $plugin->maturity  = MATURITY_ALPHA;
-$plugin->release   = '0.4.3 - Separate chat and image providers';
+$plugin->release   = '0.4.4 - Automatic credential encryption key provisioning';
