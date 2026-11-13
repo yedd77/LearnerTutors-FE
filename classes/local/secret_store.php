@@ -7,7 +7,8 @@ defined('MOODLE_INTERNAL') || die();
 
 /**
  * Encrypts Moodle-to-backend and provider credentials before storing them.
- * The 32-byte master key belongs in Moodle config.php or the PHP environment.
+ * The 32-byte master key is automatically provisioned in protected moodledata.
+ * Deployments may override it through Moodle config.php or the PHP environment.
  */
 final class secret_store {
     private const PREFIX = 'enc:v1:';
