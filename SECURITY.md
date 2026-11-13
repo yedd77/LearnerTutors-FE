@@ -39,3 +39,20 @@ To rotate the shared key, generate a new backend `RAG_API_KEY`, update the backe
 ## Operational limits
 
 Encryption at rest protects against a database-only disclosure. It does not protect against a full Moodle host compromise, malicious PHP code, or an administrator with server-level access. Restrict access to `config.php`, secure backups, use HTTPS, and keep the backend network-restricted.
+
+## Dynamic OpenAI and Gemini provider credentials
+
+The OpenAI and Gemini keys are separate from the shared `RAG_API_KEY`.
+
+1. Set a dedicated backend encryption key once in the FastAPI `.env`:
+   `RUNTIME_CONFIG_ENCRYPTION_KEY=<Fernet key>`
+2. Generate it with:
+   `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`
+3. Install the updated backend dependencies (`pip install -r requirements.txt`).
+4. In Moodle Site administration → Plugins → Local plugins → Course Learning Assistant, enter the OpenAI API key and/or Google Gemini API key and save.
+5. The next chat request or document indexing request synchronizes changed settings to FastAPI. The backend encrypts provider credentials before saving them in `storage/runtime_config.json`; no FastAPI restart is required.
+6. The saved Moodle fields remain blank in the browser. Entering a new value rotates that provider credential; leaving the field blank keeps the current value.
+
+The backend runtime encryption key must remain stable and must be backed up securely. If it is lost or changed, previously synchronized provider keys cannot be decrypted. Re-enter the provider keys in Moodle after restoring or replacing the encryption key.
+
+Provider keys are sent only in an authenticated Moodle PHP-to-FastAPI request over the configured backend connection. For non-localhost backend URLs, Moodle requires HTTPS. The backend config read endpoint returns only configured/not-configured booleans, never provider key values.
