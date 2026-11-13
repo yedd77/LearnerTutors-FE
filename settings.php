@@ -5,6 +5,7 @@
 
 defined('MOODLE_INTERNAL') || die();
 
+require_once(__DIR__ . '/classes/admin_setting_configencryptedpassword.php');
 
 if ($hassiteconfig) {
     $settings = new admin_settingpage(
@@ -69,12 +70,14 @@ if ($hassiteconfig) {
         PARAM_TEXT
     ));
 
-    $settings->add(new admin_setting_configpasswordunmask(
+    // This setting stores AES-256-GCM ciphertext in Moodle's config_plugins table.
+    // The encryption key itself must be configured outside the database.
+    $settings->add(new local_ragassistant_admin_setting_configencryptedpassword(
         'local_ragassistant/api_key',
         get_string('apikey', 'local_ragassistant'),
         get_string('apikey_desc', 'local_ragassistant'),
         ''
     ));
- 
+
     $ADMIN->add('localplugins', $settings);
 }
