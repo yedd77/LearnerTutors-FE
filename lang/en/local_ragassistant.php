@@ -156,5 +156,4 @@ $string['credentialconfigured'] = 'Configured — saved credential is available'
 $string['credentialnotconfigured'] = 'Not configured — enter an API key';
 $string['credentialnotrequired'] = 'Not required for the selected provider';
 $string['credentialverificationfailed'] = 'A saved credential exists but could not be verified. Check the encryption key and restore it from backup if necessary.';
-
-$string['credentialinputplaceholder'] = 'Enter a new API key (leave blank to keep the saved key)';
+$string['credentialinputplaceholder'] = '*******************************';
