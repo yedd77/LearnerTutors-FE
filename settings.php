@@ -27,6 +27,13 @@ if ($hassiteconfig) {
         PARAM_URL
     ));
 
+    $settings->add(new admin_setting_configpasswordunmask(
+        'local_ragassistant/api_key',
+        get_string('apikey', 'local_ragassistant'),
+        get_string('apikey_desc', 'local_ragassistant'),
+        ''
+    ));
+
     $settings->add(new admin_setting_configcheckbox(
         'local_ragassistant/enable_chat',
         get_string('enablechat', 'local_ragassistant'),

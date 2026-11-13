@@ -99,6 +99,13 @@ if (!isset($SESSION->local_ragassistant_history[$courseid])) {
     $SESSION->local_ragassistant_history[$courseid] = [];
 }
 
+// Clear the current course conversation and return to a new chat.
+if (data_submitted() && optional_param('clear_history', 0, PARAM_BOOL) && confirm_sesskey()) {
+    $SESSION->local_ragassistant_history[$courseid] = [];
+
+    redirect(new moodle_url('/local/ragassistant/chat.php', ['courseid' => $courseid]));
+}
+
 // Load suggestions only for a new chat. The joined document checks preserve
 // course/personal visibility and exclude deleted, failed, or retrieval-disabled files.
 $suggestions = [];
@@ -333,6 +340,38 @@ if ($error !== '') {
 echo html_writer::start_div(
     'ragassistant-chat-app' . (!empty($history) ? ' ragassistant-chat-active' : '')
 );
+
+// Display the new chat button only when conversation history exists.
+if (!empty($history)) {
+    echo html_writer::start_tag('form', [
+        'method' => 'post',
+        'action' => (new moodle_url('/local/ragassistant/chat.php', ['courseid' => $courseid]))->out(false),
+        'class' => 'ragassistant-new-chat-form',
+    ]);
+
+    echo html_writer::empty_tag('input', [
+        'type' => 'hidden',
+        'name' => 'sesskey',
+        'value' => sesskey(),
+    ]);
+
+    echo html_writer::empty_tag('input', [
+        'type' => 'hidden',
+        'name' => 'clear_history',
+        'value' => '1',
+    ]);
+
+    echo html_writer::tag('button',
+        html_writer::tag('span', '+', ['aria-hidden' => 'true']) . ' New chat',
+        [
+            'type' => 'submit',
+            'class' => 'ragassistant-new-chat-btn',
+            'title' => 'Start a new conversation',
+        ]
+    );
+
+    echo html_writer::end_tag('form');
+}
 
 //render chat background blobs
 echo html_writer::start_div('ragassistant-chat-background');
