@@ -1021,3 +1021,42 @@ form.mform #fgroup_id_buttonar .felement.fgroup {
     opacity: .65;
     cursor: not-allowed;
 }
+
+/* New chat control: shown only while a conversation exists. */
+.ragassistant-new-chat-form {
+    position: absolute;
+    top: 1rem;
+    left: 1rem;
+    z-index: 5;
+    margin: 0;
+}
+
+.ragassistant-new-chat-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: .45rem;
+    padding: .5rem .85rem;
+    border: 1px solid var(--bs-border-color, #dee2e6);
+    border-radius: .65rem;
+    background: rgb(255 255 255 / 85%);
+    color: var(--bs-body-color, #212529);
+    font-size: .85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background .2s ease, border-color .2s ease;
+}
+
+.ragassistant-new-chat-btn:hover {
+    background: #fff;
+    border-color: var(--ragassistant-primary, #270089);
+}
+
+.ragassistant-new-chat-btn:focus-visible {
+    outline: 2px solid var(--ragassistant-primary, #270089);
+    outline-offset: 2px;
+}
+
+/* Keep the first message clear of the floating New Chat button. */
+.ragassistant-chat-active .ragassistant-chat-transcript {
+    padding-top: 3.5rem;
+}
