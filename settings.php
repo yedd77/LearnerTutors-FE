@@ -63,6 +63,16 @@ if ($hassiteconfig) {
         PARAM_TEXT
     ));
 
+    // One credential field follows the provider selector. The setting class
+    // stores the submitted key against the selected provider while retaining
+    // previously saved credentials for the other provider.
+    $settings->add(new local_ragassistant_admin_setting_configencryptedpassword(
+        'local_ragassistant/provider_api_key',
+        get_string('provider_api_key', 'local_ragassistant'),
+        get_string('provider_api_key_desc', 'local_ragassistant'),
+        ''
+    ));
+
     // Image generation has an independent provider and model.
     $settings->add(new admin_setting_heading(
         'local_ragassistant/image_heading',
@@ -101,16 +111,6 @@ if ($hassiteconfig) {
         'local_ragassistant/image_provider_api_key',
         get_string('image_provider_api_key', 'local_ragassistant'),
         get_string('image_provider_api_key_desc', 'local_ragassistant'),
-        ''
-    ));
-
-    // One credential field follows the provider selector. The setting class
-    // stores the submitted key against the selected provider while retaining
-    // previously saved credentials for the other provider.
-    $settings->add(new local_ragassistant_admin_setting_configencryptedpassword(
-        'local_ragassistant/provider_api_key',
-        get_string('provider_api_key', 'local_ragassistant'),
-        get_string('provider_api_key_desc', 'local_ragassistant'),
         ''
     ));
 
