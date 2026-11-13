@@ -17,6 +17,12 @@ class local_ragassistant_admin_setting_configencryptedpassword extends admin_set
      */
     public function output_html($data, $query = '') {
         $html = parent::output_html('', $query);
+        // Replace Moodle's generic password placeholder with credential-specific guidance.
+        $html = str_replace(
+            'Click to enter text',
+            get_string('credentialinputplaceholder', 'local_ragassistant'),
+            $html
+        );
         $status = $this->get_credential_status();
 
         $statushtml = html_writer::tag(
