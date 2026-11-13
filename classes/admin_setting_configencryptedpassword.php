@@ -32,9 +32,9 @@ class local_ragassistant_admin_setting_configencryptedpassword extends admin_set
         }
 
         try {
-            $encrypted = \\local_ragassistant\\local\\secret_store::encrypt($value, $settingname);
+            $encrypted = \local_ragassistant\local\secret_store::encrypt($value, $settingname);
             set_config($settingname, $encrypted, 'local_ragassistant');
-        } catch (\\Throwable $exception) {
+        } catch (\Throwable $exception) {
             debugging('Could not securely store an API credential: ' . $exception->getMessage(), DEBUG_DEVELOPER);
             return get_string('secretstoragefailed', 'local_ragassistant');
         }
