@@ -47,6 +47,10 @@ class local_ragassistant_admin_setting_configencryptedpassword extends admin_set
 
         try {
             if ($settingname === 'api_key') {
+                $stored = (string) get_config('local_ragassistant', 'api_key');
+                if ($stored === '') {
+                    return ['string' => 'credentialnotconfigured', 'class' => 'badge-secondary'];
+                }
                 \local_ragassistant\local\secret_store::get_api_key();
                 return ['string' => 'credentialconfigured', 'class' => 'badge-success'];
             }
