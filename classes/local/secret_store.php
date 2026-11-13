@@ -8,8 +8,8 @@ defined('MOODLE_INTERNAL') || die();
 /**
  * Encrypts the shared FastAPI credential before it is stored in Moodle config.
  *
- * The 32-byte master key must be supplied through
- * LOCAL_RAGASSISTANT_ENCRYPTION_KEY in the PHP process environment.
+ * The 32-byte master key belongs in Moodle config.php (outside the database),
+ * or may be supplied through LOCAL_RAGASSISTANT_ENCRYPTION_KEY in the PHP environment.
  */
 final class secret_store {
     private const PREFIX = 'enc:v1:';
@@ -22,7 +22,8 @@ final class secret_store {
      * @throws \moodle_exception
      */
     private static function encryption_key(): string {
-        $encoded = getenv('LOCAL_RAGASSISTANT_ENCRYPTION_KEY');
+        global $CFG;
+        $encoded = $CFG->local_ragassistant_encryption_key ?? getenv('LOCAL_RAGASSISTANT_ENCRYPTION_KEY');
         $key = is_string($encoded) ? base64_decode($encoded, true) : false;
 
         if (!is_string($key) || strlen($key) !== 32) {
