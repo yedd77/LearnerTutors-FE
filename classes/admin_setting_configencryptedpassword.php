@@ -8,7 +8,35 @@ defined('MOODLE_INTERNAL') || die();
  * Existing values are never rendered to the administrator's browser.
  * An empty submission preserves the currently configured secret.
  */
-class local_ragassistant_admin_setting_configencryptedpassword extends admin_setting_configpasswordunmask {
+class local_ragassistant_admin_setting_configencryptedpassword extends admin_setting_configtext {
+    /**
+     * Construct a password input without Moodle's unmask/show-password control.
+     *
+     * @param string $name Setting name.
+     * @param string $visiblename Visible label.
+     * @param string $description Setting description.
+     * @param string $defaultsetting Default value (intentionally blank).
+     */
+    public function __construct($name, $visiblename, $description, $defaultsetting) {
+        parent::__construct($name, $visiblename, $description, $defaultsetting, PARAM_RAW, 30);
+    }
+
+    /**
+     * Mask credential values in Moodle's configuration change log.
+     *
+     * @param string $name Setting name.
+     * @param string $oldvalue Previous value.
+     * @param string $value New value.
+     */
+    protected function add_to_config_log($name, $oldvalue, $value) {
+        if ($value !== '') {
+            $value = '********';
+        }
+        if ($oldvalue !== '' && $oldvalue !== null) {
+            $oldvalue = '********';
+        }
+        parent::add_to_config_log($name, $oldvalue, $value);
+    }
     /**
      * Render the empty password input together with a safe credential status.
      *
@@ -16,12 +44,35 @@ class local_ragassistant_admin_setting_configencryptedpassword extends admin_set
      * included in the generated HTML. Only its availability is displayed.
      */
     public function output_html($data, $query = '') {
-        $html = parent::output_html('', $query);
-        // Replace Moodle's generic password placeholder with credential-specific guidance.
-        $html = str_replace(
-            'Click to enter text',
-            get_string('credentialinputplaceholder', 'local_ragassistant'),
-            $html
+        // Render our own password input instead of Moodle's unmaskable password
+        // setting. This avoids the Show/Hide control and Moodle's generic placeholder.
+        $id = $this->get_id();
+        $attributes = [
+            'type' => 'password',
+            'size' => $this->size,
+            'id' => $id,
+            'name' => $this->get_full_name(),
+            'value' => '',
+            'placeholder' => get_string('credentialinputplaceholder', 'local_ragassistant'),
+            'autocomplete' => 'new-password',
+            'class' => 'form-control',
+        ];
+
+        if ($this->is_readonly()) {
+            $attributes['readonly'] = 'readonly';
+            unset($attributes['name']);
+        }
+
+        $element = html_writer::empty_tag('input', $attributes);
+        $html = format_admin_setting(
+            $this,
+            $this->visiblename,
+            $element,
+            $this->description,
+            true,
+            '',
+            null,
+            $query
         );
         $status = $this->get_credential_status();
 
