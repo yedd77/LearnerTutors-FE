@@ -40,8 +40,9 @@ if ($hassiteconfig) {
         get_string('llm_heading_desc', 'local_ragassistant')
     ));
 
-    // Chat provider/model are defaults only. The backend remains responsible
-    // for API credentials; Moodle must never store provider API keys.
+    // Chat provider/model and provider credentials are managed by site administrators.
+    // Provider keys are encrypted in Moodle and sent server-to-server to FastAPI only
+    // when the saved settings change; they are never rendered back into the browser.
     $settings->add(new admin_setting_configselect(
         'local_ragassistant/llm_provider',
         get_string('llmprovider', 'local_ragassistant'),
@@ -68,6 +69,21 @@ if ($hassiteconfig) {
         get_string('image_model_desc', 'local_ragassistant'),
         '',
         PARAM_TEXT
+    ));
+
+    // Provider credentials are encrypted at rest and never shown after saving.
+    $settings->add(new local_ragassistant_admin_setting_configencryptedpassword(
+        'local_ragassistant/openai_api_key',
+        get_string('openai_api_key', 'local_ragassistant'),
+        get_string('openai_api_key_desc', 'local_ragassistant'),
+        ''
+    ));
+
+    $settings->add(new local_ragassistant_admin_setting_configencryptedpassword(
+        'local_ragassistant/gemini_api_key',
+        get_string('gemini_api_key', 'local_ragassistant'),
+        get_string('gemini_api_key_desc', 'local_ragassistant'),
+        ''
     ));
 
     // This setting stores AES-256-GCM ciphertext in Moodle's config_plugins table.
