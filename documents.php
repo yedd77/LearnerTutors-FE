@@ -46,13 +46,18 @@ function local_ragassistant_save_document_suggestions(
     $transaction = $DB->start_delegated_transaction();
     try {
         $DB->delete_records('local_ragassistant_suggestions', ['documentid' => $documentid]);
+        $slot = 0;
         foreach ($cleaned as $suggestion) {
+            $slot++;
             $DB->insert_record('local_ragassistant_suggestions', (object) [
                 'courseid' => $courseid,
                 'documentid' => $documentid,
                 'userid' => $userid,
+                'slot' => $slot,
                 'suggestion' => $suggestion,
+                'status' => 'ready',
                 'timecreated' => time(),
+                'timemodified' => time(),
             ]);
         }
         $transaction->allow_commit();
