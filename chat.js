@@ -386,15 +386,18 @@ document.addEventListener('DOMContentLoaded', function () {
             const loadingContent = loadingMessage.querySelector(
                 '.ragassistant-message-content'
             );
+            const thinkingLabel = document.createElement('span');
+            thinkingLabel.className = 'ragassistant-thinking-shimmer';
+            thinkingLabel.setAttribute('aria-live', 'off');
+            thinkingLabel.textContent = 'Thinking for 0s';
+            loadingContent.replaceChildren(thinkingLabel);
             const thinkingStartedAt = Date.now();
             const thinkingTimer = window.setInterval(function () {
                 const elapsedSeconds = Math.floor(
                     (Date.now() - thinkingStartedAt) / 1000
                 );
-                if (loadingContent) {
-                    loadingContent.textContent = 'Thinking for ' +
-                        elapsedSeconds + 's';
-                }
+                thinkingLabel.textContent = 'Thinking for ' +
+                    elapsedSeconds + 's';
             }, 1000);
             activeThinkingTimer = thinkingTimer;
 
