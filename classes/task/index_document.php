@@ -214,7 +214,12 @@ class index_document extends \core\task\adhoc_task {
                 }
             } else if ($jobtype === 'suggestion_slot') {
                 $slot = (int) ($customdata->slot ?? 0);
-                $DB->set_field('local_ragassistant_suggestions', 'status', 'failed', [
+                $saved = $DB->get_record('local_ragassistant_suggestions', [
+                    'documentid' => $documentid,
+                    'slot' => $slot,
+                ]);
+                $state = $saved && trim((string) $saved->suggestion) !== '' ? 'ready' : 'failed';
+                $DB->set_field('local_ragassistant_suggestions', 'status', $state, [
                     'documentid' => $documentid,
                     'slot' => $slot,
                 ]);
