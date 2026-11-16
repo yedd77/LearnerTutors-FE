@@ -115,6 +115,7 @@ if ($allowed) {
            FROM {local_ragassistant_suggestions} s
            JOIN {local_ragassistant_documents} d ON d.id = s.documentid
           WHERE s.courseid = :courseid
+            AND s.status = :suggestionready
             AND d.status = :ready
             AND d.retrievalenabled = 1
             AND (d.visibility = :coursevisibility OR d.userid = :userid OR :canmanage = 1)
