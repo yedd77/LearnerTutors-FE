@@ -212,6 +212,12 @@ class index_document extends \core\task\adhoc_task {
                     mtrace('RAG Assistant: local suggestion fallback failed for document ' .
                         $documentid . ': ' . $fallbackexception->getMessage());
                 }
+            } else if ($jobtype === 'suggestion_slot') {
+                $slot = (int) ($customdata->slot ?? 0);
+                $DB->set_field('local_ragassistant_suggestions', 'status', 'failed', [
+                    'documentid' => $documentid,
+                    'slot' => $slot,
+                ]);
             } else {
                 $this->update_progress($documentid, 'failed', 100, 'failed');
             }
@@ -225,9 +231,9 @@ class index_document extends \core\task\adhoc_task {
      * Generate and persist exactly one suggestion slot.
      */
     private function generate_one_suggestion(
-        \\local_ragassistant\\local\\api_client $api,
-        \\stored_file $stored,
-        \\stdClass $record,
+        \local_ragassistant\local\api_client $api,
+        \stored_file $stored,
+        \stdClass $record,
         int $slot
     ): void {
         global $DB;
@@ -247,9 +253,9 @@ class index_document extends \core\task\adhoc_task {
         try {
             $result = $api->generate_document_suggestion($stored, (int) $record->id, $slot, $existingtexts);
             $suggestion = trim(clean_param((string) ($result['suggestion'] ?? ''), PARAM_TEXT));
-            $suggestion = \\core_text::substr($suggestion, 0, 500);
+            $suggestion = \core_text::substr($suggestion, 0, 500);
             if ($suggestion === '') {
-                throw new \\moodle_exception('backendinvalidresponse', 'local_ragassistant');
+                throw new \moodle_exception('backendinvalidresponse', 'local_ragassistant');
             }
 
             $saved = $DB->get_record('local_ragassistant_suggestions', [
@@ -273,7 +279,7 @@ class index_document extends \core\task\adhoc_task {
                 $DB->insert_record('local_ragassistant_suggestions', $values);
             }
             mtrace('RAG Assistant: generated suggestion slot ' . $slot . ' for document ' . $record->id . '.');
-        } catch (\\Throwable $exception) {
+        } catch (\Throwable $exception) {
             $DB->set_field('local_ragassistant_suggestions', 'status', 'failed', [
                 'documentid' => $record->id,
                 'slot' => $slot,
@@ -296,7 +302,7 @@ class index_document extends \core\task\adhoc_task {
      */
     private function fallback_suggestions(string $filename, string $lecturernote): array {
         $title = trim(pathinfo($filename, PATHINFO_FILENAME));
-        $title = preg_replace('/\\s+/', ' ', $title);
+        $title = preg_replace('/\s+/', ' ', $title);
         $title = $title !== '' ? $title : 'this document';
         $questions = [
             'What are the main concepts covered in ' . $title . '?',
@@ -329,8 +335,8 @@ class index_document extends \core\task\adhoc_task {
             if (!is_string($suggestion)) {
                 continue;
             }
-            $suggestion = \\core_text::substr(trim(clean_param($suggestion, PARAM_TEXT)), 0, 500);
-            $key = \\core_text::strtolower($suggestion);
+            $suggestion = \core_text::substr(trim(clean_param($suggestion, PARAM_TEXT)), 0, 500);
+            $key = \core_text::strtolower($suggestion);
             if ($suggestion !== '' && !isset($cleaned[$key])) {
                 $cleaned[$key] = $suggestion;
             }
@@ -360,7 +366,7 @@ class index_document extends \core\task\adhoc_task {
                 ]);
             }
             $transaction->allow_commit();
-        } catch (\\Throwable $exception) {
+        } catch (\Throwable $exception) {
             $transaction->rollback($exception);
             throw $exception;
         }
