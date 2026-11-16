@@ -29,6 +29,7 @@ function local_ragassistant_save_document_suggestions(
     }
 
     $saved = [];
+    $slot = 0;
     foreach ($suggestions as $suggestion) {
         if (!is_string($suggestion)) {
             continue;
@@ -40,16 +41,64 @@ function local_ragassistant_save_document_suggestions(
             continue;
         }
         $saved[$key] = true;
+        $slot++;
         $DB->insert_record('local_ragassistant_suggestions', (object) [
             'courseid' => $courseid,
             'documentid' => $documentid,
             'userid' => $userid,
+            'slot' => $slot,
             'suggestion' => $suggestion,
             'timecreated' => time(),
         ]);
-        if (count($saved) >= 3) {
+        if ($slot >= 3) {
             break;
         }
+    }
+}
+
+/**
+ * Save or replace one suggestion slot without touching the other slots.
+ *
+ * @param int $courseid
+ * @param int $documentid
+ * @param int $userid
+ * @param int $slot
+ * @param string $suggestion
+ */
+function local_ragassistant_save_document_suggestion(
+    int $courseid,
+    int $documentid,
+    int $userid,
+    int $slot,
+    string $suggestion
+): void {
+    global $DB;
+
+    $suggestion = trim(clean_param($suggestion, PARAM_TEXT));
+    $suggestion = core_text::substr($suggestion, 0, 500);
+    if ($suggestion === '' || $slot < 1 || $slot > 3) {
+        throw new moodle_exception('invalidrequest', 'error');
+    }
+
+    $existing = $DB->get_record('local_ragassistant_suggestions', [
+        'documentid' => $documentid,
+        'slot' => $slot,
+    ]);
+
+    $record = (object) [
+        'courseid' => $courseid,
+        'documentid' => $documentid,
+        'userid' => $userid,
+        'slot' => $slot,
+        'suggestion' => $suggestion,
+        'timecreated' => time(),
+    ];
+
+    if ($existing) {
+        $record->id = $existing->id;
+        $DB->update_record('local_ragassistant_suggestions', $record);
+    } else {
+        $DB->insert_record('local_ragassistant_suggestions', $record);
     }
 }
 
@@ -230,6 +279,49 @@ if ($action !== '' && $actiondocumentid > 0 && data_submitted()) {
                     get_string('indexsuccess', 'local_ragassistant', (int) ($result['indexed_chunks'] ?? 0)),
                     null,
                     \core\output\notification::NOTIFY_SUCCESS
+                );
+                break;
+
+            // Generate or regenerate one suggestion without re-indexing the document.
+            case 'generate_suggestion':
+                if ($target->status !== 'ready' || !$targetfile) {
+                    throw new moodle_exception('invalidrequest', 'error');
+                }
+                $slot = required_param('slot', PARAM_INT);
+                if ($slot < 1 || $slot > 3) {
+                    throw new moodle_exception('invalidrequest', 'error');
+                }
+                $existingrecords = $DB->get_records(
+                    'local_ragassistant_suggestions',
+                    ['documentid' => $target->id],
+                    'slot ASC'
+                );
+                $existingtexts = [];
+                foreach ($existingrecords as $existingrecord) {
+                    if ((int) $existingrecord->slot !== $slot) {
+                        $existingtexts[] = (string) $existingrecord->suggestion;
+                    }
+                }
+                $generated = $api->generate_document_suggestion(
+                    $targetfile,
+                    (int) $target->id,
+                    (int) $target->courseid,
+                    $slot,
+                    $existingtexts
+                );
+                $suggestiontext = (string) ($generated['suggestion'] ?? '');
+                local_ragassistant_save_document_suggestion(
+                    (int) $target->courseid,
+                    (int) $target->id,
+                    (int) $target->userid,
+                    $slot,
+                    $suggestiontext
+                );
+                redirect(
+                    $redirecturl,
+                    'Suggestion ' . $slot . ' generated successfully.',
+                    null,
+                    \\core\\output\\notification::NOTIFY_SUCCESS
                 );
                 break;
 
@@ -560,6 +652,78 @@ if (empty($table->data)) {
     );
 }
 echo html_writer::end_div();
+
+// Per-document suggestion management: each document occupies three suggestion rows.
+$suggestiontable = new html_table();
+$suggestiontable->attributes['class'] = 'generaltable ragassistant-document-suggestions';
+$suggestiontable->head = ['Document', 'Suggestion', 'Action'];
+foreach ($documents as $document) {
+    $isowner = ((int) $document->userid === (int) $USER->id);
+    if (!$canmanage && $document->visibility !== 'course' && !$isowner) {
+        continue;
+    }
+    if (!$canmanage && !$isowner && empty($document->retrievalenabled)) {
+        continue;
+    }
+    if (!$canmanage && !$isowner) {
+        continue;
+    }
+
+    $saved = $DB->get_records(
+        'local_ragassistant_suggestions',
+        ['documentid' => $document->id],
+        'slot ASC'
+    );
+    $byslot = [];
+    foreach ($saved as $saveditem) {
+        $byslot[(int) $saveditem->slot] = $saveditem;
+    }
+
+    for ($slot = 1; $slot <= 3; $slot++) {
+        $row = [];
+        if ($slot === 1) {
+            $documentcell = new html_table_cell(
+                html_writer::tag('strong', s($document->filename))
+            );
+            $documentcell->rowspan = 3;
+            $row[] = $documentcell;
+        }
+
+        $row[] = isset($byslot[$slot])
+            ? html_writer::div(s($byslot[$slot]->suggestion), 'ragassistant-suggestion-managed-text')
+            : html_writer::span('Not generated yet', 'text-muted');
+
+        if ($document->status === 'ready') {
+            $row[] = local_ragassistant_document_action_form(
+                $courseid,
+                (int) $document->id,
+                'generate_suggestion',
+                isset($byslot[$slot]) ? 'Regenerate' : 'Generate',
+                'btn btn-outline-primary btn-sm',
+                isset($byslot[$slot])
+                    ? 'return confirm("Replace this suggestion?");'
+                    : null,
+                ['slot' => $slot]
+            );
+        } else {
+            $row[] = html_writer::span('Available after indexing', 'text-muted');
+        }
+        $suggestiontable->data[] = $row;
+    }
+}
+
+if (!empty($suggestiontable->data)) {
+    echo html_writer::start_div('ragassistant-uploaded-card');
+    echo html_writer::tag('h4', 'Document Suggestions', ['class' => 'ragassistant-card-title']);
+    echo html_writer::tag(
+        'p',
+        'Generate or regenerate each suggested question independently. This does not re-index the document.',
+        ['class' => 'ragassistant-card-description']
+    );
+    echo html_writer::div(html_writer::table($suggestiontable), 'table-responsive');
+    echo html_writer::end_div();
+}
+
 echo html_writer::div(
     html_writer::link(
         new moodle_url('/local/ragassistant/index.php', ['courseid' => $courseid]),
