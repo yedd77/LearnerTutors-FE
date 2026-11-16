@@ -71,5 +71,33 @@ function xmldb_local_ragassistant_upgrade(int $oldversion): bool
         upgrade_plugin_savepoint(true, 2026110600, 'local', 'ragassistant');
     }
 
+    if ($oldversion < 2026111600) {
+        $table = new xmldb_table('local_ragassistant_suggestions');
+        $field = new xmldb_field('slot', XMLDB_TYPE_INTEGER, '1', null, XMLDB_NOTNULL, null, '1', 'userid');
+        if ($dbman->table_exists($table) && !$dbman->field_exists($table, $field)) {
+            $dbman->add_field($table, $field);
+
+            // Preserve existing generated suggestions by assigning stable slots per document.
+            $records = $DB->get_records('local_ragassistant_suggestions', null, 'documentid ASC, id ASC');
+            $nextslots = [];
+            foreach ($records as $record) {
+                $documentid = (int) $record->documentid;
+                $nextslots[$documentid] = ($nextslots[$documentid] ?? 0) + 1;
+                $DB->set_field(
+                    'local_ragassistant_suggestions',
+                    'slot',
+                    min($nextslots[$documentid], 3),
+                    ['id' => $record->id]
+                );
+            }
+        }
+
+        $index = new xmldb_index('document_slot_uix', XMLDB_INDEX_UNIQUE, ['documentid', 'slot']);
+        if ($dbman->table_exists($table) && !$dbman->index_exists($table, $index)) {
+            $dbman->add_index($table, $index);
+        }
+        upgrade_plugin_savepoint(true, 2026111600, 'local', 'ragassistant');
+    }
+
     return true;
 }
