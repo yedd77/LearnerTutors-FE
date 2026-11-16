@@ -226,7 +226,7 @@ class api_client
      * Generate one document-grounded suggestion without re-indexing vectors.
      */
     public function generate_document_suggestion(
-        \\stored_file $file,
+        \stored_file $file,
         int $documentid,
         int $courseid,
         int $slot,
@@ -234,7 +234,7 @@ class api_client
     ): array {
         $temp = $file->copy_content_to_temp();
         if (!$temp || !is_file($temp)) {
-            throw new \\moodle_exception('filetempfailed', 'local_ragassistant');
+            throw new \moodle_exception('filetempfailed', 'local_ragassistant');
         }
 
         try {
@@ -243,14 +243,14 @@ class api_client
                 rawurlencode((string) $documentid) . '/suggestions/' . $slot
             );
             if ($handle === false) {
-                throw new \\moodle_exception('backendconnectionfailed', 'local_ragassistant');
+                throw new \moodle_exception('backendconnectionfailed', 'local_ragassistant');
             }
 
             $mime = function_exists('mime_content_type')
                 ? (mime_content_type($temp) ?: 'application/octet-stream')
                 : 'application/octet-stream';
             $post = [
-                'file' => new \\CURLFile($temp, $mime, $file->get_filename()),
+                'file' => new \CURLFile($temp, $mime, $file->get_filename()),
                 'course_id' => (string) $courseid,
                 'existing_suggestions' => json_encode($existing, JSON_UNESCAPED_UNICODE),
             ];
