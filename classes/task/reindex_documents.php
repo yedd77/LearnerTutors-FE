@@ -180,6 +180,7 @@ class reindex_documents extends \core\task\adhoc_task {
         global $DB;
         $title = trim(pathinfo((string) $record->filename, PATHINFO_FILENAME));
         $title = $title !== '' ? $title : 'this document';
+        $DB->delete_records('local_ragassistant_suggestions', ['documentid' => $record->id]);
         $questions = [
             'What are the main concepts covered in ' . $title . '?',
             'What important details and examples should I understand from ' . $title . '?',
