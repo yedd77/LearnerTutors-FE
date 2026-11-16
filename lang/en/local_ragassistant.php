@@ -67,6 +67,7 @@ $string['status_processing'] = 'Processing';
 $string['status_ready'] = 'Ready';
 $string['status_failed'] = 'Failed';
 $string['nodocuments'] = 'No documents have been uploaded for this course yet.';
+$string['nogenerateddocuments'] = 'No generated documents are available yet.';
 
 
 

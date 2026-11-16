@@ -739,13 +739,15 @@ foreach ($documents as $document) {
 }
 
 if (empty($table->data)) {
-    echo $OUTPUT->notification(get_string('nodocuments', 'local_ragassistant'), 'info');
-} else {
-    echo html_writer::div(
-        html_writer::table($table),
-        'table-responsive'
-    );
+    $emptycell = new html_table_cell(get_string('nodocuments', 'local_ragassistant'));
+    $emptycell->attributes['class'] = 'ragassistant-empty-cell';
+    $emptycell->colspan = count($table->head);
+    $table->data[] = [$emptycell];
 }
+echo html_writer::div(
+    html_writer::table($table),
+    'table-responsive'
+);
 echo html_writer::end_div();
 
 if ($canmanage) {
@@ -779,8 +781,8 @@ if ($canmanage) {
                 'ready' => 'Generated',
                 'failed' => 'Failed',
             ];
-            $statusclass = $status === 'ready' ? 'text-success'
-                : ($status === 'failed' ? 'text-danger'
+            $statusclass = $status === 'ready' ? 'badge badge-success bg-success'
+                : ($status === 'failed' ? 'badge badge-danger bg-danger'
                 : ($status === 'generating' ? 'text-info' : 'text-muted'));
             $row[] = html_writer::span($statuslabels[$status] ?? ucfirst($status), $statusclass);
 
@@ -808,6 +810,13 @@ if ($canmanage) {
             }
             $suggestiontable->data[] = $row;
         }
+    }
+
+    if (empty($suggestiontable->data)) {
+        $emptycell = new html_table_cell(get_string('nogenerateddocuments', 'local_ragassistant'));
+        $emptycell->attributes['class'] = 'ragassistant-empty-cell';
+        $emptycell->colspan = count($suggestiontable->head);
+        $suggestiontable->data[] = [$emptycell];
     }
 
     echo html_writer::start_div('ragassistant-uploaded-card');
