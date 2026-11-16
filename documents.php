@@ -340,7 +340,8 @@ if ($action !== '' && $actiondocumentid > 0 && data_submitted()) {
             // Queue generation for one suggestion slot without re-indexing the document.
             case 'generate_suggestion':
                 require_capability('local/ragassistant:managedocuments', $context);
-                if ($target->status !== 'ready' || !$targetfile) {
+                if ($target->status !== 'ready' || !$targetfile ||
+                        in_array((string) ($target->stage ?? ''), ['suggestions queued', 'generating suggestions'], true)) {
                     throw new moodle_exception('invalidrequest', 'error');
                 }
                 $slot = required_param('slot', PARAM_INT);
@@ -360,9 +361,9 @@ if ($action !== '' && $actiondocumentid > 0 && data_submitted()) {
                     'documentid' => $target->id,
                     'userid' => $target->userid,
                     'slot' => $slot,
-                    'suggestion' => $existing->suggestion ?? '',
+                    'suggestion' => $existing ? $existing->suggestion : '',
                     'status' => 'generating',
-                    'timecreated' => $existing->timecreated ?? time(),
+                    'timecreated' => $existing ? $existing->timecreated : time(),
                     'timemodified' => time(),
                 ];
                 if ($existing) {
@@ -382,7 +383,12 @@ if ($action !== '' && $actiondocumentid > 0 && data_submitted()) {
                 try {
                     \core\task\manager::queue_adhoc_task($task);
                 } catch (\Throwable $exception) {
-                    $DB->set_field('local_ragassistant_suggestions', 'status', 'failed', [
+                    $current = $DB->get_record('local_ragassistant_suggestions', [
+                        'documentid' => $target->id,
+                        'slot' => $slot,
+                    ]);
+                    $state = $current && trim((string) $current->suggestion) !== '' ? 'ready' : 'failed';
+                    $DB->set_field('local_ragassistant_suggestions', 'status', $state, [
                         'documentid' => $target->id,
                         'slot' => $slot,
                     ]);
@@ -778,7 +784,8 @@ if ($canmanage) {
                 : ($status === 'generating' ? 'text-info' : 'text-muted'));
             $row[] = html_writer::span($statuslabels[$status] ?? ucfirst($status), $statusclass);
 
-            if ($document->status === 'ready' && $status !== 'generating') {
+            if ($document->status === 'ready' && $status !== 'generating' &&
+                    !in_array((string) ($document->stage ?? ''), ['suggestions queued', 'generating suggestions'], true)) {
                 $row[] = local_ragassistant_document_action_form(
                     $courseid,
                     (int) $document->id,
