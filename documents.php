@@ -332,6 +332,61 @@ if ($action !== '' && $actiondocumentid > 0 && data_submitted()) {
                 );
                 break;
 
+            // Queue generation for one suggestion slot without re-indexing the document.
+            case 'generate_suggestion':
+                require_capability('local/ragassistant:managedocuments', $context);
+                if ($target->status !== 'ready' || !$targetfile) {
+                    throw new moodle_exception('invalidrequest', 'error');
+                }
+                $slot = required_param('slot', PARAM_INT);
+                if ($slot < 1 || $slot > 3) {
+                    throw new moodle_exception('invalidrequest', 'error');
+                }
+                $existing = $DB->get_record('local_ragassistant_suggestions', [
+                    'documentid' => $target->id,
+                    'slot' => $slot,
+                ]);
+                if ($existing && $existing->status === 'generating') {
+                    redirect($redirecturl, 'This suggestion is already being generated.', null,
+                        \\core\\output\\notification::NOTIFY_INFO);
+                }
+                $suggestionrecord = (object) [
+                    'courseid' => $target->courseid,
+                    'documentid' => $target->id,
+                    'userid' => $target->userid,
+                    'slot' => $slot,
+                    'suggestion' => $existing->suggestion ?? '',
+                    'status' => 'generating',
+                    'timecreated' => $existing->timecreated ?? time(),
+                    'timemodified' => time(),
+                ];
+                if ($existing) {
+                    $suggestionrecord->id = $existing->id;
+                    $DB->update_record('local_ragassistant_suggestions', $suggestionrecord);
+                } else {
+                    $DB->insert_record('local_ragassistant_suggestions', $suggestionrecord);
+                }
+
+                $task = new \\local_ragassistant\\task\\index_document();
+                $task->set_component('local_ragassistant');
+                $task->set_custom_data([
+                    'documentid' => (int) $target->id,
+                    'jobtype' => 'suggestion_slot',
+                    'slot' => $slot,
+                ]);
+                try {
+                    \\core\\task\\manager::queue_adhoc_task($task);
+                } catch (\\Throwable $exception) {
+                    $DB->set_field('local_ragassistant_suggestions', 'status', 'failed', [
+                        'documentid' => $target->id,
+                        'slot' => $slot,
+                    ]);
+                    throw $exception;
+                }
+                redirect($redirecturl, 'Suggestion ' . $slot . ' generation queued.', null,
+                    \\core\\output\\notification::NOTIFY_SUCCESS);
+                break;
+
             // Handle 'retrival' action
             case 'retrieval':
 
@@ -600,16 +655,6 @@ foreach ($documents as $document) {
                 'return confirm("Queue reindexing for this document?");'
             );
         }
-        if (in_array($document->status, ['ready', 'failed'], true)) {
-            $actions[] = local_ragassistant_document_action_form(
-                $courseid,
-                (int) $document->id,
-                'regenerate_suggestions',
-                'Regenerate suggestions',
-                'btn btn-outline-secondary btn-sm',
-                'return confirm("Regenerate starter suggestions without reindexing the document?");'
-            );
-        }
         if ($document->status === 'ready') {
             $actions[] = local_ragassistant_document_action_form(
                 $courseid,
@@ -691,6 +736,79 @@ if (empty($table->data)) {
     );
 }
 echo html_writer::end_div();
+
+if ($canmanage) {
+    $suggestiontable = new html_table();
+    $suggestiontable->attributes['class'] = 'generaltable ragassistant-document-suggestions';
+    $suggestiontable->head = ['Document', 'Suggestion', 'Status', 'Action'];
+
+    foreach ($documents as $document) {
+        $saved = $DB->get_records('local_ragassistant_suggestions', ['documentid' => $document->id], 'slot ASC');
+        $byslot = [];
+        foreach ($saved as $saveditem) {
+            $byslot[(int) $saveditem->slot] = $saveditem;
+        }
+
+        for ($slot = 1; $slot <= 3; $slot++) {
+            $item = $byslot[$slot] ?? null;
+            $row = [];
+            if ($slot === 1) {
+                $documentcell = new html_table_cell(s($document->filename));
+                $documentcell->rowspan = 3;
+                $row[] = $documentcell;
+            }
+            $row[] = $item && trim((string) $item->suggestion) !== ''
+                ? html_writer::div(s($item->suggestion), 'ragassistant-suggestion-text')
+                : html_writer::span('No suggestion generated yet', 'text-muted');
+
+            $status = $item->status ?? 'empty';
+            $statuslabels = [
+                'empty' => 'Not generated',
+                'generating' => 'Generating',
+                'ready' => 'Generated',
+                'failed' => 'Failed',
+            ];
+            $statusclass = $status === 'ready' ? 'text-success'
+                : ($status === 'failed' ? 'text-danger'
+                : ($status === 'generating' ? 'text-info' : 'text-muted'));
+            $row[] = html_writer::span($statuslabels[$status] ?? ucfirst($status), $statusclass);
+
+            if ($document->status === 'ready' && $status !== 'generating') {
+                $row[] = local_ragassistant_document_action_form(
+                    $courseid,
+                    (int) $document->id,
+                    'generate_suggestion',
+                    $item && trim((string) $item->suggestion) !== '' ? 'Regenerate' : 'Generate',
+                    'btn btn-outline-primary btn-sm',
+                    $item && trim((string) $item->suggestion) !== ''
+                        ? 'return confirm("Regenerate only this suggestion?");'
+                        : null,
+                    ['slot' => $slot]
+                );
+            } else if ($status === 'generating') {
+                $row[] = html_writer::tag('button', 'Generating…', [
+                    'type' => 'button',
+                    'class' => 'btn btn-outline-secondary btn-sm',
+                    'disabled' => 'disabled',
+                ]);
+            } else {
+                $row[] = html_writer::span('Available after indexing', 'text-muted');
+            }
+            $suggestiontable->data[] = $row;
+        }
+    }
+
+    echo html_writer::start_div('ragassistant-uploaded-card');
+    echo html_writer::tag('h4', 'Document Suggestions', ['class' => 'ragassistant-card-title']);
+    echo html_writer::tag(
+        'p',
+        'Generate or regenerate each suggestion independently. Suggestion generation does not re-index documents.',
+        ['class' => 'ragassistant-card-description']
+    );
+    echo html_writer::div(html_writer::table($suggestiontable), 'table-responsive');
+    echo html_writer::end_div();
+}
+
 echo html_writer::div(
     html_writer::link(
         new moodle_url('/local/ragassistant/index.php', ['courseid' => $courseid]),
