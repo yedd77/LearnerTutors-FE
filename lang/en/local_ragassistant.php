@@ -1,17 +1,17 @@
 <?php
 
 // Course Learning Assistant landing page
-$string['pluginname'] = 'Course Learning Assistant'; # Plugin name
-$string['dashboardheading'] = 'Course Learning Assistant'; # Plugin Heading
-$string['uploadCardTitle'] = 'Manage Course Materials'; # Card title
-$string['uploadCardDesc'] = 'Upload and manage learning materials available to the assistant for this course.'; # Card description
-$string['uploadButton'] = 'Manage documents'; # Card button
-$string['askassistant'] = 'Ask the Course Learning Assistant'; # Card title
-$string['chatintro'] = 'Ask questions about permitted course materials and review cited sources.'; # Card description
-$string['openchat'] = 'Open chat'; # Button
-$string['settingCardTitle'] = 'Permission Settings'; # Card title
-$string['settingCardDesc'] = 'Manage permission settings for Couse Learning Assistant.'; # Card description
-$string['coursepolicytitle'] = 'Manage settings'; // Card Button
+$string['pluginname'] = 'Course Learning Assistant'; 
+$string['dashboardheading'] = 'Course Learning Assistant'; 
+$string['uploadCardTitle'] = 'Manage Course Materials'; 
+$string['uploadCardDesc'] = 'Upload and manage learning materials available to the assistant for this course.'; 
+$string['uploadButton'] = 'Manage documents'; 
+$string['askassistant'] = 'Ask the Course Learning Assistant'; 
+$string['chatintro'] = 'Ask questions about permitted course materials and review cited sources.'; 
+$string['openchat'] = 'Open chat'; 
+$string['settingCardTitle'] = 'Permission Settings'; 
+$string['settingCardDesc'] = 'Manage permission settings for Couse Learning Assistant.'; 
+$string['coursepolicytitle'] = 'Manage settings'; 
 
 // Upload document form components
 $string['submitdocument'] = 'Upload course material document';
