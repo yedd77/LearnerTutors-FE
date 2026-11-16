@@ -48,6 +48,18 @@ class index_document extends \core\task\adhoc_task {
             'jobtype' => 'suggestions',
             'timemodified' => time(),
         ]);
+
+        // Reflect full-document suggestion generation in each visible table slot.
+        if ($stage === 'generating suggestions') {
+            $DB->set_field('local_ragassistant_suggestions', 'status', 'generating', [
+                'documentid' => $documentid,
+            ]);
+        } else if ($stage === 'suggestions failed') {
+            $DB->set_field('local_ragassistant_suggestions', 'status', 'failed', [
+                'documentid' => $documentid,
+                'status' => 'generating',
+            ]);
+        }
     }
 
     /**
