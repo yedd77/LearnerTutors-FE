@@ -77,7 +77,9 @@ class index_document extends \core\task\adhoc_task {
         $customdata = $this->get_custom_data();
         $documentid = (int) ($customdata->documentid ?? 0);
         $jobtype = (string) ($customdata->jobtype ?? 'index');
-        if ($documentid <= 0 || !in_array($jobtype, ['index', 'reindex', 'suggestions'], true)) {
+        $slot = (int) ($customdata->slot ?? 0);
+        if ($documentid <= 0 || !in_array($jobtype, ['index', 'reindex', 'suggestions', 'suggestion_slot'], true) ||
+                ($jobtype === 'suggestion_slot' && ($slot < 1 || $slot > 3))) {
             mtrace('RAG Assistant: document task has invalid data.');
             return;
         }
@@ -102,6 +104,11 @@ class index_document extends \core\task\adhoc_task {
             }
 
             $api = new \local_ragassistant\local\api_client();
+            if ($jobtype === 'suggestion_slot') {
+                $this->generate_one_suggestion($api, $stored, $record, $slot);
+                return;
+            }
+
             if ($jobtype === 'suggestions') {
                 // Suggestion work is independent: keep the indexed document ready
                 // so retrieval and management actions remain available.
@@ -215,6 +222,68 @@ class index_document extends \core\task\adhoc_task {
     }
 
     /**
+     * Generate and persist exactly one suggestion slot.
+     */
+    private function generate_one_suggestion(
+        \\local_ragassistant\\local\\api_client $api,
+        \\stored_file $stored,
+        \\stdClass $record,
+        int $slot
+    ): void {
+        global $DB;
+
+        $existingrecords = $DB->get_records(
+            'local_ragassistant_suggestions',
+            ['documentid' => $record->id],
+            'slot ASC'
+        );
+        $existingtexts = [];
+        foreach ($existingrecords as $existingrecord) {
+            if ((int) $existingrecord->slot !== $slot && trim((string) $existingrecord->suggestion) !== '') {
+                $existingtexts[] = (string) $existingrecord->suggestion;
+            }
+        }
+
+        try {
+            $result = $api->generate_document_suggestion($stored, (int) $record->id, $slot, $existingtexts);
+            $suggestion = trim(clean_param((string) ($result['suggestion'] ?? ''), PARAM_TEXT));
+            $suggestion = \\core_text::substr($suggestion, 0, 500);
+            if ($suggestion === '') {
+                throw new \\moodle_exception('backendinvalidresponse', 'local_ragassistant');
+            }
+
+            $saved = $DB->get_record('local_ragassistant_suggestions', [
+                'documentid' => $record->id,
+                'slot' => $slot,
+            ]);
+            $values = (object) [
+                'courseid' => $record->courseid,
+                'documentid' => $record->id,
+                'userid' => $record->userid,
+                'slot' => $slot,
+                'suggestion' => $suggestion,
+                'status' => 'ready',
+                'timemodified' => time(),
+                'timecreated' => $saved->timecreated ?? time(),
+            ];
+            if ($saved) {
+                $values->id = $saved->id;
+                $DB->update_record('local_ragassistant_suggestions', $values);
+            } else {
+                $DB->insert_record('local_ragassistant_suggestions', $values);
+            }
+            mtrace('RAG Assistant: generated suggestion slot ' . $slot . ' for document ' . $record->id . '.');
+        } catch (\\Throwable $exception) {
+            $DB->set_field('local_ragassistant_suggestions', 'status', 'failed', [
+                'documentid' => $record->id,
+                'slot' => $slot,
+            ]);
+            mtrace('RAG Assistant: suggestion slot ' . $slot . ' failed for document ' . $record->id . ': ' .
+                $exception->getMessage());
+        }
+    }
+
+    /**
      * Create deterministic starter questions when the backend/LLM is unavailable.
      *
      * These questions are deliberately based on lecturer-provided document metadata
@@ -260,8 +329,8 @@ class index_document extends \core\task\adhoc_task {
             if (!is_string($suggestion)) {
                 continue;
             }
-            $suggestion = \core_text::substr(trim(clean_param($suggestion, PARAM_TEXT)), 0, 500);
-            $key = \core_text::strtolower($suggestion);
+            $suggestion = \\core_text::substr(trim(clean_param($suggestion, PARAM_TEXT)), 0, 500);
+            $key = \\core_text::strtolower($suggestion);
             if ($suggestion !== '' && !isset($cleaned[$key])) {
                 $cleaned[$key] = $suggestion;
             }
@@ -269,7 +338,6 @@ class index_document extends \core\task\adhoc_task {
                 break;
             }
         }
-        // Preserve existing suggestions if the model returns no valid replacements.
         if (count($cleaned) < 3) {
             return 0;
         }
@@ -277,20 +345,24 @@ class index_document extends \core\task\adhoc_task {
         $transaction = $DB->start_delegated_transaction();
         try {
             $DB->delete_records('local_ragassistant_suggestions', ['documentid' => $documentid]);
+            $slot = 0;
             foreach ($cleaned as $suggestion) {
+                $slot++;
                 $DB->insert_record('local_ragassistant_suggestions', (object) [
                     'courseid' => $courseid,
                     'documentid' => $documentid,
                     'userid' => $userid,
+                    'slot' => $slot,
                     'suggestion' => $suggestion,
+                    'status' => 'ready',
                     'timecreated' => time(),
+                    'timemodified' => time(),
                 ]);
             }
             $transaction->allow_commit();
-        } catch (\Throwable $exception) {
+        } catch (\\Throwable $exception) {
             $transaction->rollback($exception);
             throw $exception;
         }
         return count($cleaned);
-    }
-}
+    }}
