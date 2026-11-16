@@ -372,6 +372,52 @@ class api_client
     }
 
     /**
+     * Generate one suggestion for a document without re-indexing its vectors.
+     */
+    public function generate_document_suggestion(\\stored_file $file, int $documentid, int $slot, array $existing): array {
+        $this->sync_configuration_if_changed();
+        $temp = $file->copy_content_to_temp();
+        if (!$temp || !is_file($temp)) {
+            throw new \\moodle_exception('filetempfailed', 'local_ragassistant');
+        }
+        try {
+            $handle = curl_init(
+                $this->get_base_url() . '/api/v1/documents/' .
+                rawurlencode((string) $documentid) . '/suggestions/' . $slot
+            );
+            if ($handle === false) {
+                throw new \\moodle_exception('backendconnectionfailed', 'local_ragassistant');
+            }
+            $mime = function_exists('mime_content_type')
+                ? (mime_content_type($temp) ?: 'application/octet-stream')
+                : 'application/octet-stream';
+            curl_setopt_array($handle, [
+                CURLOPT_POST => true,
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_CONNECTTIMEOUT => 5,
+                CURLOPT_TIMEOUT => 240,
+                CURLOPT_HTTPHEADER => [
+                    'Accept: application/json',
+                    'X-RAG-API-Key: ' . $this->get_api_key(),
+                ],
+                CURLOPT_POSTFIELDS => [
+                    'file' => new \\CURLFile($temp, $mime, $file->get_filename()),
+                    'existing_suggestions' => json_encode($existing, JSON_UNESCAPED_UNICODE),
+                ],
+            ]);
+            $body = curl_exec($handle);
+            $error = curl_error($handle);
+            $status = (int) curl_getinfo($handle, CURLINFO_HTTP_CODE);
+            curl_close($handle);
+            return $this->decode_response($body, $error, $status);
+        } finally {
+            if (is_file($temp)) {
+                @unlink($temp);
+            }
+        }
+    }
+
+    /**
      * Enable or disable retrieval for a document.
      */
     public function set_document_retrieval(int $documentid, bool $enabled): array {
