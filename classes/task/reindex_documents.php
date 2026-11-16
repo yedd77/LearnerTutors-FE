@@ -99,13 +99,18 @@ class reindex_documents extends \core\task\adhoc_task {
                         $transaction = $DB->start_delegated_transaction();
                         try {
                             $DB->delete_records('local_ragassistant_suggestions', ['documentid' => $record->id]);
+                            $slot = 0;
                             foreach ($cleaned as $suggestion) {
+                                $slot++;
                                 $DB->insert_record('local_ragassistant_suggestions', (object) [
                                     'courseid' => (int) $record->courseid,
                                     'documentid' => (int) $record->id,
                                     'userid' => (int) $record->userid,
+                                    'slot' => $slot,
                                     'suggestion' => $suggestion,
+                                    'status' => 'ready',
                                     'timecreated' => time(),
+                                    'timemodified' => time(),
                                 ]);
                             }
                             $transaction->allow_commit();
