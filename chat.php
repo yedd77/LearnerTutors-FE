@@ -121,6 +121,7 @@ if ($allowed) {
           ORDER BY s.id ASC",
         [
             'courseid' => $courseid,
+            'suggestionready' => 'ready',
             'ready' => 'ready',
             'coursevisibility' => 'course',
             'userid' => $USER->id,
