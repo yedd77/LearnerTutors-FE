@@ -770,9 +770,14 @@ if ($canmanage) {
                 $documentcell->rowspan = 3;
                 $row[] = $documentcell;
             }
-            $row[] = $item && trim((string) $item->suggestion) !== ''
+            $hassuggestion = $item && trim((string) $item->suggestion) !== '';
+            $suggestiontext = $hassuggestion
                 ? html_writer::div(s($item->suggestion), 'ragassistant-suggestion-text')
                 : html_writer::span('No suggestion generated yet', 'text-muted');
+            $row[] = html_writer::div($suggestiontext, 'ragassistant-suggestion-cell', [
+                'data-document-id' => (int) $document->id,
+                'data-slot' => $slot,
+            ]);
 
             $status = $item->status ?? 'empty';
             $statuslabels = [
@@ -784,30 +789,43 @@ if ($canmanage) {
             $statusclass = $status === 'ready' ? 'badge badge-success bg-success'
                 : ($status === 'failed' ? 'badge badge-danger bg-danger'
                 : ($status === 'generating' ? 'text-info' : 'text-muted'));
-            $row[] = html_writer::span($statuslabels[$status] ?? ucfirst($status), $statusclass);
+            $row[] = html_writer::div(
+                html_writer::span($statuslabels[$status] ?? ucfirst($status), $statusclass),
+                'ragassistant-suggestion-status',
+                ['data-document-id' => (int) $document->id, 'data-slot' => $slot]
+            );
 
+            $actioncontent = '';
             if ($document->status === 'ready' && $status !== 'generating' &&
                     !in_array((string) ($document->stage ?? ''), ['suggestions queued', 'generating suggestions'], true)) {
-                $row[] = local_ragassistant_document_action_form(
+                $actioncontent = local_ragassistant_document_action_form(
                     $courseid,
                     (int) $document->id,
                     'generate_suggestion',
-                    $item && trim((string) $item->suggestion) !== '' ? 'Regenerate' : 'Generate',
+                    $hassuggestion ? 'Regenerate' : 'Generate',
                     'btn btn-outline-primary btn-sm',
-                    $item && trim((string) $item->suggestion) !== ''
-                        ? 'return confirm("Regenerate only this suggestion?");'
-                        : null,
+                    $hassuggestion ? 'return confirm("Regenerate only this suggestion?");' : null,
                     ['slot' => $slot]
                 );
             } else if ($status === 'generating') {
-                $row[] = html_writer::tag('button', 'Generating…', [
+                $actioncontent = html_writer::tag('button', 'Generating…', [
                     'type' => 'button',
                     'class' => 'btn btn-outline-secondary btn-sm',
                     'disabled' => 'disabled',
                 ]);
             } else {
-                $row[] = html_writer::span('Available after indexing', 'text-muted');
+                $actioncontent = html_writer::span('Available after indexing', 'text-muted');
             }
+            $row[] = html_writer::div($actioncontent, 'ragassistant-suggestion-action', [
+                'data-document-id' => (int) $document->id,
+                'data-slot' => $slot,
+                'data-course-id' => $courseid,
+                'data-sesskey' => sesskey(),
+                'data-action-url' => (new moodle_url('/local/ragassistant/documents.php', [
+                    'courseid' => $courseid,
+                ]))->out(false),
+                'data-document-ready' => $document->status === 'ready' ? '1' : '0',
+            ]);
             $suggestiontable->data[] = $row;
         }
     }
@@ -837,13 +855,87 @@ echo html_writer::div(
     ),
     'mt-3'
 );
-// Poll document jobs while the table contains queued or running work.
+// Poll document and suggestion jobs so both tables update without a manual reload.
 $statusurl = (new moodle_url('/local/ragassistant/document_status.php', [
     'courseid' => $courseid,
     'sesskey' => sesskey(),
 ]))->out(false);
 $polljs = '(function() {
     const url = ' . json_encode($statusurl) . ';
+    const labels = {
+        empty: "Not generated",
+        generating: "Generating",
+        ready: "Generated",
+        failed: "Failed"
+    };
+
+    function updateSuggestion(suggestion) {
+        const selector = "[data-document-id=\\"" + suggestion.documentid +
+            "\\"][data-slot=\\"" + suggestion.slot + "\\"]";
+        const textbox = document.querySelector(".ragassistant-suggestion-cell" + selector);
+        const statusbox = document.querySelector(".ragassistant-suggestion-status" + selector);
+        const actionbox = document.querySelector(".ragassistant-suggestion-action" + selector);
+        if (!textbox || !statusbox || !actionbox) return;
+
+        const hasText = !!suggestion.suggestion;
+        textbox.replaceChildren();
+        const text = document.createElement(hasText ? "div" : "span");
+        text.className = hasText ? "ragassistant-suggestion-text" : "text-muted";
+        text.textContent = hasText ? suggestion.suggestion : "No suggestion generated yet";
+        textbox.appendChild(text);
+
+        statusbox.replaceChildren();
+        const badge = document.createElement("span");
+        badge.textContent = labels[suggestion.status] || suggestion.status;
+        if (suggestion.status === "ready") badge.className = "badge badge-success bg-success";
+        else if (suggestion.status === "failed") badge.className = "badge badge-danger bg-danger";
+        else if (suggestion.status === "generating") badge.className = "text-info";
+        else badge.className = "text-muted";
+        statusbox.appendChild(badge);
+
+        actionbox.replaceChildren();
+        if (suggestion.status === "generating") {
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = "btn btn-outline-secondary btn-sm";
+            button.disabled = true;
+            button.textContent = "Generating…";
+            actionbox.appendChild(button);
+        } else if (actionbox.dataset.documentReady === "1") {
+            const form = document.createElement("form");
+            form.method = "post";
+            form.action = actionbox.dataset.actionUrl;
+            form.className = "ragassistant-document-action";
+            [["sesskey", actionbox.dataset.sesskey],
+             ["courseid", actionbox.dataset.courseId],
+             ["action", "generate_suggestion"],
+             ["documentid", suggestion.documentid],
+             ["slot", suggestion.slot]].forEach(function(pair) {
+                const input = document.createElement("input");
+                input.type = "hidden";
+                input.name = pair[0];
+                input.value = pair[1];
+                form.appendChild(input);
+            });
+            const button = document.createElement("button");
+            button.type = "submit";
+            button.className = "btn btn-outline-primary btn-sm";
+            button.textContent = hasText ? "Regenerate" : "Generate";
+            if (hasText) {
+                form.addEventListener("submit", function(event) {
+                    if (!window.confirm("Regenerate only this suggestion?")) event.preventDefault();
+                });
+            }
+            form.appendChild(button);
+            actionbox.appendChild(form);
+        } else {
+            const note = document.createElement("span");
+            note.className = "text-muted";
+            note.textContent = "Available after indexing";
+            actionbox.appendChild(note);
+        }
+    }
+
     async function poll() {
         try {
             const response = await fetch(url, {
@@ -859,7 +951,7 @@ $polljs = '(function() {
             let completed = false;
             (payload.documents || []).forEach(function(doc) {
                 const box = document.querySelector(
-                    ".ragassistant-processing-status[data-document-id=\"" + doc.id + "\"]"
+                    ".ragassistant-processing-status[data-document-id=\\"" + doc.id + "\\"]"
                 );
                 if (!box) return;
                 const previous = box.dataset.status;
@@ -894,25 +986,32 @@ $polljs = '(function() {
                 } else if (previous === "pending" || previous === "processing") {
                     completed = true;
                 }
+            });
 
+            let activeSuggestions = false;
+            (payload.suggestions || []).forEach(function(suggestion) {
+                updateSuggestion(suggestion);
+                if (suggestion.status === "generating") activeSuggestions = true;
             });
 
             if (completed) {
                 window.location.reload();
                 return;
             }
-            if (active) window.setTimeout(poll, 2500);
+            if (active || activeSuggestions) window.setTimeout(poll, 2500);
         } catch (error) {
             window.setTimeout(poll, 5000);
         }
     }
 
-    if (document.querySelector(
-        ".ragassistant-processing-status[data-status=\"pending\"], " +
-        ".ragassistant-processing-status[data-status=\"processing\"]"
-    )) {
-        poll();
-    }
+    const hasActiveDocuments = document.querySelector(
+        ".ragassistant-processing-status[data-status=\\"pending\\"], " +
+        ".ragassistant-processing-status[data-status=\\"processing\\"]"
+    );
+    const hasGeneratingSuggestions = document.querySelector(
+        ".ragassistant-suggestion-status .text-info"
+    );
+    if (hasActiveDocuments || hasGeneratingSuggestions) poll();
 })();';
 echo html_writer::script($polljs);
 echo $OUTPUT->footer();
