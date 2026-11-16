@@ -371,4 +371,5 @@ class index_document extends \core\task\adhoc_task {
             throw $exception;
         }
         return count($cleaned);
-    }}
+    }
+}
