@@ -185,13 +185,18 @@ class reindex_documents extends \core\task\adhoc_task {
             'What important details and examples should I understand from ' . $title . '?',
             'How can I apply the knowledge from ' . $title . ' to a practical situation?',
         ];
+        $slot = 0;
         foreach ($questions as $question) {
+            $slot++;
             $DB->insert_record('local_ragassistant_suggestions', (object) [
                 'courseid' => (int) $record->courseid,
                 'documentid' => (int) $record->id,
                 'userid' => (int) $record->userid,
+                'slot' => $slot,
                 'suggestion' => $question,
+                'status' => 'ready',
                 'timecreated' => time(),
+                'timemodified' => time(),
             ]);
         }
     }
