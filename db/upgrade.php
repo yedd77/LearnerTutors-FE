@@ -86,5 +86,39 @@ function xmldb_local_ragassistant_upgrade(int $oldversion): bool
         upgrade_plugin_savepoint(true, 2026111200, 'local', 'ragassistant');
     }
 
+    if ($oldversion < 2026111600) {
+        $table = new xmldb_table('local_ragassistant_suggestions');
+        $slotfield = new xmldb_field('slot', XMLDB_TYPE_INTEGER, '1', null, XMLDB_NOTNULL, null, '1', 'userid');
+        $statusfield = new xmldb_field('status', XMLDB_TYPE_CHAR, '20', null, XMLDB_NOTNULL, null, 'ready', 'suggestion');
+        $modifiedfield = new xmldb_field('timemodified', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0', 'timecreated');
+
+        if ($dbman->table_exists($table) && !$dbman->field_exists($table, $slotfield)) {
+            $dbman->add_field($table, $slotfield);
+        }
+        if ($dbman->table_exists($table) && !$dbman->field_exists($table, $statusfield)) {
+            $dbman->add_field($table, $statusfield);
+        }
+        if ($dbman->table_exists($table) && !$dbman->field_exists($table, $modifiedfield)) {
+            $dbman->add_field($table, $modifiedfield);
+        }
+
+        if ($dbman->table_exists($table)) {
+            $records = $DB->get_records('local_ragassistant_suggestions', null, 'documentid ASC, id ASC');
+            $slots = [];
+            foreach ($records as $record) {
+                $documentid = (int) $record->documentid;
+                $slots[$documentid] = ($slots[$documentid] ?? 0) + 1;
+                $DB->set_field('local_ragassistant_suggestions', 'slot', min($slots[$documentid], 3), ['id' => $record->id]);
+                $DB->set_field('local_ragassistant_suggestions', 'status', 'ready', ['id' => $record->id]);
+                $DB->set_field('local_ragassistant_suggestions', 'timemodified', (int) $record->timecreated, ['id' => $record->id]);
+            }
+            $index = new xmldb_index('document_slot_uix', XMLDB_INDEX_UNIQUE, ['documentid', 'slot']);
+            if (!$dbman->index_exists($table, $index)) {
+                $dbman->add_index($table, $index);
+            }
+        }
+        upgrade_plugin_savepoint(true, 2026111600, 'local', 'ragassistant');
+    }
+
     return true;
 }
