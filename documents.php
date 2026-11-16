@@ -321,7 +321,7 @@ if ($action !== '' && $actiondocumentid > 0 && data_submitted()) {
                     $redirecturl,
                     'Suggestion ' . $slot . ' generated successfully.',
                     null,
-                    \\core\\output\\notification::NOTIFY_SUCCESS
+                    \core\output\notification::NOTIFY_SUCCESS
                 );
                 break;
 
