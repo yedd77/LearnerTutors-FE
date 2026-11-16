@@ -353,7 +353,7 @@ if ($action !== '' && $actiondocumentid > 0 && data_submitted()) {
                 ]);
                 if ($existing && $existing->status === 'generating') {
                     redirect($redirecturl, 'This suggestion is already being generated.', null,
-                        \\core\\output\\notification::NOTIFY_INFO);
+                        \core\output\notification::NOTIFY_INFO);
                 }
                 $suggestionrecord = (object) [
                     'courseid' => $target->courseid,
@@ -372,7 +372,7 @@ if ($action !== '' && $actiondocumentid > 0 && data_submitted()) {
                     $DB->insert_record('local_ragassistant_suggestions', $suggestionrecord);
                 }
 
-                $task = new \\local_ragassistant\\task\\index_document();
+                $task = new \local_ragassistant\task\index_document();
                 $task->set_component('local_ragassistant');
                 $task->set_custom_data([
                     'documentid' => (int) $target->id,
@@ -380,8 +380,8 @@ if ($action !== '' && $actiondocumentid > 0 && data_submitted()) {
                     'slot' => $slot,
                 ]);
                 try {
-                    \\core\\task\\manager::queue_adhoc_task($task);
-                } catch (\\Throwable $exception) {
+                    \core\task\manager::queue_adhoc_task($task);
+                } catch (\Throwable $exception) {
                     $DB->set_field('local_ragassistant_suggestions', 'status', 'failed', [
                         'documentid' => $target->id,
                         'slot' => $slot,
@@ -389,7 +389,7 @@ if ($action !== '' && $actiondocumentid > 0 && data_submitted()) {
                     throw $exception;
                 }
                 redirect($redirecturl, 'Suggestion ' . $slot . ' generation queued.', null,
-                    \\core\\output\\notification::NOTIFY_SUCCESS);
+                    \core\output\notification::NOTIFY_SUCCESS);
                 break;
 
             // Handle 'retrival' action
