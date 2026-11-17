@@ -62,6 +62,8 @@ class api_client
         $configuration = [
             'llm_provider' => trim((string) get_config('local_ragassistant', 'llm_provider')),
             'llm_model' => trim((string) get_config('local_ragassistant', 'chat_model')),
+            'fallback_provider' => 'ollama',
+            'fallback_model' => trim((string) get_config('local_ragassistant', 'fallback_model')),
             'image_provider' => trim((string) get_config('local_ragassistant', 'image_provider')) ?: 'openai',
             'image_model' => trim((string) get_config('local_ragassistant', 'image_model')),
             'reuse_chat_api_key' => (bool) get_config('local_ragassistant', 'reuse_chat_api_key'),
@@ -115,6 +117,8 @@ class api_client
         $result = $this->post_json('/api/v1/admin/config', [
             'llm_provider' => trim((string) get_config('local_ragassistant', 'llm_provider')),
             'llm_model' => trim((string) get_config('local_ragassistant', 'chat_model')),
+            'fallback_provider' => 'ollama',
+            'fallback_model' => trim((string) get_config('local_ragassistant', 'fallback_model')),
             'image_provider' => trim((string) get_config('local_ragassistant', 'image_provider')) ?: 'openai',
             'image_model' => trim((string) get_config('local_ragassistant', 'image_model')),
             'reuse_chat_api_key' => (bool) get_config('local_ragassistant', 'reuse_chat_api_key'),
