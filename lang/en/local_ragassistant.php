@@ -158,3 +158,9 @@ $string['credentialnotconfigured'] = 'Not configured — enter an API key';
 $string['credentialnotrequired'] = 'Not required for the selected provider';
 $string['credentialverificationfailed'] = 'A saved credential exists but could not be verified. Check the encryption key and restore it from backup if necessary.';
 $string['credentialinputplaceholder'] = '*******************************';
+
+// Local LLM fallback
+$string['fallback_heading'] = 'Local LLM fallback';
+$string['fallback_heading_desc'] = 'Configure the local Ollama model used as a fallback when the primary cloud model call fails. The provider is fixed to Ollama.';
+$string['fallback_model'] = 'Fallback model';
+$string['fallback_model_desc'] = 'Enter the Ollama model identifier installed on the backend host, for example qwen2.5:7b-instruct. Leave blank to disable the local fallback.';
