@@ -80,6 +80,21 @@ if ($hassiteconfig) {
         ''
     ));
 
+    // Local Ollama is used by FastAPI only when the primary cloud model fails.
+    $settings->add(new admin_setting_heading(
+        'local_ragassistant/fallback_heading',
+        get_string('fallback_heading', 'local_ragassistant'),
+        get_string('fallback_heading_desc', 'local_ragassistant')
+    ));
+
+    $settings->add(new admin_setting_configtext(
+        'local_ragassistant/fallback_model',
+        get_string('fallback_model', 'local_ragassistant'),
+        get_string('fallback_model_desc', 'local_ragassistant'),
+        '',
+        PARAM_TEXT
+    ));
+
     // Image generation has an independent provider and model.
     $settings->add(new admin_setting_heading(
         'local_ragassistant/image_heading',
