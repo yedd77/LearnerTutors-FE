@@ -681,8 +681,6 @@ document.addEventListener('DOMContentLoaded', function () {
             editor.focus();
             return;
         }
-        removeSuggestions();
-        activateChatBackground();
         valueInput.value = text;
     });
 
