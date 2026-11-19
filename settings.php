@@ -1,11 +1,30 @@
 <?php
-// This file is part of Moodle - https://moodle.org/
+// This file is part of Moodle - http://moodle.org/
 //
-// Site administration settings.
-require_once ($CFG->dirroot .
-    '/local/ragassistant/classes/admin_setting_configuration_health.php');
+// Moodle is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// Moodle is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+
+/**
+ * Site administration settings.
+ *
+ * @package    local_ragassistant
+ * @copyright  2026 Zarith
+ * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ */
+
 defined('MOODLE_INTERNAL') || die();
 
+require_once(__DIR__ . '/classes/admin_setting_configuration_health.php');
 require_once(__DIR__ . '/classes/admin_setting_configencryptedpassword.php');
 
 if ($hassiteconfig) {
@@ -28,7 +47,9 @@ if ($hassiteconfig) {
         PARAM_URL
     ));
 
-    $settings->add(new admin_setting_configpasswordunmask(
+    // This setting stores AES-256-GCM ciphertext in Moodle's config_plugins table.
+    // The encryption key itself must be configured outside the database.
+    $settings->add(new local_ragassistant_admin_setting_configencryptedpassword(
         'local_ragassistant/api_key',
         get_string('apikey', 'local_ragassistant'),
         get_string('apikey_desc', 'local_ragassistant'),
@@ -81,21 +102,6 @@ if ($hassiteconfig) {
         ''
     ));
 
-    // Local Ollama is used by FastAPI only when the primary cloud model fails.
-    $settings->add(new admin_setting_heading(
-        'local_ragassistant/fallback_heading',
-        get_string('fallback_heading', 'local_ragassistant'),
-        get_string('fallback_heading_desc', 'local_ragassistant')
-    ));
-
-    $settings->add(new admin_setting_configtext(
-        'local_ragassistant/fallback_model',
-        get_string('fallback_model', 'local_ragassistant'),
-        get_string('fallback_model_desc', 'local_ragassistant'),
-        '',
-        PARAM_TEXT
-    ));
-
     // Image generation has an independent provider and model.
     $settings->add(new admin_setting_heading(
         'local_ragassistant/image_heading',
@@ -137,16 +143,46 @@ if ($hassiteconfig) {
         ''
     ));
 
-    // This setting stores AES-256-GCM ciphertext in Moodle's config_plugins table.
-    // The encryption key itself must be configured outside the database.
-    $settings->add(new local_ragassistant_admin_setting_configencryptedpassword(
-        'local_ragassistant/api_key',
-        get_string('apikey', 'local_ragassistant'),
-        get_string('apikey_desc', 'local_ragassistant'),
-        ''
+     // Local Ollama is used by FastAPI only when the primary cloud model fails.
+    $settings->add(new admin_setting_heading(
+        'local_ragassistant/fallback_heading',
+        get_string('fallback_heading', 'local_ragassistant'),
+        get_string('fallback_heading_desc', 'local_ragassistant')
+    ));
+
+    $settings->add(new admin_setting_configtext(
+        'local_ragassistant/fallback_model',
+        get_string('fallback_model', 'local_ragassistant'),
+        get_string('fallback_model_desc', 'local_ragassistant'),
+        '',
+        PARAM_TEXT
+    ));
+
+    $settings->add(new admin_setting_heading(
+        'local_ragassistant/health_heading',
+        get_string('configurationhealth_heading', 'local_ragassistant'),
+        get_string('configurationhealth_heading_desc', 'local_ragassistant')
     ));
 
     $settings->add(new local_ragassistant_admin_setting_configuration_health());
+
+    // Show only the settings that apply. Hidden values are still saved and kept.
+    // Several hide_if() calls on one setting hide it when any condition matches.
+    // Chat off: hide the settings used only by the chatbot. The backend URL and
+    // application API key stay visible because indexing and connection tests use them.
+    $chatonly = [
+        'llm_provider', 'chat_model', 'provider_api_key', 'fallback_model',
+        'image_provider', 'image_model', 'reuse_chat_api_key', 'image_provider_api_key',
+    ];
+    foreach ($chatonly as $name) {
+        $settings->hide_if('local_ragassistant/' . $name, 'local_ragassistant/enable_chat', 'notchecked');
+    }
+    // Ollama runs locally: no provider key, no Ollama fallback, and no chat key to reuse.
+    $settings->hide_if('local_ragassistant/provider_api_key', 'local_ragassistant/llm_provider', 'eq', 'ollama');
+    $settings->hide_if('local_ragassistant/fallback_model', 'local_ragassistant/llm_provider', 'eq', 'ollama');
+    $settings->hide_if('local_ragassistant/reuse_chat_api_key', 'local_ragassistant/llm_provider', 'eq', 'ollama');
+    // A reused chat key replaces the separate image key.
+    $settings->hide_if('local_ragassistant/image_provider_api_key', 'local_ragassistant/reuse_chat_api_key', 'checked');
 
     $ADMIN->add('localplugins', $settings);
 

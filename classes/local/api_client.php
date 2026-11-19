@@ -10,12 +10,31 @@ defined('MOODLE_INTERNAL') || die();
  */
 class api_client
 {
+    /** @var string|null Backend URL typed in the settings form, used only for a configuration test. */
+    private ?string $baseurloverride;
+
+    /** @var string|null Application API key typed in the settings form, used only for a configuration test. */
+    private ?string $apikeyoverride;
+
+    /**
+     * Normal use passes nothing and reads the saved settings. The configuration health
+     * check passes values typed into the settings form so they can be tested before saving.
+     *
+     * @param string|null $baseurl Unsaved backend URL, or null for the saved one.
+     * @param string|null $apikey Unsaved application API key, or null for the saved one.
+     */
+    public function __construct(?string $baseurl = null, ?string $apikey = null)
+    {
+        $this->baseurloverride = ($baseurl !== null && trim($baseurl) !== '') ? trim($baseurl) : null;
+        $this->apikeyoverride = ($apikey !== null && trim($apikey) !== '') ? trim($apikey) : null;
+    }
+
     /**
      * Return configured backend base URL.
      */
     public function get_base_url(): string
     {
-        $url = get_config('local_ragassistant', 'api_base_url');
+        $url = $this->baseurloverride ?? get_config('local_ragassistant', 'api_base_url');
 
         $url = rtrim((string) ($url ?: 'http://127.0.0.1:8000'), '/');
         $parts = parse_url($url);
@@ -40,7 +59,7 @@ class api_client
      */
     private function get_api_key(): string
     {
-        return secret_store::get_api_key();
+        return $this->apikeyoverride ?? secret_store::get_api_key();
     }
 
     /**
@@ -48,7 +67,10 @@ class api_client
      */
     public function test_connection(): array
     {
-        return $this->post_json('/api/v1/admin/connection-test', []);
+        // A short limit: this tiny authenticated request answers at once when the backend
+        // is up. A proxy or port forward can accept the connection while the backend is
+        // down, which would otherwise hold the health check for the full default timeout.
+        return $this->post_json('/api/v1/admin/connection-test', [], 10);
     }
 
     /**
@@ -162,7 +184,7 @@ class api_client
      */
     public function sync_configuration(): array
     {
-        $result = $this->post_json('/api/v1/admin/config', [
+        $payload = [
             'llm_provider' => trim((string) get_config('local_ragassistant', 'llm_provider')),
             'llm_model' => trim((string) get_config('local_ragassistant', 'chat_model')),
             'fallback_provider' => 'ollama',
@@ -176,7 +198,21 @@ class api_client
             'gemini_api_key' => secret_store::get_provider_api_key('gemini'),
             'openai_image_api_key' => secret_store::get_image_provider_api_key('openai'),
             'gemini_image_api_key' => secret_store::get_image_provider_api_key('gemini'),
-        ]);
+        ];
+
+        // A blank key keeps the backend's stored copy, so keys deleted in Moodle are
+        // removed there with an explicit clear flag. A key saved again since then wins.
+        $pendingclears = secret_store::get_pending_key_clears();
+        foreach ($pendingclears as $field) {
+            if ($payload[$field] === '') {
+                $payload['clear_' . $field] = true;
+            }
+        }
+
+        $result = $this->post_json('/api/v1/admin/config', $payload);
+        if ($pendingclears) {
+            secret_store::forget_pending_key_clears();
+        }
 
         // The backend reports when stored document vectors need rebuilding.
         if (!empty($result['reindex_required'])) {
@@ -198,8 +234,12 @@ class api_client
 
     /**
      * Send a JSON POST request.
+     *
+     * @param string $path Backend path, for example /api/v1/chat.
+     * @param array $payload Request body.
+     * @param int $timeout Maximum seconds for the whole request.
      */
-    public function post_json(string $path, array $payload): array
+    public function post_json(string $path, array $payload, int $timeout = 420): array
     {
         $handle = curl_init($this->get_base_url() . $path);
 
@@ -231,7 +271,7 @@ class api_client
             CURLOPT_CONNECTTIMEOUT => 5,
             CURLOPT_SSL_VERIFYPEER => true,
             CURLOPT_SSL_VERIFYHOST => 2,
-            CURLOPT_TIMEOUT => 420,
+            CURLOPT_TIMEOUT => $timeout,
             CURLOPT_HTTPHEADER => [
                 'Content-Type: application/json',
                 'Accept: application/json',

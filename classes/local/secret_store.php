@@ -161,6 +161,46 @@ final class secret_store {
         }
         return self::decrypt($stored, $name);
     }
+    /** Backend request fields for the provider keys Moodle manages. */
+    private const BACKEND_KEY_FIELDS = ['openai_api_key', 'gemini_api_key', 'openai_image_api_key', 'gemini_image_api_key'];
+
+    /**
+     * Backend key fields deleted in Moodle that the next configuration sync must clear.
+     *
+     * @return string[]
+     */
+    public static function get_pending_key_clears(): array {
+        $fields = explode(',', (string) get_config('local_ragassistant', 'pending_key_clears'));
+        return array_values(array_intersect(self::BACKEND_KEY_FIELDS, $fields));
+    }
+
+    /**
+     * Remember that a key was deleted in Moodle, so the backend copy is cleared too.
+     *
+     * @param string $field Backend field name, for example gemini_api_key.
+     */
+    public static function add_pending_key_clear(string $field): void {
+        $fields = array_unique(array_merge(self::get_pending_key_clears(), [$field]));
+        set_config('pending_key_clears', implode(',', array_intersect(self::BACKEND_KEY_FIELDS, $fields)), 'local_ragassistant');
+    }
+
+    /**
+     * A key saved again must not be cleared by an older pending deletion.
+     *
+     * @param string $field Backend field name.
+     */
+    public static function remove_pending_key_clear(string $field): void {
+        $fields = array_diff(self::get_pending_key_clears(), [$field]);
+        set_config('pending_key_clears', implode(',', $fields), 'local_ragassistant');
+    }
+
+    /**
+     * Called after a successful sync has cleared the keys on the backend.
+     */
+    public static function forget_pending_key_clears(): void {
+        unset_config('pending_key_clears', 'local_ragassistant');
+    }
+
     /**
      * Read an optional Moodle-managed image-provider key. Never expose it to a page.
      */

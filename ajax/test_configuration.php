@@ -1,11 +1,30 @@
 <?php
-// This file is part of Moodle - https://moodle.org/
+// This file is part of Moodle - http://moodle.org/
 //
-// Configuration health checks for the plugin settings page.
+// Moodle is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
 //
-// Backend requests go through api_client, which uses the saved backend URL and
-// the saved encrypted application API key. Credentials are never returned to
-// the browser or written to logs.
+// Moodle is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+
+/**
+ * Configuration health checks for the plugin settings page.
+ *
+ * Backend requests go through api_client, which uses the saved backend URL and
+ * the saved encrypted application API key unless the administrator typed new
+ * values to test. Credentials are never returned to the browser or written to logs.
+ *
+ * @package    local_ragassistant
+ * @copyright  2026 Zarith
+ * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ */
 
 define('AJAX_SCRIPT', true);
 
@@ -40,6 +59,7 @@ function local_ragassistant_healthcheck_result(string $status, string $message):
  */
 function local_ragassistant_healthcheck_log(string $check, Throwable $exception): void {
     // Moodle appends the debug info (for example the curl error) to the message in developer mode.
+    // phpcs:ignore moodle.PHP.ForbiddenFunctions.FoundWithAlternative -- debugging() breaks the JSON reply, see above.
     error_log('local_ragassistant configuration health: ' . $check . ' check failed: ' .
         get_class($exception) . ': ' . $exception->getMessage());
 }
@@ -58,6 +78,57 @@ function local_ragassistant_healthcheck_clean($message): string {
     // Hide anything that looks like a provider key, even a partial one.
     $text = preg_replace('/\b(?:sk-|AIza)[A-Za-z0-9_\-\*\.]{6,}/', '[hidden]', $text);
     return shorten_text($text, 300);
+}
+
+/**
+ * Check that Moodle background tasks run. Document indexing is an ad hoc task, so
+ * uploads are not processed while cron is stopped or indexing tasks keep failing.
+ *
+ * @return array
+ */
+function local_ragassistant_healthcheck_cron(): array {
+    global $DB;
+
+    $now = time();
+    $lastcron = (int) get_config('tool_task', 'lastcronstart');
+    if ($lastcron === 0) {
+        return local_ragassistant_healthcheck_result('fail', get_string('healthcheck_cron_never', 'local_ragassistant'));
+    }
+    if ($now - $lastcron > HOURSECS) {
+        return local_ragassistant_healthcheck_result(
+            'fail',
+            get_string('healthcheck_cron_overdue', 'local_ragassistant', format_time($now - $lastcron))
+        );
+    }
+
+    $failing = $DB->count_records_select(
+        'task_adhoc',
+        'component = :component AND faildelay > 0',
+        ['component' => 'local_ragassistant']
+    );
+    if ($failing) {
+        return local_ragassistant_healthcheck_result(
+            'fail',
+            get_string('healthcheck_cron_failing', 'local_ragassistant', $failing)
+        );
+    }
+
+    $waiting = $DB->count_records_select(
+        'task_adhoc',
+        'component = :component AND timestarted IS NULL AND nextruntime < :cutoff',
+        ['component' => 'local_ragassistant', 'cutoff' => $now - HOURSECS]
+    );
+    if ($waiting) {
+        return local_ragassistant_healthcheck_result(
+            'fail',
+            get_string('healthcheck_cron_waiting', 'local_ragassistant', $waiting)
+        );
+    }
+
+    return local_ragassistant_healthcheck_result(
+        'pass',
+        get_string('healthcheck_cron_pass', 'local_ragassistant', format_time($now - $lastcron))
+    );
 }
 
 /**
@@ -101,13 +172,23 @@ function local_ragassistant_healthcheck_overrides(string $rawconfig): array {
         $overrides['reuse_chat_api_key'] = !empty($config['reuse_chat_api_key']);
     }
 
-    // Keys the administrator typed but has not saved yet. Blank means "use the saved key".
-    foreach (['provider_api_key', 'image_provider_api_key'] as $name) {
+    // Keys the administrator typed but has not saved yet, including the application key.
+    // Blank means "use the saved key". Testing never saves anything.
+    foreach (['provider_api_key', 'image_provider_api_key', 'api_key'] as $name) {
         if (isset($config[$name]) && is_string($config[$name])) {
             $value = trim($config[$name]);
             if ($value !== '' && strlen($value) <= 512) {
                 $overrides[$name] = $value;
             }
+        }
+    }
+
+    // The backend URL as typed, so a new URL can be tested before it is saved. The API
+    // client applies the same rules as for the saved URL (HTTPS except on loopback).
+    if (isset($config['api_base_url']) && is_string($config['api_base_url'])) {
+        $url = trim($config['api_base_url']);
+        if ($url !== '' && strlen($url) <= 255) {
+            $overrides['api_base_url'] = $url;
         }
     }
 
@@ -121,108 +202,70 @@ try {
     \core\session\manager::write_close();
     core_php_time_limit::raise(900);
 
-    $client = new \local_ragassistant\local\api_client();
+    // Typed (unsaved) backend URL and application key are used for this test run only.
+    $client = new \local_ragassistant\local\api_client(
+        $overrides['api_base_url'] ?? null,
+        $overrides['api_key'] ?? null
+    );
     $results = [];
 
-    // 1. Backend connectivity and 2. application API key authentication.
+    // 1. Application server: the URL is reachable, then the saved API key is accepted.
+    // The API client needs the saved key to send any request, so a missing or unreadable
+    // key is reported before the URL can be tried.
     try {
         $connection = $client->test_connection();
-        $results['server'] = local_ragassistant_healthcheck_result(
-            'pass',
-            get_string('healthcheck_server_pass', 'local_ragassistant')
-        );
-        if (!empty($connection['authenticated']) && ($connection['status'] ?? '') === 'ok') {
-            $results['auth'] = local_ragassistant_healthcheck_result(
-                'pass',
-                get_string('healthcheck_auth_pass', 'local_ragassistant')
-            );
-        } else {
-            $results['auth'] = local_ragassistant_healthcheck_result(
-                'fail',
-                get_string('backendinvalidresponse', 'local_ragassistant')
-            );
-        }
+        $results['server'] = (!empty($connection['authenticated']) && ($connection['status'] ?? '') === 'ok')
+            ? local_ragassistant_healthcheck_result('pass', get_string('healthcheck_server_pass', 'local_ragassistant'))
+            : local_ragassistant_healthcheck_result('fail', get_string('backendinvalidresponse', 'local_ragassistant'));
     } catch (moodle_exception $exception) {
-        local_ragassistant_healthcheck_log('connection', $exception);
+        local_ragassistant_healthcheck_log('server', $exception);
 
         switch ($exception->errorcode) {
             case 'backendrequestfailed':
-                // The backend answered with an HTTP error, so it is reachable.
-                $results['server'] = local_ragassistant_healthcheck_result(
-                    'pass',
-                    get_string('healthcheck_server_pass', 'local_ragassistant')
-                );
-                $results['auth'] = local_ragassistant_healthcheck_result(
-                    'fail',
-                    local_ragassistant_healthcheck_clean($exception->getMessage())
-                );
+                // Reachable, but the backend refused the request (normally a wrong API key).
+                $message = local_ragassistant_healthcheck_clean($exception->getMessage());
                 break;
-
             case 'backendinvalidresponse':
-                $results['server'] = local_ragassistant_healthcheck_result(
-                    'pass',
-                    get_string('healthcheck_server_pass', 'local_ragassistant')
-                );
-                $results['auth'] = local_ragassistant_healthcheck_result(
-                    'fail',
-                    get_string('backendinvalidresponse', 'local_ragassistant')
-                );
+                $message = get_string('backendinvalidresponse', 'local_ragassistant');
                 break;
-
             case 'apikeymissing':
+                $message = get_string('healthcheck_apikeymissing', 'local_ragassistant');
+                break;
             case 'secretdecryptionfailed':
             case 'encryptionkeymissing':
             case 'encryptionkeyinvalid':
-                // The saved key could not be loaded, so no request was sent.
-                $results['server'] = local_ragassistant_healthcheck_result(
-                    'skipped',
-                    get_string('healthcheck_server_skipped', 'local_ragassistant')
-                );
-                $results['auth'] = local_ragassistant_healthcheck_result(
-                    'fail',
-                    $exception->errorcode === 'apikeymissing'
-                        ? get_string('healthcheck_apikeymissing', 'local_ragassistant')
-                        : local_ragassistant_healthcheck_clean($exception->getMessage())
-                );
+                $message = local_ragassistant_healthcheck_clean($exception->getMessage());
                 break;
-
             case 'backendhttpsrequired':
-                $results['server'] = local_ragassistant_healthcheck_result(
-                    'fail',
-                    get_string('backendhttpsrequired', 'local_ragassistant')
-                );
-                $results['auth'] = local_ragassistant_healthcheck_result(
-                    'skipped',
-                    get_string('healthcheck_auth_skipped', 'local_ragassistant')
-                );
+                $message = get_string('backendhttpsrequired', 'local_ragassistant');
                 break;
-
             default:
-                $results['server'] = local_ragassistant_healthcheck_result(
-                    'fail',
-                    get_string('healthcheck_server_fail', 'local_ragassistant')
-                );
-                $results['auth'] = local_ragassistant_healthcheck_result(
-                    'skipped',
-                    get_string('healthcheck_auth_skipped', 'local_ragassistant')
-                );
+                $message = get_string('healthcheck_server_fail', 'local_ragassistant');
         }
+        $results['server'] = local_ragassistant_healthcheck_result('fail', $message);
     } catch (Throwable $exception) {
-        local_ragassistant_healthcheck_log('connection', $exception);
+        local_ragassistant_healthcheck_log('server', $exception);
         $results['server'] = local_ragassistant_healthcheck_result(
             'fail',
             get_string('healthcheck_server_fail', 'local_ragassistant')
         );
-        $results['auth'] = local_ragassistant_healthcheck_result(
-            'skipped',
-            get_string('healthcheck_auth_skipped', 'local_ragassistant')
+    }
+
+    // 2. Background tasks. Moodle-side only, so it runs even when the backend is down.
+    try {
+        $results['cron'] = local_ragassistant_healthcheck_cron();
+    } catch (Throwable $exception) {
+        local_ragassistant_healthcheck_log('cron', $exception);
+        $results['cron'] = local_ragassistant_healthcheck_result(
+            'fail',
+            get_string('healthcheck_cron_error', 'local_ragassistant')
         );
     }
 
-    // 3-5. Main LLM, Ollama fallback and image generation. The backend runs these
+    // 3-5. Main LLM, image generation and Ollama fallback. The backend runs these
     // independently and reports pass, fail or skipped for each one.
-    $providertests = ['llm', 'fallback', 'image'];
-    $backendready = $results['server']['status'] === 'pass' && $results['auth']['status'] === 'pass';
+    $providertests = ['llm', 'image', 'fallback'];
+    $backendready = $results['server']['status'] === 'pass';
     $llmmodel = $overrides['llm_model'] ?? trim((string) get_config('local_ragassistant', 'chat_model'));
 
     if (!$backendready) {
@@ -238,7 +281,7 @@ try {
             'fail',
             get_string('healthcheck_llmmodelmissing', 'local_ragassistant')
         );
-        foreach (['fallback', 'image'] as $test) {
+        foreach (['image', 'fallback'] as $test) {
             $results[$test] = local_ragassistant_healthcheck_result(
                 'skipped',
                 get_string('healthcheck_needsmodel', 'local_ragassistant')

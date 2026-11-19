@@ -151,21 +151,42 @@ class local_ragassistant_admin_setting_configencryptedpassword extends admin_set
             }
         } catch (\Throwable $exception) {
             // Do not expose decryption errors or credential details in settings HTML.
-            debugging('Could not verify a stored API credential.', DEBUG_DEVELOPER);
+            // Use error_log() rather than debugging(): with developer debugging and Whoops
+            // enabled, debugging() is raised as an error and replaces the settings page.
+            // phpcs:ignore moodle.PHP.ForbiddenFunctions.FoundWithAlternative -- see the comment above.
+            error_log('local_ragassistant: could not verify a stored API credential: ' . get_class($exception));
             return ['string' => 'credentialverificationfailed', 'class' => 'badge-warning'];
         }
 
         return ['string' => 'credentialnotconfigured', 'class' => 'badge-secondary'];
     }
 
+    /**
+     * Encrypt and store a submitted key. A blank submission keeps the saved key.
+     *
+     * @param mixed $data Submitted value.
+     * @return string Empty string on success, otherwise an error message.
+     */
     public function write_setting($data) {
         $value = trim((string) $data);
+        $parts = explode('/', $this->name);
+        $settingname = end($parts);
+
+        // The "Reuse chat provider API key" option only works when chat and image use the
+        // same provider; the backend rejects the whole configuration otherwise. This field is
+        // saved after both providers and the reuse checkbox, so correct the checkbox here.
+        if (
+            $settingname === 'image_provider_api_key'
+            && get_config('local_ragassistant', 'reuse_chat_api_key')
+            && get_config('local_ragassistant', 'image_provider') !== get_config('local_ragassistant', 'llm_provider')
+        ) {
+            set_config('reuse_chat_api_key', 0, 'local_ragassistant');
+        }
+
         if ($value === '') {
             return '';
         }
 
-        $parts = explode('/', $this->name);
-        $settingname = end($parts);
         $purpose = $settingname;
 
         // The single provider key field stores the credential for the provider
@@ -199,8 +220,31 @@ class local_ragassistant_admin_setting_configencryptedpassword extends admin_set
             $encrypted = \local_ragassistant\local\secret_store::encrypt($value, $purpose);
             set_config($settingname, $encrypted, 'local_ragassistant');
         } catch (\Throwable $exception) {
-            debugging('Could not securely store an API credential: ' . $exception->getMessage(), DEBUG_DEVELOPER);
+            // Use error_log() rather than debugging(), so a storage failure shows the form error
+            // instead of a Whoops page. The message comes from secret_store and never contains the key.
+            // phpcs:ignore moodle.PHP.ForbiddenFunctions.FoundWithAlternative -- see the comment above.
+            error_log('local_ragassistant: could not securely store an API credential: ' . $exception->getMessage());
             return get_string('secretstoragefailed', 'local_ragassistant');
+        }
+
+        // Only the selected provider's key is kept: saving a key for one provider deletes
+        // the other provider's key in the same group, here and (on the next sync) on the
+        // backend. Moodle setting name => [the other provider's setting, its backend field].
+        $replaces = [
+            'openai_api_key' => ['gemini_api_key', 'gemini_api_key'],
+            'gemini_api_key' => ['openai_api_key', 'openai_api_key'],
+            'image_openai_api_key' => ['image_gemini_api_key', 'gemini_image_api_key'],
+            'image_gemini_api_key' => ['image_openai_api_key', 'openai_image_api_key'],
+        ];
+        if (isset($replaces[$settingname])) {
+            $savedfield = $replaces[$replaces[$settingname][0]][1];
+            \local_ragassistant\local\secret_store::remove_pending_key_clear($savedfield);
+
+            [$othersetting, $otherfield] = $replaces[$settingname];
+            if ((string) get_config('local_ragassistant', $othersetting) !== '') {
+                unset_config($othersetting, 'local_ragassistant');
+                \local_ragassistant\local\secret_store::add_pending_key_clear($otherfield);
+            }
         }
         return '';
     }
