@@ -23,9 +23,12 @@ const STATES = {
 const TESTED_SETTINGS = ['enable_chat', 'api_base_url', 'api_key', 'llm_provider', 'chat_model', 'provider_api_key',
     'fallback_model', 'image_provider', 'image_model', 'reuse_chat_api_key', 'image_provider_api_key'];
 
-// The checks whose failure blocks saving. Background tasks (cron) only warn: saving
-// the form cannot fix them.
-const BLOCKING_TESTS = ['server', 'llm', 'image', 'fallback'];
+// Every check must pass before changed settings can be saved. The local fallback is not
+// required while chat itself uses Ollama, because the fallback is then hidden and unused.
+const ALL_TESTS = ['server', 'cron', 'llm', 'image', 'fallback'];
+
+// Checks that the backend runs. The backend always tests the LLM in the same request.
+const AI_TESTS = ['llm', 'image', 'fallback'];
 
 // Admin setting inputs are named s_<plugin>_<setting>.
 const field = (name) => document.querySelector(`[name="s_local_ragassistant_${name}"]`);
@@ -170,14 +173,14 @@ const initReuseRules = () => {
     }
 };
 
-// While AI chat is enabled, changes to tested settings lock "Save changes" until a test
-// run with no blocking failures has covered exactly the current values. Turning AI chat
-// off always unlocks it, so a provider outage can never lock an administrator out.
-const initSaveGate = (strings) => {
+// While AI chat is enabled, changes to tested settings lock "Save changes" until every
+// required check has passed for the current values (isSatisfied). Turning AI chat off
+// always unlocks it, so a provider outage can never lock an administrator out.
+const initSaveGate = (strings, isSatisfied) => {
     const chat = checkbox('enable_chat');
     const form = chat ? chat.form : null;
     if (!form) {
-        return {snapshot: () => '', tested: () => null};
+        return {update: () => null};
     }
 
     const snapshot = () => JSON.stringify(TESTED_SETTINGS.map((name) => {
@@ -190,7 +193,6 @@ const initSaveGate = (strings) => {
     }));
 
     const initial = snapshot();
-    let passed = null;
 
     const buttons = [...form.querySelectorAll('button[type="submit"], input[type="submit"]')];
     const notice = document.createElement('div');
@@ -202,10 +204,7 @@ const initSaveGate = (strings) => {
         buttons[0].insertAdjacentElement('beforebegin', notice);
     }
 
-    const locked = () => {
-        const now = snapshot();
-        return chat.checked && now !== initial && now !== passed;
-    };
+    const locked = () => chat.checked && snapshot() !== initial && !isSatisfied();
 
     const update = () => {
         const islocked = locked();
@@ -225,14 +224,7 @@ const initSaveGate = (strings) => {
     });
     update();
 
-    return {
-        snapshot,
-        // Record the values a finished run tested; null when it had blocking failures.
-        tested: (values) => {
-            passed = values;
-            update();
-        },
-    };
+    return {update};
 };
 
 export const init = (option) => {
@@ -241,11 +233,12 @@ export const init = (option) => {
     initSectionVisibility();
     initProviderKeys(option.keys || {}, strings);
     initReuseRules();
-    const gate = initSaveGate(strings);
 
     const button = document.getElementById('ragassistant-run-healthcheck');
 
     if (!button) {
+        // Without the panel nothing can be tested, so do not lock saving.
+        initSaveGate(strings, () => true);
         return;
     }
 
@@ -329,10 +322,84 @@ export const init = (option) => {
         summary.className = isError ? 'mt-3 fw-bold text-danger' : 'mt-3 fw-bold';
     };
 
+    const rowFor = (test) => [...rows].find((row) => row.dataset.test === test);
+
+    // The form values each check depends on. A result only counts while these are unchanged.
+    const signature = (test) => {
+        const server = [getValue('api_base_url'), getValue('api_key')];
+        const reuse = isChecked('reuse_chat_api_key');
+        const values = {
+            server,
+            cron: [],
+            llm: [...server, getValue('llm_provider'), getValue('chat_model'), getValue('provider_api_key')],
+            image: [...server, getValue('image_provider'), getValue('image_model'), getValue('image_provider_api_key'),
+                reuse, ...(reuse ? [getValue('llm_provider'), getValue('provider_api_key')] : [])],
+            fallback: [...server, getValue('fallback_model')],
+        };
+        return JSON.stringify(values[test]);
+    };
+
+    const requiredTests = () => ALL_TESTS.filter((test) => test !== 'fallback' || getValue('llm_provider') !== 'ollama');
+
+    const passedNow = (test) => {
+        const row = rowFor(test);
+        return !!row && row.dataset.status === 'pass' && row.dataset.sig === signature(test);
+    };
+
+    // One summary for all rows, including results kept from an earlier run.
+    const showSummary = () => {
+        const counts = {pass: 0, fail: 0, skipped: 0};
+        rows.forEach((row) => {
+            if (counts[row.dataset.status] !== undefined) {
+                counts[row.dataset.status]++;
+            }
+        });
+        const text = (strings.summary || '').replace('{pass}', counts.pass).replace('{fail}', counts.fail)
+            .replace('{skipped}', counts.skipped);
+        setSummary(text, counts.fail > 0);
+    };
+
+    const gate = initSaveGate(strings, () => requiredTests().every(passedNow));
+
+    // A result for values that have since changed no longer counts: show that it needs a re-run.
+    const form = button.closest('form');
+    const markChanged = () => {
+        let changed = false;
+        rows.forEach((row) => {
+            if (['pass', 'fail', 'skipped'].includes(row.dataset.status) && row.dataset.sig !== signature(row.dataset.test)) {
+                setRow(row, 'idle', strings.stale);
+                changed = true;
+            }
+        });
+        if (changed) {
+            showSummary();
+        }
+    };
+    if (form) {
+        form.addEventListener('input', markChanged);
+        form.addEventListener('change', markChanged);
+    }
+
     button.addEventListener('click', async() => {
         const originalLabel = button.textContent;
-        // The values this run tests; edits made while it runs need another run.
-        const testedvalues = gate.snapshot();
+
+        // Run only what has not passed for the current values; if everything has, re-check
+        // all. Any AI check needs the server check, and the backend always tests the LLM.
+        const required = requiredTests();
+        let torun = required.filter((test) => !passedNow(test));
+        if (!torun.length) {
+            torun = required.slice();
+        }
+        if (torun.some((test) => AI_TESTS.includes(test))) {
+            torun = [...new Set(['server', 'llm', ...torun])];
+        }
+        torun = ALL_TESTS.filter((test) => torun.includes(test));
+        // The values this run tests, per check; edits made while it runs need another run.
+        const sigs = {};
+        torun.forEach((test) => {
+            sigs[test] = signature(test);
+        });
+
         button.disabled = true;
         button.setAttribute('aria-busy', 'true');
         const spinner = document.createElement('span');
@@ -351,13 +418,18 @@ export const init = (option) => {
             results.hidden = false;
             results.setAttribute('aria-busy', 'true');
         }
-        rows.forEach((row) => setRow(row, 'pending', row.dataset.testing));
+        torun.forEach((test) => setRow(rowFor(test), 'pending', rowFor(test).dataset.testing));
+        if (!required.includes('fallback')) {
+            setRow(rowFor('fallback'), 'skipped', strings.notneeded);
+            rowFor('fallback').dataset.sig = '';
+        }
         startRunning();
 
         try {
             const formData = new URLSearchParams();
             formData.append('sesskey', M.cfg.sesskey);
             formData.append('config', JSON.stringify(collectConfiguration()));
+            formData.append('tests', torun.join(','));
 
             const response = await fetch(option.endpoint, {
                 method: 'POST',
@@ -372,27 +444,24 @@ export const init = (option) => {
                 throw new Error(result.message);
             }
 
-            let failed = false;
-            let blocked = false;
-            rows.forEach((row) => {
-                const test = result.results[row.dataset.test];
-                if (test) {
-                    failed = failed || test.status === 'fail';
-                    blocked = blocked || (test.status === 'fail' && BLOCKING_TESTS.includes(row.dataset.test));
-                    setRow(row, test.status, test.message);
+            // Rows that were not run keep their earlier result.
+            torun.forEach((test) => {
+                const row = rowFor(test);
+                const outcome = result.results[test];
+                if (outcome) {
+                    setRow(row, outcome.status, outcome.message);
+                    row.dataset.sig = sigs[test];
                 } else {
-                    blocked = blocked || BLOCKING_TESTS.includes(row.dataset.test);
                     setRow(row, 'idle', '');
                 }
             });
-            setSummary(result.summary, failed);
-            gate.tested(blocked ? null : testedvalues);
+            showSummary();
         } catch (error) {
-            // The request itself failed, so no test result is known: put the rows back.
-            rows.forEach((row) => setRow(row, 'idle', ''));
+            // The request itself failed, so this run's results are unknown: put those rows back.
+            torun.forEach((test) => setRow(rowFor(test), 'idle', ''));
             setSummary(error.message, true);
-            gate.tested(null);
         } finally {
+            gate.update();
             stopRunning();
             if (results) {
                 results.removeAttribute('aria-busy');

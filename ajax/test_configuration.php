@@ -209,119 +209,147 @@ try {
     );
     $results = [];
 
-    // 1. Application server: the URL is reachable, then the saved API key is accepted.
-    // The API client needs the saved key to send any request, so a missing or unreadable
-    // key is reported before the URL can be tried.
-    try {
-        $connection = $client->test_connection();
-        $results['server'] = (!empty($connection['authenticated']) && ($connection['status'] ?? '') === 'ok')
-            ? local_ragassistant_healthcheck_result('pass', get_string('healthcheck_server_pass', 'local_ragassistant'))
-            : local_ragassistant_healthcheck_result('fail', get_string('backendinvalidresponse', 'local_ragassistant'));
-    } catch (moodle_exception $exception) {
-        local_ragassistant_healthcheck_log('server', $exception);
+    // Only the checks the page asks for run, for example just the ones that failed last
+    // time. Every AI check needs the backend, so it re-checks the server too. The backend
+    // always tests the LLM, so any AI run also reports the LLM.
+    $alltests = ['server', 'cron', 'llm', 'image', 'fallback'];
+    $requested = array_values(array_intersect($alltests, explode(',', optional_param('tests', '', PARAM_TEXT))));
+    if (!$requested) {
+        $requested = $alltests;
+    }
+    $providertests = array_values(array_intersect(['llm', 'image', 'fallback'], $requested));
+    if ($providertests && !in_array('llm', $providertests, true)) {
+        array_unshift($providertests, 'llm');
+    }
+    $runserver = in_array('server', $requested, true) || $providertests;
 
-        switch ($exception->errorcode) {
-            case 'backendrequestfailed':
-                // Reachable, but the backend refused the request (normally a wrong API key).
-                $message = local_ragassistant_healthcheck_clean($exception->getMessage());
-                break;
-            case 'backendinvalidresponse':
-                $message = get_string('backendinvalidresponse', 'local_ragassistant');
-                break;
-            case 'apikeymissing':
-                $message = get_string('healthcheck_apikeymissing', 'local_ragassistant');
-                break;
-            case 'secretdecryptionfailed':
-            case 'encryptionkeymissing':
-            case 'encryptionkeyinvalid':
-                $message = local_ragassistant_healthcheck_clean($exception->getMessage());
-                break;
-            case 'backendhttpsrequired':
-                $message = get_string('backendhttpsrequired', 'local_ragassistant');
-                break;
-            default:
-                $message = get_string('healthcheck_server_fail', 'local_ragassistant');
+    if ($runserver) {
+        // 1. Application server: the URL is reachable, then the saved API key is accepted.
+        // The API client needs the saved key to send any request, so a missing or unreadable
+        // key is reported before the URL can be tried.
+        try {
+            $connection = $client->test_connection();
+            $results['server'] = (!empty($connection['authenticated']) && ($connection['status'] ?? '') === 'ok')
+                ? local_ragassistant_healthcheck_result('pass', get_string('healthcheck_server_pass', 'local_ragassistant'))
+                : local_ragassistant_healthcheck_result('fail', get_string('backendinvalidresponse', 'local_ragassistant'));
+        } catch (moodle_exception $exception) {
+            local_ragassistant_healthcheck_log('server', $exception);
+
+            switch ($exception->errorcode) {
+                case 'backendrequestfailed':
+                    // Reachable, but the backend refused the request (normally a wrong API key).
+                    $message = local_ragassistant_healthcheck_clean($exception->getMessage());
+                    break;
+                case 'backendinvalidresponse':
+                    $message = get_string('backendinvalidresponse', 'local_ragassistant');
+                    break;
+                case 'apikeymissing':
+                    $message = get_string('healthcheck_apikeymissing', 'local_ragassistant');
+                    break;
+                case 'secretdecryptionfailed':
+                case 'encryptionkeymissing':
+                case 'encryptionkeyinvalid':
+                    $message = local_ragassistant_healthcheck_clean($exception->getMessage());
+                    break;
+                case 'backendhttpsrequired':
+                    $message = get_string('backendhttpsrequired', 'local_ragassistant');
+                    break;
+                default:
+                    $message = get_string('healthcheck_server_fail', 'local_ragassistant');
+            }
+            $results['server'] = local_ragassistant_healthcheck_result('fail', $message);
+        } catch (Throwable $exception) {
+            local_ragassistant_healthcheck_log('server', $exception);
+            $results['server'] = local_ragassistant_healthcheck_result(
+                'fail',
+                get_string('healthcheck_server_fail', 'local_ragassistant')
+            );
         }
-        $results['server'] = local_ragassistant_healthcheck_result('fail', $message);
-    } catch (Throwable $exception) {
-        local_ragassistant_healthcheck_log('server', $exception);
-        $results['server'] = local_ragassistant_healthcheck_result(
-            'fail',
-            get_string('healthcheck_server_fail', 'local_ragassistant')
-        );
     }
 
-    // 2. Background tasks. Moodle-side only, so it runs even when the backend is down.
-    try {
-        $results['cron'] = local_ragassistant_healthcheck_cron();
-    } catch (Throwable $exception) {
-        local_ragassistant_healthcheck_log('cron', $exception);
-        $results['cron'] = local_ragassistant_healthcheck_result(
-            'fail',
-            get_string('healthcheck_cron_error', 'local_ragassistant')
-        );
+    if (in_array('cron', $requested, true)) {
+        // 2. Background tasks. Moodle-side only, so it runs even when the backend is down.
+        try {
+            $results['cron'] = local_ragassistant_healthcheck_cron();
+        } catch (Throwable $exception) {
+            local_ragassistant_healthcheck_log('cron', $exception);
+            $results['cron'] = local_ragassistant_healthcheck_result(
+                'fail',
+                get_string('healthcheck_cron_error', 'local_ragassistant')
+            );
+        }
     }
 
     // 3-5. Main LLM, image generation and Ollama fallback. The backend runs these
     // independently and reports pass, fail or skipped for each one.
-    $providertests = ['llm', 'image', 'fallback'];
-    $backendready = $results['server']['status'] === 'pass';
-    $llmmodel = $overrides['llm_model'] ?? trim((string) get_config('local_ragassistant', 'chat_model'));
+    if ($providertests) {
+        $backendready = isset($results['server']) && $results['server']['status'] === 'pass';
+        $llmmodel = $overrides['llm_model'] ?? trim((string) get_config('local_ragassistant', 'chat_model'));
 
-    if (!$backendready) {
-        foreach ($providertests as $test) {
-            $results[$test] = local_ragassistant_healthcheck_result(
-                'skipped',
-                get_string('healthcheck_requires_backend', 'local_ragassistant')
-            );
-        }
-    } else if ($llmmodel === '') {
-        // The backend rejects a request without a chat model, so nothing can run.
-        $results['llm'] = local_ragassistant_healthcheck_result(
-            'fail',
-            get_string('healthcheck_llmmodelmissing', 'local_ragassistant')
-        );
-        foreach (['image', 'fallback'] as $test) {
-            $results[$test] = local_ragassistant_healthcheck_result(
-                'skipped',
-                get_string('healthcheck_needsmodel', 'local_ragassistant')
-            );
-        }
-    } else {
-        try {
-            $response = $client->test_configuration($overrides);
-            $reported = (isset($response['results']) && is_array($response['results']))
-                ? $response['results']
-                : $response;
-
-            // The backend reports these checks as llm, fallback_model and image_generation.
-            $backendkeys = ['llm' => 'llm', 'fallback' => 'fallback_model', 'image' => 'image_generation'];
+        if (!$backendready) {
             foreach ($providertests as $test) {
-                $item = $reported[$backendkeys[$test]] ?? null;
-                $status = is_array($item) ? ($item['status'] ?? '') : '';
-
-                if (!in_array($status, ['pass', 'fail', 'skipped'], true)) {
-                    $results[$test] = local_ragassistant_healthcheck_result(
-                        'fail',
-                        get_string('healthcheck_notreported', 'local_ragassistant')
-                    );
-                    continue;
-                }
-
-                $message = local_ragassistant_healthcheck_clean($item['message'] ?? '');
                 $results[$test] = local_ragassistant_healthcheck_result(
-                    $status,
-                    $message !== '' ? $message : get_string('healthcheck_status_' . $status, 'local_ragassistant')
+                    'skipped',
+                    get_string('healthcheck_requires_backend', 'local_ragassistant')
                 );
             }
-        } catch (Throwable $exception) {
-            local_ragassistant_healthcheck_log('provider', $exception);
-            $message = ($exception instanceof moodle_exception && $exception->errorcode === 'backendrequestfailed')
-                ? local_ragassistant_healthcheck_clean($exception->getMessage())
-                : get_string('healthcheck_requestfailed', 'local_ragassistant');
+        } else if ($llmmodel === '') {
+            // The backend rejects a request without a chat model, so nothing can run.
+            $results['llm'] = local_ragassistant_healthcheck_result(
+                'fail',
+                get_string('healthcheck_llmmodelmissing', 'local_ragassistant')
+            );
+            foreach (array_diff($providertests, ['llm']) as $test) {
+                $results[$test] = local_ragassistant_healthcheck_result(
+                    'skipped',
+                    get_string('healthcheck_needsmodel', 'local_ragassistant')
+                );
+            }
+        } else {
+            try {
+                // A blank model makes the backend skip that check, so one that already
+                // passed is not run again (image generation is the slowest and costliest).
+                $testoverrides = $overrides;
+                if (!in_array('image', $providertests, true)) {
+                    $testoverrides['image_model'] = '';
+                }
+                if (!in_array('fallback', $providertests, true)) {
+                    $testoverrides['fallback_model'] = '';
+                }
+                $response = $client->test_configuration($testoverrides);
+                $reported = (isset($response['results']) && is_array($response['results']))
+                    ? $response['results']
+                    : $response;
 
-            foreach ($providertests as $test) {
-                $results[$test] = local_ragassistant_healthcheck_result('fail', $message);
+                // The backend reports these checks as llm, fallback_model and image_generation.
+                $backendkeys = ['llm' => 'llm', 'fallback' => 'fallback_model', 'image' => 'image_generation'];
+                foreach ($providertests as $test) {
+                    $item = $reported[$backendkeys[$test]] ?? null;
+                    $status = is_array($item) ? ($item['status'] ?? '') : '';
+
+                    if (!in_array($status, ['pass', 'fail', 'skipped'], true)) {
+                        $results[$test] = local_ragassistant_healthcheck_result(
+                            'fail',
+                            get_string('healthcheck_notreported', 'local_ragassistant')
+                        );
+                        continue;
+                    }
+
+                    $message = local_ragassistant_healthcheck_clean($item['message'] ?? '');
+                    $results[$test] = local_ragassistant_healthcheck_result(
+                        $status,
+                        $message !== '' ? $message : get_string('healthcheck_status_' . $status, 'local_ragassistant')
+                    );
+                }
+            } catch (Throwable $exception) {
+                local_ragassistant_healthcheck_log('provider', $exception);
+                $message = ($exception instanceof moodle_exception && $exception->errorcode === 'backendrequestfailed')
+                    ? local_ragassistant_healthcheck_clean($exception->getMessage())
+                    : get_string('healthcheck_requestfailed', 'local_ragassistant');
+
+                foreach ($providertests as $test) {
+                    $results[$test] = local_ragassistant_healthcheck_result('fail', $message);
+                }
             }
         }
     }

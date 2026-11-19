@@ -129,6 +129,11 @@ class local_ragassistant_admin_setting_configuration_health extends admin_settin
                     'keysaved' => get_string('healthcheck_keysaved', 'local_ragassistant'),
                     'keynone' => get_string('healthcheck_keynone', 'local_ragassistant'),
                     'savelocked' => get_string('healthcheck_savelocked', 'local_ragassistant'),
+                    'stale' => get_string('healthcheck_stale', 'local_ragassistant'),
+                    'notneeded' => get_string('healthcheck_notneeded', 'local_ragassistant'),
+                    // The JS fills in {pass}, {fail} and {skipped} for all rows together.
+                    'summary' => get_string('healthcheck_summary', 'local_ragassistant',
+                        (object) ['pass' => '{pass}', 'fail' => '{fail}', 'skipped' => '{skipped}']),
                 ],
                 'keys' => $this->saved_keys(),
             ]]
