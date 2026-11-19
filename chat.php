@@ -231,16 +231,25 @@ if (data_submitted() && confirm_sesskey()) {
                 // Do not block site-wide chat while individual documents are rebuilt.
 
                 // Retrieve the answer from the RAG Assistant API.
-                $response = $apiclient->post_json('/api/v1/chat', [
+                $provider = trim((string) get_config('local_ragassistant', 'llm_provider'));
+                $chatrequest = [
                     'question' => $question,
                     'course_id' => (int) $course->id,
                     'user_id' => (int) $USER->id,
                     'include_course_documents' => true,
                     'history' => $conversationhistory,
                     'tool_id' => $toolid !== '' ? $toolid : null,
-                    'provider' => trim((string) get_config('local_ragassistant', 'llm_provider')),
+                    'provider' => $provider,
                     'model' => trim((string) get_config('local_ragassistant', 'chat_model')),
-                ]);
+                ];
+                // The backend switches to the local Ollama model only when the request names
+                // it (both fields, or neither). Not needed when chat already uses Ollama.
+                $fallbackmodel = trim((string) get_config('local_ragassistant', 'fallback_model'));
+                if ($fallbackmodel !== '' && $provider !== 'ollama') {
+                    $chatrequest['fallback_provider'] = 'ollama';
+                    $chatrequest['fallback_model'] = $fallbackmodel;
+                }
+                $response = $apiclient->post_json('/api/v1/chat', $chatrequest);
             } finally {
                 if ($sessionclosed) {
                     // Re-open the same Moodle session briefly to persist the answer.

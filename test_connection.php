@@ -31,7 +31,10 @@ if ($testrequested) {
         }
     } catch (\Throwable $exception) {
         // Do not display request headers, credentials, or raw transport details.
-        debugging('FastAPI connection test failed: ' . $exception->getMessage(), DEBUG_DEVELOPER);
+        // Use error_log() rather than debugging(): with developer debugging and Whoops
+        // enabled, debugging() is raised as an error and replaces this page with an error page.
+        // phpcs:ignore moodle.PHP.ForbiddenFunctions.FoundWithAlternative -- see the comment above.
+        error_log('local_ragassistant: FastAPI connection test failed: ' . $exception->getMessage());
         $error = get_string('backendconnectionfailed', 'local_ragassistant');
     }
 }

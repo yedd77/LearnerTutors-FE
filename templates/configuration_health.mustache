@@ -1,0 +1,72 @@
+{{!
+    This file is part of Moodle - http://moodle.org/
+
+    Moodle is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    Moodle is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+}}
+{{!
+    @template local_ragassistant/configuration_health
+
+    Configuration health check panel on the plugin settings page. Only the run button
+    shows until the first run; then one row per test shows its name, a message and a
+    status badge, updated by the local_ragassistant/configuration_health module.
+
+    Classes required for JS:
+    * none; the module finds elements by their data attributes.
+
+    Data attributes required for JS:
+    * data-role="results" - the list, hidden until the first run
+    * data-test - the test key, on each list item
+    * data-testing - the message shown while that test runs
+    * data-role - icon, message or badge, inside each list item
+    * data-role="running" and data-role="elapsed" - the elapsed-time line shown while tests run
+
+    Context variables required for this template:
+    * buttonlabel - Text of the run button
+    * idlelabel - Message before a test has run
+    * tests - The tests to list, each with key, label and testing
+
+    Example context (json):
+    {
+        "buttonlabel": "Run Configuration Tests",
+        "idlelabel": "Not tested",
+        "tests": [
+            {"key": "server", "label": "Application Server", "testing": "Testing Application Server..."},
+            {"key": "llm", "label": "LLM provider and model", "testing": "Testing LLM provider and model..."}
+        ]
+    }
+}}
+<div class="local-ragassistant-healthcheck" id="ragassistant-healthcheck">
+    <button type="button" id="ragassistant-run-healthcheck" class="btn btn-primary">{{buttonlabel}}</button>
+    <ul class="list-group mt-3" data-role="results" hidden>
+        {{#tests}}
+        <li class="list-group-item d-flex align-items-start" data-test="{{key}}" data-testing="{{testing}}" data-status="idle">
+            <span class="fa-regular fa-circle fs-4 text-muted me-3 mt-1" data-role="icon" aria-hidden="true"></span>
+            <div class="flex-grow-1">
+                <div class="fw-bold">{{label}}</div>
+                <div class="small text-muted" data-role="message">{{idlelabel}}</div>
+            </div>
+            <span class="badge text-bg-light border ms-3" data-role="badge" hidden></span>
+        </li>
+        {{/tests}}
+    </ul>
+    {{! Shown while tests run. The ticking time is hidden from screen readers, which get the summary below instead.
+        "hidden" sits on the outer element because Bootstrap's d-flex would override it. }}
+    <div data-role="running" hidden>
+        <div class="mt-3 small text-primary d-flex align-items-center">
+            <span class="spinner-grow spinner-grow-sm me-2" aria-hidden="true"></span>
+            <span data-role="elapsed" aria-hidden="true"></span>
+        </div>
+    </div>
+    <div id="ragassistant-healthcheck-summary" class="mt-3 fw-bold" role="status" aria-live="polite"></div>
+</div>

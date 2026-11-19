@@ -105,29 +105,49 @@ $string['reindexpending'] = 'The embedding configuration has changed. Course doc
 // Plugin Settings compoments
 $string['settingsheading'] = 'Plugin settings';
 $string['settingsintro'] = 'Configure the local FastAPI service. Do not expose this service publicly without authentication and network restrictions.';
+$string['apibaseurl'] = 'Server API URL';
+$string['apibaseurl_desc'] = 'URL used for API call to the server.';
+$string['apikey'] = 'Server API key';
+$string['apikey_desc'] = 'Enter the server API key matching the generated key created during server setup.';
 $string['enablechat'] = 'Enable AI chat';
-$string['enablechat_desc'] = 'Global setting to enable AI chat feature.';
-$string['apibaseurl'] = 'Server API endpoint';
-$string['apibaseurl_desc'] = 'Endpoint used to invoke the API call.';
+$string['enablechat_desc'] = 'Global setting to enable AI chat feature. If unchecked, the AI chat feature will be disabled for all courses but indexing and document management will still be available.';
 // LLM config settings 
 $string['llm_heading'] = 'LLM configuration';
 $string['llm_heading_desc'] = 'Configure the LLM settings for the RAG system.';
-$string['llmprovider'] = 'Chat provider';
-$string['llmprovider_desc'] = 'Select the AI provider used for chat generation. Enter its matching credential in the single Provider API key field below.';
-$string['llm_model'] = 'Chat model';
-$string['llm_model_desc'] = 'Required chat model identifier supplied to the backend. Changing the generation model does not require document reindexing.';
-$string['image_heading'] = 'Image generation configuration';
-$string['image_heading_desc'] = 'Choose the provider and model used for /explain illustrations. Image generation is configured independently from chat generation.';
-$string['image_provider'] = 'Image provider';
-$string['image_provider_desc'] = 'Select OpenAI or Google Gemini for illustration generation. Ollama is not available for image generation.';
+$string['llmprovider'] = 'LLM provider';
+$string['llmprovider_desc'] = 'Select the LLM provider used for chat generation.';
+$string['llm_model'] = 'LLM model';
+$string['llm_model_desc'] = 'Enter the LLM model identifier corresponding to the selected provider.';
+$string['provider_api_key'] = 'LLM API key';
+$string['provider_api_key_desc'] = 'Enter the API key for the provider selected above (OpenAI or Google Gemini).';
+// Image LLM config settings
+$string['image_heading'] = 'LLM for Image generation configuration';
+$string['image_heading_desc'] = 'Configure the LLM for image generation settings for the RAG system.';
+$string['image_provider'] = 'LLM for Image provider';
+$string['image_provider_desc'] = 'Select the LLM provider for image generation.';
 $string['image_model'] = 'Image generation model';
-$string['image_model_desc'] = 'Model identifier for the selected image provider. Examples: gpt-image-1 for OpenAI or gemini-3.1-flash-image for Gemini.';
+$string['image_model_desc'] = 'Enter the model identifier for the selected LLM for image generation provider.';
 $string['reuse_chat_api_key'] = 'Reuse chat provider API key';
-$string['reuse_chat_api_key_desc'] = 'Use the chat provider credential for image generation when both provider selections are the same. If the providers differ, leave this unchecked and enter a separate image provider API key below. The backend rejects reuse when the providers do not match.';
-$string['image_provider_api_key'] = 'Image provider API key';
-$string['image_provider_api_key_desc'] = 'Enter the API key for the selected image provider. This is stored separately from the chat key, encrypted in Moodle, and sent only to FastAPI. Leave blank to keep the existing image key. Not required when reuse is enabled and the chat and image providers match.';
-$string['apikey'] = 'Application API key';
-$string['apikey_desc'] = 'Enter the shared key matching RAG_API_KEY on FastAPI. The field is blank to avoid sending the saved key to your browser. Leave blank to keep the current key. Moodle encrypts the value at rest using an automatically generated key stored in the protected moodledata directory. Advanced deployments may provide LOCAL_RAGASSISTANT_ENCRYPTION_KEY or $CFG->local_ragassistant_encryption_key instead.';
+$string['reuse_chat_api_key_desc'] = 'If the provider for image generation is the same as the chat provider, and use the same API key, you can reuse the chat provider API key. ';
+$string['image_provider_api_key'] = 'Image generation provider API key';
+$string['image_provider_api_key_desc'] = 'Enter the API key for the selected image generation provider.';
+// Local LLM fallback
+$string['fallback_heading'] = 'Local LLM fallback';
+$string['fallback_heading_desc'] = 'Configure the local Ollama model. This model will be run inside local environments when the primary cloud model call fails. The provider is fixed to Ollama.';
+$string['fallback_model'] = 'Fallback model';
+$string['fallback_model_desc'] = 'Enter the Ollama model identifier installed on the server';
+// Configuration health check
+$string['configurationhealth_heading'] = 'Configuration Health Checks';
+$string['configurationhealth_heading_desc'] = 'Check the connectivity of the RAG system and the availability of the configured LLM providers and models. Before the changes are saved, run the tests and fix any failed checks. ';
+$string['configurationhealth'] = 'Test RAG configuration';
+$string['configurationhealth_desc'] = 'Check the connectivity of the RAG system and the availability of the configured LLM providers and models.';
+$string['healthcheck_test_server'] = 'Application Server';
+$string['healthcheck_test_llm'] = 'LLM provider and model';
+$string['healthcheck_test_image'] = 'Image generation provider and model';
+$string['healthcheck_test_fallback'] = 'Local fallback model (Ollama)';
+
+
+
 $string['encryptionkeymissing'] = 'Moodle could not access its protected data directory to initialize secure credential storage. Check the dataroot path and PHP write permissions.';
 $string['encryptionkeyinvalid'] = 'The configured Moodle credential encryption key is invalid, or the saved key file is damaged. Restore the original key from backup; do not generate a replacement while encrypted credentials exist.';
 $string['secretencryptionfailed'] = 'Moodle could not encrypt the application API key.';
@@ -146,8 +166,6 @@ $string['backendhttpsrequired'] = 'The FastAPI URL must use HTTPS. HTTP is allow
 
 
 // Combined provider credential setting
-$string['provider_api_key'] = 'Provider API key';
-$string['provider_api_key_desc'] = 'Enter the API key for the provider selected above (OpenAI or Google Gemini). The key is encrypted in Moodle and synchronized securely to FastAPI. The field stays blank after saving; leave it blank to keep the selected provider’s existing key. Switching providers does not delete the other provider’s saved key. Ollama does not require an API key.';
 $string['providerkeynotrequired'] = 'Ollama does not require an API key. Select OpenAI or Google Gemini to save a provider credential.';
 $string['providerkeytoolong'] = 'Use a provider API key with at least 20 characters.';
 
@@ -158,3 +176,42 @@ $string['credentialnotconfigured'] = 'Not configured — enter an API key';
 $string['credentialnotrequired'] = 'Not required for the selected provider';
 $string['credentialverificationfailed'] = 'A saved credential exists but could not be verified. Check the encryption key and restore it from backup if necessary.';
 $string['credentialinputplaceholder'] = '*******************************';
+
+
+
+//settings
+$string['runconfigurationtests'] = 'Run Configuration Tests';
+$string['healthcheck_apikeymissing'] = 'No application API key is saved. Enter it above and save the settings first.';
+$string['healthcheck_llmmodelmissing'] = 'Enter a chat model before running the tests.';
+$string['healthcheck_needsmodel'] = 'Not tested because the backend needs a chat model to run any provider test.';
+$string['healthcheck_notreported'] = 'The backend did not report a result for this test.';
+$string['healthcheck_requestfailed'] = 'Unable to complete the configuration tests. Check your settings and backend connection.';
+$string['healthcheck_requires_backend'] = 'Not tested because the application server check failed.';
+$string['healthcheck_server_fail'] = 'Could not reach the backend. Check that FastAPI is running and the saved backend URL is correct.';
+$string['healthcheck_server_pass'] = 'Reachable, and the application API key was accepted.';
+$string['healthcheck_status_fail'] = 'Failed';
+$string['healthcheck_status_pass'] = 'Passed';
+$string['healthcheck_status_skipped'] = 'Skipped';
+
+
+
+
+
+
+
+$string['healthcheck_status_idle'] = 'Not tested';
+$string['healthcheck_status_testing'] = 'Testing...';
+$string['healthcheck_running'] = 'Running tests...';
+$string['healthcheck_summary'] = '{$a->pass} passed, {$a->fail} failed, {$a->skipped} skipped';
+$string['healthcheck_test_cron'] = 'Background tasks (cron)';
+$string['healthcheck_testing_row'] = 'Testing {$a}...';
+$string['healthcheck_cron_never'] = 'Moodle cron has never run. Document indexing runs as a background task, so uploads will not be processed until cron is set up.';
+$string['healthcheck_cron_overdue'] = 'Moodle cron last ran {$a} ago. Document indexing waits until cron runs again, so check the cron schedule.';
+$string['healthcheck_cron_failing'] = '{$a} document indexing task(s) are failing and waiting to retry. Check Site administration > Server > Tasks > Ad hoc tasks.';
+$string['healthcheck_cron_waiting'] = '{$a} document indexing task(s) have been waiting for more than an hour.';
+$string['healthcheck_cron_pass'] = 'Cron last ran {$a} ago, and no indexing tasks are stuck.';
+$string['healthcheck_cron_error'] = 'Could not check the background tasks.';
+$string['healthcheck_keysaved'] = 'A key is saved for this provider. Leave blank to keep it.';
+$string['healthcheck_keynone'] = 'No key is saved for this provider yet.';
+$string['healthcheck_savelocked'] = 'Run the configuration tests below and fix any failed checks before saving these changes.';
+$string['healthcheck_elapsed'] = '{$a} s elapsed. AI checks can take up to a minute.';
