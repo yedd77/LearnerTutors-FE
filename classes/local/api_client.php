@@ -52,6 +52,54 @@ class api_client
     }
 
     /**
+     * Run the backend's live configuration tests without saving anything.
+     *
+     * Saved settings are used unless an administrator supplied unsaved form
+     * values in $overrides. Provider keys default to the keys saved in Moodle;
+     * they are decrypted only here and sent over this authenticated
+     * server-to-server request, never to browsers.
+     *
+     * @param array $overrides Validated unsaved values: llm_provider, llm_model,
+     *     fallback_model, image_provider, image_model, reuse_chat_api_key,
+     *     provider_api_key and image_provider_api_key.
+     */
+    public function test_configuration(array $overrides = []): array
+    {
+        $llmprovider = $overrides['llm_provider']
+            ?? trim((string) get_config('local_ragassistant', 'llm_provider'));
+        $imageprovider = $overrides['image_provider']
+            ?? (trim((string) get_config('local_ragassistant', 'image_provider')) ?: 'openai');
+
+        $payload = [
+            'llm_provider' => $llmprovider,
+            'llm_model' => $overrides['llm_model']
+                ?? trim((string) get_config('local_ragassistant', 'chat_model')),
+            'fallback_model' => $overrides['fallback_model']
+                ?? trim((string) get_config('local_ragassistant', 'fallback_model')),
+            'image_provider' => $imageprovider,
+            'image_model' => $overrides['image_model']
+                ?? trim((string) get_config('local_ragassistant', 'image_model')),
+            'reuse_chat_api_key' => $overrides['reuse_chat_api_key']
+                ?? (bool) get_config('local_ragassistant', 'reuse_chat_api_key'),
+            'openai_api_key' => secret_store::get_provider_api_key('openai'),
+            'gemini_api_key' => secret_store::get_provider_api_key('gemini'),
+            'openai_image_api_key' => secret_store::get_image_provider_api_key('openai'),
+            'gemini_image_api_key' => secret_store::get_image_provider_api_key('gemini'),
+        ];
+
+        // A key typed into the settings form but not saved yet applies to the
+        // provider currently selected, matching how the setting saves it.
+        if (!empty($overrides['provider_api_key']) && in_array($llmprovider, ['openai', 'gemini'], true)) {
+            $payload[$llmprovider . '_api_key'] = $overrides['provider_api_key'];
+        }
+        if (!empty($overrides['image_provider_api_key']) && in_array($imageprovider, ['openai', 'gemini'], true)) {
+            $payload[$imageprovider . '_image_api_key'] = $overrides['image_provider_api_key'];
+        }
+
+        return $this->post_json('/api/v1/admin/test-configuration', $payload);
+    }
+
+    /**
      * Synchronize configuration only when administrator-selected values change.
      *
      * The backend persists its runtime configuration, so repeating this

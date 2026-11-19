@@ -2,7 +2,8 @@
 // This file is part of Moodle - https://moodle.org/
 //
 // Site administration settings.
-
+require_once ($CFG->dirroot .
+    '/local/ragassistant/classes/admin_setting_configuration_health.php');
 defined('MOODLE_INTERNAL') || die();
 
 require_once(__DIR__ . '/classes/admin_setting_configencryptedpassword.php');
@@ -144,6 +145,8 @@ if ($hassiteconfig) {
         get_string('apikey_desc', 'local_ragassistant'),
         ''
     ));
+
+    $settings->add(new local_ragassistant_admin_setting_configuration_health());
 
     $ADMIN->add('localplugins', $settings);
 
