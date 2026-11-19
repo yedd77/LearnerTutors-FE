@@ -217,3 +217,4 @@ $string['healthcheck_savelocked'] = 'Run the configuration tests below. Every ch
 $string['healthcheck_elapsed'] = '{$a} s elapsed. AI checks can take up to a minute.';
 $string['healthcheck_stale'] = 'Settings changed. Run the tests again.';
 $string['healthcheck_notneeded'] = 'Not needed: chat already uses Ollama.';
+$string['assistantname'] = 'LearnerTutors';

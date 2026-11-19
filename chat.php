@@ -395,6 +395,8 @@ echo html_writer::start_div('ragassistant-chat-transcript', [
     'id' => 'ragassistant-chat-transcript',
     'role' => 'log',
     'aria-live' => 'polite',
+    // chat.js labels new answers with the same name as the history below.
+    'data-assistant-name' => get_string('assistantname', 'local_ragassistant'),
 ]);
 
 if (empty($history)) {
@@ -410,7 +412,12 @@ if (empty($history)) {
             'ragassistant-message ragassistant-message-user'
         );
         echo html_writer::start_div('ragassistant-message ragassistant-message-assistant');
-        echo html_writer::tag('div', '✦', ['class' => 'ragassistant-assistant-avatar']);
+        // Header: decorative avatar and the assistant's name, above the answer.
+        echo html_writer::div(
+            html_writer::tag('div', '✦', ['class' => 'ragassistant-assistant-avatar', 'aria-hidden' => 'true']) .
+                html_writer::div(get_string('assistantname', 'local_ragassistant'), 'ragassistant-assistant-name'),
+            'ragassistant-assistant-header'
+        );
         echo html_writer::start_div('ragassistant-message-content');
         echo markdown_renderer::render((string) $turn['answer'], $context);
         if (!empty($turn['illustration_url'])) {

@@ -248,14 +248,42 @@
     border-radius: 1rem 1rem .25rem 1rem;
 }
 
+/* Avatar in its own column; name and answer stacked to its right. */
 .ragassistant-message-assistant {
     align-self: flex-start;
+    display: grid;
+    grid-template-columns: 1.75rem minmax(0, 1fr);
+    column-gap: .5rem;
+    row-gap: .35rem;
 }
 
 .ragassistant-message-assistant .ragassistant-message-content {
+    grid-column: 2;
     background: #e4daf5;
     color: #363636;
     border-radius: .25rem 1rem 1rem 1rem;
+}
+
+/* The header only groups the markup; its avatar and name are placed in the grid. */
+.ragassistant-assistant-header {
+    display: contents;
+}
+
+/* Centre the avatar on the gap between the name and the answer:
+   (name line 1.05rem + half the row gap .175rem) - half the avatar .875rem = .35rem. */
+.ragassistant-message-assistant .ragassistant-assistant-avatar {
+    grid-column: 1;
+    grid-row: 1 / span 2;
+    align-self: start;
+    margin-top: .35rem;
+}
+
+.ragassistant-assistant-name {
+    grid-column: 2;
+    color: var(--ragassistant-primary, #270089);
+    font-size: .875rem;
+    font-weight: 600;
+    line-height: 1.2;
 }
 
 .ragassistant-message-content {
@@ -272,12 +300,13 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    flex: 0 0 2rem;
-    width: 2rem;
-    height: 2rem;
+    flex: 0 0 1.75rem;
+    width: 1.75rem;
+    height: 1.75rem;
     border-radius: 50%;
     background: var(--ragassistant-primary, #270089);
     color: #fff;
+    font-size: .85rem;
     font-weight: 700;
 }
 

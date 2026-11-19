@@ -180,10 +180,18 @@ document.addEventListener('DOMContentLoaded', function () {
             : 'ragassistant-message ragassistant-message-assistant';
 
         if (role === 'assistant') {
+            // Header: decorative avatar and the assistant's name, above the answer.
+            const header = document.createElement('div');
+            header.className = 'ragassistant-assistant-header';
             const avatar = document.createElement('div');
             avatar.className = 'ragassistant-assistant-avatar';
+            avatar.setAttribute('aria-hidden', 'true');
             avatar.textContent = '✦';
-            message.appendChild(avatar);
+            const name = document.createElement('div');
+            name.className = 'ragassistant-assistant-name';
+            name.textContent = transcript.dataset.assistantName || 'LearnerTutors';
+            header.append(avatar, name);
+            message.appendChild(header);
         }
 
         const content = document.createElement('div');
