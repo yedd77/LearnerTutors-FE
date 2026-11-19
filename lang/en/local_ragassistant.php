@@ -43,8 +43,6 @@ $string['questiontoolong'] = 'Keep your question under 4,000 characters.';
 // Settings page components
 $string['allowstudentchat'] = 'Allow students to use the AI chat';
 $string['allowstudentchat_desc'] = 'When disabled, students cannot open or submit questions to the assistant in this course. Educators with document-management permission remain able to use it.';
-$string['allowstudentupload'] = 'Allow students to upload personal documents';
-$string['allowstudentupload_desc'] = 'When disabled, only educators with document-management permission can upload documents. Student uploads, when allowed, remain private to the uploader.';
 $string['coursepolicyhelp'] = 'Choose whether enrolled students may use the chat or upload their own documents. Educators with document-management permission can always use chat and manage course documents. Changes apply to this course only.';
 $string['policysaved'] = 'Course assistant permissions saved.';
 

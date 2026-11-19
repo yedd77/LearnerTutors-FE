@@ -41,15 +41,9 @@ $PAGE->requires->css(
     new moodle_url('/local/ragassistant/styles.css')
 );
 
-// Check permissions for uploads and chat.
-$canUploadPersonal = has_capability(
-    'local/ragassistant:uploadpersonal',
-    $context
-);
-
-// Lecturers who can manage documents can upload regardless of student policy.
-$uploadAllowed = $canManage ||
-    ($canUploadPersonal && !empty($policy->allowstudentupload));
+// Only educators who manage documents can upload. Student (personal) uploads were
+// removed because the backend no longer indexes them.
+$uploadAllowed = $canManage;
 
 // Managers can use chat regardless of student policy, provided they also
 // have the useassistant capability.
@@ -65,19 +59,18 @@ echo $OUTPUT->heading(
 // Start dashboard grid.
 $cards = html_writer::start_div('ragassistant-grid');
 
-// Upload materials card.
-$cards .= html_writer::start_div('ragassistant-card');
-$cards .= html_writer::tag(
-    'h3',
-    get_string('uploadCardTitle', 'local_ragassistant')
-);
-$cards .= html_writer::tag(
-    'p',
-    get_string('uploadCardDesc', 'local_ragassistant')
-);
-
-// Display the upload link or a disabled button.
+// Course materials card: only for educators who manage documents. Students have
+// nothing to upload, so they do not see the card at all.
 if ($uploadAllowed) {
+    $cards .= html_writer::start_div('ragassistant-card');
+    $cards .= html_writer::tag(
+        'h3',
+        get_string('uploadCardTitle', 'local_ragassistant')
+    );
+    $cards .= html_writer::tag(
+        'p',
+        get_string('uploadCardDesc', 'local_ragassistant')
+    );
     $cards .= html_writer::link(
         new moodle_url('/local/ragassistant/documents.php', [
             'courseid' => $courseid,
@@ -85,27 +78,9 @@ if ($uploadAllowed) {
         get_string('uploadButton', 'local_ragassistant'),
         ['class' => 'btn btn-primary']
     );
-} else {
-    $cards .= html_writer::tag(
-        'button',
-        get_string('uploadButton', 'local_ragassistant'),
-        [
-            'class' => 'btn btn-primary',
-            'disabled' => 'disabled',
-            'title' => 'You do not have permission to upload documents, '
-                . 'or student uploads are disabled for this course.',
-        ]
-    );
-
-    $cards .= html_writer::tag(
-        'p',
-        'You do not have permission to upload documents, or your lecturer '
-            . 'has disabled student document uploads.',
-        ['class' => 'text-muted small']
-    );
+    $cards .= html_writer::end_div();
 }
-$cards .= html_writer::end_div();
-    
+
 // AI chat card.
 $cards .= html_writer::start_div('ragassistant-card');
 $cards .= html_writer::tag(

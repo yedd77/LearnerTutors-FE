@@ -19,8 +19,7 @@ $PAGE->requires->css(new moodle_url('/local/ragassistant/styles.css'));
 
 if (data_submitted() && confirm_sesskey()) {
     $allowchat = (bool)optional_param('allowstudentchat', 0, PARAM_BOOL);
-    $allowupload = (bool)optional_param('allowstudentupload', 0, PARAM_BOOL);
-    \local_ragassistant\local\course_policy::save($courseid, $allowchat, $allowupload);
+    \local_ragassistant\local\course_policy::save($courseid, $allowchat);
     redirect($PAGE->url, get_string('policysaved', 'local_ragassistant'), null, \core\output\notification::NOTIFY_SUCCESS);
 }
 $policy = \local_ragassistant\local\course_policy::get($courseid);
@@ -31,8 +30,6 @@ echo html_writer::start_tag('form', ['method' => 'post', 'action' => $PAGE->url-
 echo html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'sesskey', 'value' => sesskey()]);
 echo html_writer::tag('label', html_writer::empty_tag('input', ['type' => 'checkbox', 'name' => 'allowstudentchat', 'value' => '1', 'checked' => $policy->allowstudentchat ? 'checked' : null]) . ' ' . get_string('allowstudentchat', 'local_ragassistant'), ['class' => 'ragassistant-policy-option']);
 echo html_writer::tag('p', get_string('allowstudentchat_desc', 'local_ragassistant'), ['class' => 'text-muted']);
-echo html_writer::tag('label', html_writer::empty_tag('input', ['type' => 'checkbox', 'name' => 'allowstudentupload', 'value' => '1', 'checked' => $policy->allowstudentupload ? 'checked' : null]) . ' ' . get_string('allowstudentupload', 'local_ragassistant'), ['class' => 'ragassistant-policy-option']);
-echo html_writer::tag('p', get_string('allowstudentupload_desc', 'local_ragassistant'), ['class' => 'text-muted']);
 echo html_writer::tag('button', get_string('savechanges'), ['type' => 'submit', 'class' => 'btn btn-primary']);
 echo html_writer::end_tag('form');
 echo html_writer::div(html_writer::link(new moodle_url('/local/ragassistant/index.php', ['courseid' => $courseid]), get_string('backtodashboard', 'local_ragassistant')), 'mt-3');

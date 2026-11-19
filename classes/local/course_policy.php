@@ -17,14 +17,19 @@ class course_policy {
         return $settings;
     }
 
-    /** Save a policy row for a course. */
-    public static function save(int $courseid, bool $allowstudentchat, bool $allowstudentupload): void {
+    /**
+     * Save a policy row for a course.
+     *
+     * Student (personal) uploads were removed because the backend no longer indexes them,
+     * so allowstudentupload is always stored as 0. The column is kept for existing rows.
+     */
+    public static function save(int $courseid, bool $allowstudentchat): void {
         global $DB;
         $record = $DB->get_record('local_ragassistant_coursecfg', ['courseid' => $courseid]);
         $data = (object)[
             'courseid' => $courseid,
             'allowstudentchat' => (int)$allowstudentchat,
-            'allowstudentupload' => (int)$allowstudentupload,
+            'allowstudentupload' => 0,
             'timemodified' => time(),
         ];
         if ($record) {

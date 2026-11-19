@@ -215,7 +215,9 @@ $context = context_course::instance($course->id);
 require_capability('local/ragassistant:useassistant', $context);
 $canmanage = has_capability('local/ragassistant:managedocuments', $context);
 $policy = \local_ragassistant\local\course_policy::get($courseid);
-$canupload = $canmanage || ((bool) $policy->allowstudentupload && has_capability('local/ragassistant:uploadpersonal', $context));
+// Only educators who manage documents can upload. Student (personal) uploads were removed
+// because the backend no longer indexes them.
+$canupload = $canmanage;
 $api = new \local_ragassistant\local\api_client();
 
 // Page setup and metadata
@@ -262,16 +264,8 @@ if ($action !== '' && $actiondocumentid > 0 && data_submitted()) {
         MUST_EXIST
     );
 
-    // Check if the user can manage the document
-    $isowner = (int) $target->userid === (int) $USER->id;
-    $canmanagepersonal = $isowner
-        && $target->visibility === 'personal'
-        && has_capability('local/ragassistant:uploadpersonal', $context);
-
-    // require capability if the user cannot manage the document
-    if (!$canmanage && !$canmanagepersonal) {
-        require_capability('local/ragassistant:managedocuments', $context);
-    }
+    // Only educators who manage documents can act on them (student uploads were removed).
+    require_capability('local/ragassistant:managedocuments', $context);
 
     // prepare redirect URL for after action
     $redirecturl = new moodle_url('/local/ragassistant/documents.php', ['courseid' => $courseid]);
@@ -485,7 +479,7 @@ if ($mform->is_cancelled()) {
 } else if ($data = $mform->get_data()) {
     require_sesskey();
     if (!$canupload) {
-        throw new required_capability_exception($context, 'local/ragassistant:uploadpersonal', 'nopermissions', '');
+        throw new required_capability_exception($context, 'local/ragassistant:managedocuments', 'nopermissions', '');
     }
 
     $draftitemid = (int) ($data->documents ?? 0);
@@ -517,7 +511,8 @@ if ($mform->is_cancelled()) {
             continue;
         }
 
-        $visibility = $canmanage ? 'course' : 'personal';
+        // The backend indexes course documents only.
+        $visibility = 'course';
         $note = $canmanage ? trim((string) ($filenotes[$draftfile->get_filename()] ?? '')) : '';
         $documentid = 0;
         try {
