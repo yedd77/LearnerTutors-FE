@@ -214,8 +214,17 @@ $PAGE->requires->css('/local/ragassistant/styles.css');
 $context = context_course::instance($course->id);
 // Course material management is for educators only. Students have nothing to upload
 // (personal uploads were removed), so they must not reach this page by URL either.
-require_capability('local/ragassistant:managedocuments', $context);
+// Send them back to the chat with a notice rather than throwing a permission exception,
+// which on sites with developer debugging shows a full debug page with request data.
 $canmanage = has_capability('local/ragassistant:managedocuments', $context);
+if (!$canmanage) {
+    redirect(
+        new moodle_url('/local/ragassistant/index.php', ['courseid' => $courseid]),
+        get_string('nomanagedocuments', 'local_ragassistant'),
+        null,
+        \core\output\notification::NOTIFY_WARNING
+    );
+}
 $policy = \local_ragassistant\local\course_policy::get($courseid);
 // Only educators who manage documents can upload. Student (personal) uploads were removed
 // because the backend no longer indexes them.
@@ -608,7 +617,15 @@ $table->head = [
     get_string('actions', 'local_ragassistant'),
 ];
 
-foreach ($documents as $document) {
+// Paginate the uploaded documents table: 4 documents per page. Only managers reach this
+// page, so every course document is listed. The suggestions table below still uses all.
+$docperpage = 4;
+$doctotal = count($documents);
+$docpage = optional_param('docpage', 0, PARAM_INT);
+$docpage = max(0, min($docpage, max(0, (int) ceil($doctotal / $docperpage) - 1)));
+$pageddocuments = array_slice($documents, $docpage * $docperpage, $docperpage, true);
+
+foreach ($pageddocuments as $document) {
     $isowner = ((int) $document->userid === (int) $USER->id);
     if (!$canmanage && $document->visibility !== 'course' && !$isowner) {
         continue;
@@ -722,6 +739,21 @@ echo html_writer::div(
     html_writer::table($table),
     'table-responsive'
 );
+if ($doctotal > $docperpage) {
+    echo html_writer::div(
+        $OUTPUT->paging_bar(
+            $doctotal,
+            $docpage,
+            $docperpage,
+            new moodle_url('/local/ragassistant/documents.php', [
+                'courseid' => $courseid,
+                'sugpage' => optional_param('sugpage', 0, PARAM_INT),
+            ]),
+            'docpage'
+        ),
+        'ragassistant-docs-paging'
+    );
+}
 echo html_writer::end_div();
 
 if ($canmanage) {
@@ -729,7 +761,13 @@ if ($canmanage) {
     $suggestiontable->attributes['class'] = 'generaltable ragassistant-document-suggestions';
     $suggestiontable->head = ['Document', 'Suggestion', 'Status', 'Action'];
 
-    foreach ($documents as $document) {
+    // Paginate the suggestions table by document (each document has 3 suggestion rows).
+    $sugperpage = 4;
+    $sugtotal = count($documents);
+    $sugpage = optional_param('sugpage', 0, PARAM_INT);
+    $sugpage = max(0, min($sugpage, max(0, (int) ceil($sugtotal / $sugperpage) - 1)));
+
+    foreach (array_slice($documents, $sugpage * $sugperpage, $sugperpage, true) as $document) {
         $saved = $DB->get_records('local_ragassistant_suggestions', ['documentid' => $document->id], 'slot ASC');
         $byslot = [];
         foreach ($saved as $saveditem) {
@@ -833,6 +871,21 @@ if ($canmanage) {
         html_writer::table($suggestiontable),
         'table-responsive'
     );
+    if ($sugtotal > $sugperpage) {
+        echo html_writer::div(
+            $OUTPUT->paging_bar(
+                $sugtotal,
+                $sugpage,
+                $sugperpage,
+                new moodle_url('/local/ragassistant/documents.php', [
+                    'courseid' => $courseid,
+                    'docpage' => $docpage,
+                ]),
+                'sugpage'
+            ),
+            'ragassistant-docs-paging'
+        );
+    }
     echo html_writer::end_div();
 
     // Course chat settings card (moved here from the former course settings page).

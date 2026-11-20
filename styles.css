@@ -54,6 +54,17 @@
     text-align: center;
 }
 
+/* Uploaded documents pagination: right-aligned below the table. */
+.ragassistant-docs-paging {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 1rem;
+}
+
+.ragassistant-docs-paging .pagination {
+    margin-bottom: 0;
+}
+
 /* Shared column widths so both management tables line up: the document table's
    Retrieval column matches the suggestion table's Status column, and its Lecturer note,
    Processing status and Actions columns match the suggestion table's Action column. */

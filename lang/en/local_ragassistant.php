@@ -212,3 +212,7 @@ $string['healthcheck_elapsed'] = '{$a} s elapsed. AI checks can take up to a min
 $string['healthcheck_stale'] = 'Settings changed. Run the tests again.';
 $string['healthcheck_notneeded'] = 'Not needed: chat already uses Ollama.';
 $string['assistantname'] = 'LearnerTutors';
+// Capability names (shown on permission pages and in "no permission" errors).
+$string['ragassistant:useassistant'] = 'Use the LearnerTutors AI chat';
+$string['ragassistant:managedocuments'] = 'Manage LearnerTutors course documents';
+$string['nomanagedocuments'] = 'Only lecturers can manage course materials.';

@@ -16,7 +16,13 @@ require_sesskey();
 $context = context_course::instance($courseid);
 // Only the course material management page polls this endpoint, so it shares that
 // page's educator-only access.
-require_capability('local/ragassistant:managedocuments', $context);
+// Answer with a plain JSON 403 instead of an exception page.
+if (!has_capability('local/ragassistant:managedocuments', $context)) {
+    http_response_code(403);
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode(['error' => 'forbidden']);
+    exit;
+}
 
 global $DB, $USER;
 $canmanage = has_capability('local/ragassistant:managedocuments', $context);
