@@ -8,10 +8,7 @@ $string['uploadCardDesc'] = 'Upload and manage learning materials available to t
 $string['uploadButton'] = 'Manage documents'; 
 $string['askassistant'] = 'Ask the Course Learning Assistant'; 
 $string['chatintro'] = 'Ask questions about permitted course materials and review cited sources.'; 
-$string['openchat'] = 'Open chat'; 
-$string['settingCardTitle'] = 'Permission Settings'; 
-$string['settingCardDesc'] = 'Manage permission settings for Couse Learning Assistant.'; 
-$string['coursepolicytitle'] = 'Manage settings'; 
+$string['openchat'] = 'Open chat';
 
 // Upload document form components
 $string['submitdocument'] = 'Upload course material document';
@@ -40,11 +37,12 @@ $string['questionrequired'] = 'Enter a question with at least two characters.';
 $string['questiontoolong'] = 'Keep your question under 4,000 characters.';
 
 
-// Settings page components
+// Course chat settings card (on the course materials page)
+$string['chatsettingstitle'] = 'Chat Settings';
+$string['chatsettingsdesc'] = 'Choose whether enrolled students may use the AI chat in this course. Changes apply to this course only.';
 $string['allowstudentchat'] = 'Allow students to use the AI chat';
 $string['allowstudentchat_desc'] = 'When disabled, students cannot open or submit questions to the assistant in this course. Educators with document-management permission remain able to use it.';
-$string['coursepolicyhelp'] = 'Choose whether enrolled students may use the chat or upload their own documents. Educators with document-management permission can always use chat and manage course documents. Changes apply to this course only.';
-$string['policysaved'] = 'Course assistant permissions saved.';
+$string['policysaved'] = 'Course chat settings saved.';
 
 // Utility strings
 $string['backtodashboard'] = 'Back to Course Learning Asistant dashboard';

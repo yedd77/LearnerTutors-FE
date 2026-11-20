@@ -212,7 +212,9 @@ $course = get_course($courseid);
 require_login($course);
 $PAGE->requires->css('/local/ragassistant/styles.css');
 $context = context_course::instance($course->id);
-require_capability('local/ragassistant:useassistant', $context);
+// Course material management is for educators only. Students have nothing to upload
+// (personal uploads were removed), so they must not reach this page by URL either.
+require_capability('local/ragassistant:managedocuments', $context);
 $canmanage = has_capability('local/ragassistant:managedocuments', $context);
 $policy = \local_ragassistant\local\course_policy::get($courseid);
 // Only educators who manage documents can upload. Student (personal) uploads were removed
@@ -231,23 +233,15 @@ $PAGE->set_heading(format_string($course->fullname));
 $action = optional_param('action', '', PARAM_ALPHANUMEXT);
 $actiondocumentid = optional_param('documentid', 0, PARAM_INT);
 
-// Queue a reindex for every eligible course document; cron performs the work.
-if ($action === 'reindexall' && data_submitted()) {
+// Save the course chat policy from the settings card at the bottom of the page.
+if ($action === 'savepolicy' && data_submitted()) {
     require_sesskey();
     require_capability('local/ragassistant:managedocuments', $context);
-    $records = $DB->get_records('local_ragassistant_documents', ['courseid' => $courseid], 'id ASC');
-    $queued = 0;
-    foreach ($records as $record) {
-        if (!in_array($record->status, ['ready', 'failed'], true)) {
-            continue;
-        }
-        if (local_ragassistant_queue_document_task((int) $record->id, 'reindex')) {
-            $queued++;
-        }
-    }
+    $allowchat = (bool) optional_param('allowstudentchat', 0, PARAM_BOOL);
+    \local_ragassistant\local\course_policy::save($courseid, $allowchat);
     redirect(
         new moodle_url('/local/ragassistant/documents.php', ['courseid' => $courseid]),
-        $queued . ' document(s) queued for reindexing. You can continue using Moodle while they process.',
+        get_string('policysaved', 'local_ragassistant'),
         null,
         \core\output\notification::NOTIFY_SUCCESS
     );
@@ -578,21 +572,6 @@ if ($mform->is_cancelled()) {
 
 echo $OUTPUT->header();
 echo $OUTPUT->heading(get_string('uploadCardTitle', 'local_ragassistant'));
-if ($canmanage) {
-    echo html_writer::tag(
-        'form',
-        html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'sesskey', 'value' => sesskey()]) .
-        html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'courseid', 'value' => $courseid]) .
-        html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'action', 'value' => 'reindexall']) .
-        html_writer::tag('button', 'Queue reindex for all course documents', [
-            'type' => 'submit',
-            'class' => 'btn btn-outline-primary mb-3',
-            'onclick' => 'return confirm("Queue all course documents for reindexing using the current embedding model?");',
-        ]),
-        ['method' => 'post', 'action' => (new moodle_url('/local/ragassistant/documents.php', ['courseid' => $courseid]))->out(false)]
-    );
-}
-
 if ($canupload) {
     $mform->display();
 } else {
@@ -833,13 +812,71 @@ if ($canmanage) {
     }
 
     echo html_writer::start_div('ragassistant-uploaded-card');
-    echo html_writer::tag('h4', 'Document Suggestions', ['class' => 'ragassistant-card-title']);
     echo html_writer::tag(
-        'p',
-        'Generate or regenerate each suggestion independently. Suggestion generation does not re-index documents.',
-        ['class' => 'ragassistant-card-description']
+        'div',
+        html_writer::tag(
+            'h4',
+            'Document Suggestions',
+            ['class' => 'ragassistant-card-title']
+        ) .
+        html_writer::tag(
+            'p',
+            'Generate or regenerate each suggestion independently. Suggestion generation does not re-index documents.',
+            ['class' => 'ragassistant-card-description']
+        ),
+        [
+            'id' => 'ragassistant-suggestions-heading',
+            'class' => 'ragassistant-card-heading',
+        ]
     );
-    echo html_writer::div(html_writer::table($suggestiontable), 'table-responsive');
+    echo html_writer::div(
+        html_writer::table($suggestiontable),
+        'table-responsive'
+    );
+    echo html_writer::end_div();
+
+    // Course chat settings card (moved here from the former course settings page).
+    echo html_writer::start_div('ragassistant-uploaded-card');
+    echo html_writer::tag(
+        'div',
+        html_writer::tag(
+            'h4',
+            get_string('chatsettingstitle', 'local_ragassistant'),
+            ['class' => 'ragassistant-card-title']
+        ) .
+        html_writer::tag(
+            'p',
+            get_string('chatsettingsdesc', 'local_ragassistant'),
+            ['class' => 'ragassistant-card-description']
+        ),
+        [
+            'id' => 'ragassistant-chatsettings-heading',
+            'class' => 'ragassistant-card-heading',
+        ]
+    );
+    echo html_writer::tag(
+        'form',
+        html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'sesskey', 'value' => sesskey()]) .
+        html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'courseid', 'value' => $courseid]) .
+        html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'action', 'value' => 'savepolicy']) .
+        html_writer::tag(
+            'label',
+            html_writer::empty_tag('input', [
+                'type' => 'checkbox',
+                'name' => 'allowstudentchat',
+                'value' => '1',
+                'checked' => !empty($policy->allowstudentchat) ? 'checked' : null,
+            ]) . ' ' . get_string('allowstudentchat', 'local_ragassistant'),
+            ['class' => 'ragassistant-policy-option']
+        ) .
+        html_writer::tag('p', get_string('allowstudentchat_desc', 'local_ragassistant'), ['class' => 'text-muted']) .
+        html_writer::tag('button', get_string('savechanges'), ['type' => 'submit', 'class' => 'btn btn-primary']),
+        [
+            'method' => 'post',
+            'action' => (new moodle_url('/local/ragassistant/documents.php', ['courseid' => $courseid]))->out(false),
+            'class' => 'ragassistant-policy-form',
+        ]
+    );
     echo html_writer::end_div();
 }
 

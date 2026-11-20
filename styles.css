@@ -43,11 +43,43 @@
     text-align: center;
 }
 
-.ragassistant-documents th:last-child,
-.ragassistant-documents td:last-child,
-.ragassistant-document-suggestions th:last-child,
-.ragassistant-document-suggestions td:last-child {
-    min-width: 10rem;
+/* Shared column widths so both management tables line up: the document table's
+   Retrieval column matches the suggestion table's Status column, and its Lecturer note,
+   Processing status and Actions columns match the suggestion table's Action column. */
+.ragassistant-documents,
+.ragassistant-document-suggestions {
+    --ragassistant-status-col: 8rem;
+    --ragassistant-action-col: 12rem;
+}
+
+/* Widths go on header cells only: the suggestion table's Document cell uses rowspan,
+   so nth-child on body cells would hit the wrong columns in later rows. */
+.ragassistant-documents th:nth-child(2),
+.ragassistant-documents th:nth-child(3),
+.ragassistant-documents th:nth-child(5),
+.ragassistant-document-suggestions th:nth-child(4) {
+    width: var(--ragassistant-action-col);
+    min-width: var(--ragassistant-action-col);
+}
+
+.ragassistant-documents th:nth-child(4),
+.ragassistant-document-suggestions th:nth-child(3) {
+    width: var(--ragassistant-status-col);
+    min-width: var(--ragassistant-status-col);
+}
+
+.ragassistant-documents td:nth-child(2) {
+    overflow-wrap: anywhere;
+}
+
+/* Centre every column except Document and Suggestion. Suggestion body cells are
+   targeted through their wrapper divs because of the Document rowspan. */
+.ragassistant-documents th:not(:first-child),
+.ragassistant-documents td:not(:first-child),
+.ragassistant-document-suggestions th:nth-child(n+3),
+.ragassistant-document-suggestions .ragassistant-suggestion-status,
+.ragassistant-document-suggestions .ragassistant-suggestion-action {
+    text-align: center;
 }
 
 .ragassistant-document-name {
@@ -86,11 +118,9 @@
     overflow-wrap: anywhere;
 }
 
+/* Sits inside a .ragassistant-uploaded-card, so it carries no border of its own. */
 .ragassistant-policy-form {
     max-width: 780px;
-    border: 1px solid var(--bs-border-color, #dee2e6);
-    border-radius: .75rem;
-    padding: 1.25rem;
 }
 
 .ragassistant-policy-option {

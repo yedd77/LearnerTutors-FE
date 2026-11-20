@@ -14,7 +14,9 @@ $course = get_course($courseid);
 require_login($course);
 require_sesskey();
 $context = context_course::instance($courseid);
-require_capability('local/ragassistant:useassistant', $context);
+// Only the course material management page polls this endpoint, so it shares that
+// page's educator-only access.
+require_capability('local/ragassistant:managedocuments', $context);
 
 global $DB, $USER;
 $canmanage = has_capability('local/ragassistant:managedocuments', $context);

@@ -80,8 +80,8 @@ class reindex_documents extends \core\task\adhoc_task {
                             if (!is_string($suggestion)) {
                                 continue;
                             }
-                            $suggestion = core_text::substr(trim(clean_param($suggestion, PARAM_TEXT)), 0, 500);
-                            $key = core_text::strtolower($suggestion);
+                            $suggestion = \core_text::substr(trim(clean_param($suggestion, PARAM_TEXT)), 0, 500);
+                            $key = \core_text::strtolower($suggestion);
                             if ($suggestion !== '' && !isset($cleaned[$key])) {
                                 $cleaned[$key] = $suggestion;
                             }

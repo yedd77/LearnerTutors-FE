@@ -126,26 +126,5 @@ $cards .= html_writer::end_div();
 // End dashboard grid and render page footer.
 $cards .= html_writer::end_div();
 
-// Course settings card for users who can manage documents.
-if ($canManage) {
-    $cards .= html_writer::start_div('ragassistant-card');
-    $cards .= html_writer::tag(
-        'h3',
-        get_string('settingCardTitle', 'local_ragassistant')
-    );
-    $cards .= html_writer::tag(
-        'p',
-        get_string('settingCardDesc', 'local_ragassistant')
-    );
-    $cards .= html_writer::link(
-        new moodle_url('/local/ragassistant/course_settings.php', [
-            'courseid' => $courseid,
-        ]),
-        get_string('coursepolicytitle', 'local_ragassistant'),
-        ['class' => 'btn btn-warning']
-    );
-    $cards .= html_writer::end_div();
-}
-
 echo $cards;
 echo $OUTPUT->footer();
