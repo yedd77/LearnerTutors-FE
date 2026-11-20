@@ -16,7 +16,7 @@ LearnerTutors uses one installation-wide shared secret. It is not an OpenAI or G
    ```
 
 5. Restart/reload the PHP web server so the configuration is applied.
-6. In Site administration → Plugins → Local plugins → Course Learning Assistant, enter the same FastAPI `RAG_API_KEY` in Application API key and save.
+6. In Site administration → Plugins → Local plugins → LearnerTutors, enter the same FastAPI `RAG_API_KEY` in Application API key and save.
 7. Open Site administration → Plugins → Local plugins → Test FastAPI connection and run the test.
 
 The Moodle encryption key must be different from `RAG_API_KEY`. Keep it out of source control, database backups, and web-accessible files. Back it up securely: losing or changing it makes previously encrypted API keys unreadable. If it is lost, generate a new encryption key and re-enter the shared FastAPI key.
@@ -49,7 +49,7 @@ The OpenAI and Gemini keys are separate from the shared `RAG_API_KEY`.
 2. Generate it with:
    `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`
 3. Install the updated backend dependencies (`pip install -r requirements.txt`).
-4. In Moodle Site administration → Plugins → Local plugins → Course Learning Assistant, select the Chat provider, then enter that provider's key in the single Provider API key field and save. The field saves the credential against the selected provider; existing credentials for the other provider are retained.
+4. In Moodle Site administration → Plugins → Local plugins → LearnerTutors, select the Chat provider, then enter that provider's key in the single Provider API key field and save. The field saves the credential against the selected provider; existing credentials for the other provider are retained.
 5. The next chat request or document indexing request synchronizes changed settings to FastAPI. The backend encrypts provider credentials before saving them in `storage/runtime_config.json`; no FastAPI restart is required.
 6. The saved Moodle fields remain blank in the browser. Entering a new value rotates the selected provider credential; leaving the field blank keeps its current value. Only the selected provider's key is kept: saving a key for one provider deletes the other provider's key in the same group (chat or image) in Moodle, and the next configuration sync clears it on the backend with an explicit `clear_*` flag. Switching providers in the form without saving a key changes nothing. Saving a key for a different chat provider also turns off "Reuse chat provider API key" when the chat and image providers no longer match.
 

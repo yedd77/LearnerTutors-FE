@@ -1,12 +1,12 @@
 <?php
 
-// Course Learning Assistant landing page
-$string['pluginname'] = 'Course Learning Assistant'; 
-$string['dashboardheading'] = 'Course Learning Assistant'; 
+// LearnerTutors landing page
+$string['pluginname'] = 'LearnerTutors'; 
+$string['dashboardheading'] = 'LearnerTutors'; 
 $string['uploadCardTitle'] = 'Manage Course Materials'; 
 $string['uploadCardDesc'] = 'Upload and manage learning materials available to the assistant for this course.'; 
 $string['uploadButton'] = 'Manage documents'; 
-$string['askassistant'] = 'Ask the Course Learning Assistant'; 
+$string['askassistant'] = 'Ask the LearnerTutors'; 
 $string['chatintro'] = 'Ask questions about permitted course materials and review cited sources.'; 
 $string['openchat'] = 'Open chat';
 
@@ -45,7 +45,7 @@ $string['allowstudentchat_desc'] = 'When disabled, students cannot open or submi
 $string['policysaved'] = 'Course chat settings saved.';
 
 // Utility strings
-$string['backtodashboard'] = 'Back to Course Learning Asistant dashboard';
+$string['backtodashboard'] = 'Back to LearnerTutors';
 
 
 $string['uploadfailed'] = 'The file was not stored. Please try again.';
