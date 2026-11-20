@@ -6,9 +6,7 @@ $string['dashboardheading'] = 'LearnerTutors';
 $string['uploadCardTitle'] = 'Manage Course Materials'; 
 $string['uploadCardDesc'] = 'Upload and manage learning materials available to the assistant for this course.'; 
 $string['uploadButton'] = 'Manage documents'; 
-$string['askassistant'] = 'Ask the LearnerTutors'; 
-$string['chatintro'] = 'Ask questions about permitted course materials and review cited sources.'; 
-$string['openchat'] = 'Open chat';
+$string['chatnopermission'] = 'You do not have permission to use the AI chat in this course.';
 
 // Upload document form components
 $string['submitdocument'] = 'Upload course material document';

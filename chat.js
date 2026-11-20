@@ -13,7 +13,6 @@ document.addEventListener('DOMContentLoaded', function () {
     let requestInProgress = false;
     let activeThinkingTimer = null;
     const MAXLEN = 4000;
-    let mathJaxTypesetQueue = Promise.resolve();
 
     if (!editor) {
         return;
@@ -96,64 +95,22 @@ document.addEventListener('DOMContentLoaded', function () {
         form.requestSubmit();
     });
 
-    // Resolve with the MathJax object once it is loaded and initialised,
-    // or null if it never shows up. Moodle loads MathJax asynchronously, so
-    // window.MathJax can exist (as a config object) before the library is ready.
-    function waitForMathJax(timeout) {
-        return new Promise(function (resolve) {
-            const started = Date.now();
-
-            (function check() {
-                const mj = window.MathJax;
-
-                if (mj && typeof mj.typesetPromise === 'function' && mj.startup && mj.startup.promise) {
-                    mj.startup.promise.then(function () { resolve(mj); }, function () { resolve(null); });
-                    return;
-                }
-                if (mj && mj.Hub && typeof mj.Hub.Queue === 'function') {
-                    resolve(mj); // MathJax v2.
-                    return;
-                }
-                if (Date.now() - started > timeout) {
-                    resolve(null);
-                    return;
-                }
-                window.setTimeout(check, 200);
-            })();
-        });
-    }
-
+    // Hand an answer inserted by AJAX to Moodle's MathJax filter. The server already ran
+    // the answer through format_text(), which wraps each equation in
+    // .filter_mathjaxloader_equation; filter_mathjaxloader loads MathJax on demand and
+    // typesets those spans when it receives this event. Answers without equations are
+    // skipped: Moodle never loads MathJax for them, so there is nothing to wait for.
+    // (Equations in the server-rendered history are typeset by the filter on page load.)
     function typesetMath(element) {
-        if (!element) {
-            return Promise.resolve();
+        if (!element || !element.querySelector('.filter_mathjaxloader_equation')) {
+            return;
         }
 
-        // Use Moodle's filter event so filter_mathjaxloader can typeset
-        // dynamically inserted filtered content.
         document.dispatchEvent(new CustomEvent('core_filters/contentUpdated', {
             detail: {
                 nodes: [element]
             }
         }));
-
-        mathJaxTypesetQueue = mathJaxTypesetQueue.then(async function () {
-            const mj = await waitForMathJax(15000);
-
-            if (!mj) {
-                console.warn('RAG Assistant: MathJax is not available.');
-                return;
-            }
-
-            if (typeof mj.typesetPromise === 'function') {
-                await mj.typesetPromise([element]);
-            } else {
-                mj.Hub.Queue(['Typeset', mj.Hub, element]);
-            }
-        }).catch(function (error) {
-            console.error('RAG Assistant MathJax rendering failed.', error);
-        });
-
-        return mathJaxTypesetQueue;
     }
 
 
@@ -211,10 +168,104 @@ document.addEventListener('DOMContentLoaded', function () {
         return message;
     }
 
-    function centerMessage(message) {
-        if (!message) return;
+    // The user's latest question, kept near the top of the view while its answer arrives.
+    let pinnedMessage = null;
 
-        message.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    // The nearest scrolling ancestor of the chat (Moodle's page container or the window).
+    function pageScroller() {
+        let node = chatApp ? chatApp.parentElement : null;
+        while (node && node !== document.body) {
+            const overflowY = getComputedStyle(node).overflowY;
+            if ((overflowY === 'auto' || overflowY === 'scroll') &&
+                    node.scrollHeight > node.clientHeight) {
+                return node;
+            }
+            node = node.parentElement;
+        }
+        return document.scrollingElement || document.documentElement;
+    }
+
+    // Hand wheel scrolling over to the page once the transcript reaches its start or end.
+    // Chrome "latches" one continuous wheel gesture to the element it started on, so
+    // without this the page only scrolls after the user pauses or moves the mouse.
+    if (transcript) {
+        let pageScrollTarget = null;
+
+        transcript.addEventListener('wheel', function (event) {
+            if (event.ctrlKey || event.defaultPrevented ||
+                    Math.abs(event.deltaX) > Math.abs(event.deltaY) || event.deltaY === 0) {
+                return;   // pinch-zoom, horizontal or empty scrolls: leave to the browser
+            }
+
+            // A short transcript does not scroll, and the browser already passes those
+            // scrolls to the page.
+            const maxTranscriptTop = transcript.scrollHeight - transcript.clientHeight;
+            if (maxTranscriptTop <= 1) {
+                return;
+            }
+
+            const goingUp = event.deltaY < 0;
+            const atStart = transcript.scrollTop <= 0;
+            const atEnd = transcript.scrollTop >= maxTranscriptTop - 1;
+            if ((goingUp && !atStart) || (!goingUp && !atEnd)) {
+                return;   // the transcript still has room: let the browser scroll it
+            }
+
+            const scroller = pageScroller();
+            let delta = event.deltaY;
+            if (event.deltaMode === 1) {
+                delta *= 16;                       // lines -> pixels
+            } else if (event.deltaMode === 2) {
+                delta *= scroller.clientHeight;    // pages -> pixels
+            }
+
+            const maxPageTop = scroller.scrollHeight - scroller.clientHeight;
+            const current = scroller.scrollTop;
+            if ((goingUp && current <= 0) || (!goingUp && current >= maxPageTop - 1)) {
+                return;   // the page is at its own limit too: nothing to do
+            }
+
+            event.preventDefault();
+
+            // Keep adding to the target while a smooth scroll is still running, so quick
+            // wheel ticks add up instead of each restarting from the current position.
+            const base = pageScrollTarget !== null && Math.abs(current - pageScrollTarget) > 1
+                ? pageScrollTarget
+                : current;
+            pageScrollTarget = Math.min(maxPageTop, Math.max(0, base + delta));
+            scroller.scrollTo({ top: pageScrollTarget, behavior: 'smooth' });
+        }, { passive: false });
+    }
+
+    // Top edge of the part of the transcript the user can currently see: below the New
+    // chat button (the transcript's top padding), and below Moodle's fixed navbar when
+    // the top of the chat is scrolled off the screen.
+    function visibleTranscriptTop() {
+        const rect = transcript.getBoundingClientRect();
+        const paddingTop = parseFloat(getComputedStyle(transcript).paddingTop) || 0;
+        const navbar = document.querySelector('nav.navbar.fixed-top, .navbar.fixed-top');
+        const screenTop = (navbar ? navbar.getBoundingClientRect().bottom : 0) + 8;
+        // Never aim below the transcript itself, even if most of the chat is off-screen.
+        return Math.min(Math.max(rect.top + paddingTop, screenTop), rect.bottom - 48);
+    }
+
+    // Scroll the transcript (never the page) so the message's top lines up with the top
+    // of the current view, as far as the content allows: with a short answer the view
+    // simply stops at the end of the conversation, so no blank space is added.
+    function scrollMessageToViewTop(message) {
+        if (!message || !transcript || !message.isConnected) return;
+
+        const offset = message.getBoundingClientRect().top - visibleTranscriptTop();
+        const maxScrollTop = transcript.scrollHeight - transcript.clientHeight;
+        const top = Math.min(maxScrollTop, Math.max(0, transcript.scrollTop + offset));
+        transcript.scrollTo({ top: top, behavior: 'smooth' });
+    }
+
+    // Jump straight to the latest message (used on page load).
+    function scrollTranscriptToEnd() {
+        if (transcript) {
+            transcript.scrollTo({ top: transcript.scrollHeight, behavior: 'instant' });
+        }
     }
 
     function appendSources(content, sources) {
@@ -326,10 +377,6 @@ document.addEventListener('DOMContentLoaded', function () {
         '.ragassistant-message-user .ragassistant-message-content'
     ).forEach(highlightMessageCommand);
 
-    document.querySelectorAll(
-        '.ragassistant-message-assistant .ragassistant-message-content'
-    ).forEach(typesetMath);
-
 
     //intercept the form submission to handle it via AJAX
     if (form && transcript) {
@@ -369,6 +416,12 @@ document.addEventListener('DOMContentLoaded', function () {
             }
 
             requestInProgress = true;
+
+            // Switch to the conversation layout before measuring where the new message
+            // goes (as clicking a suggestion card already does).
+            removeSuggestions();
+            activateChatBackground();
+
             const formData = new FormData(form);
             formData.set('question', cleanQuestion);
             formData.set('display_question', originalQuestion);
@@ -386,7 +439,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
             // Show the user's question immediately.
             const userMessage = createMessage('user', originalQuestion);
-            centerMessage(userMessage);
 
             // Show a temporary loading indicator.
             const loadingMessage = createMessage('assistant', 'Thinking for 0s');
@@ -399,6 +451,12 @@ document.addEventListener('DOMContentLoaded', function () {
             thinkingLabel.setAttribute('aria-live', 'off');
             thinkingLabel.textContent = 'Thinking for 0s';
             loadingContent.replaceChildren(thinkingLabel);
+
+            // Bring the new question towards the top of the current view, with the
+            // loading indicator underneath it.
+            pinnedMessage = userMessage;
+            scrollMessageToViewTop(userMessage);
+
             const thinkingStartedAt = Date.now();
             const thinkingTimer = window.setInterval(function () {
                 const elapsedSeconds = Math.floor(
@@ -457,10 +515,14 @@ document.addEventListener('DOMContentLoaded', function () {
                 appendIllustration(content, result.illustration_url);
                 appendSources(content, result.sources);
 
-                await typesetMath(content);
+                // Show the question at the top of the view with as much of the answer as
+                // fits below it. Rendered maths only changes content below the question,
+                // so the question stays in place when MathJax finishes later.
+                scrollMessageToViewTop(pinnedMessage);
 
-                // Keep the new answer in the center of the visible transcript.
-                centerMessage(assistantMessage);
+                // Not awaited: maths renders in the background, so the Send button is
+                // re-enabled as soon as the answer is shown.
+                typesetMath(content);
 
             } catch (error) {
                 loadingMessage.remove();
@@ -469,8 +531,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (error.name !== 'AbortError') {
                     const errorMessage = createMessage('assistant', error.message || 'A connection error occurred.');
                     errorMessage.classList.add('ragassistant-message-error');
-                    centerMessage(errorMessage);
                 }
+                scrollMessageToViewTop(pinnedMessage);
 
             } finally {
                 window.clearInterval(thinkingTimer);
@@ -698,4 +760,40 @@ document.addEventListener('DOMContentLoaded', function () {
     editor.addEventListener('focus', renderMenu);
 
     updateHighlight();   // highlight a prefilled question after a validation error
+
+    // On page load, line the bottom of the chat up with the bottom of the screen so the
+    // composer and the latest messages are visible without scrolling.
+    if (chatApp) {
+        // Stop the browser restoring the previous scroll position on reload.
+        if ('scrollRestoration' in window.history) {
+            window.history.scrollRestoration = 'manual';
+        }
+
+        const alignChatToViewportBottom = function () {
+            chatApp.scrollIntoView({ block: 'end', inline: 'nearest' });
+        };
+
+        // Images, fonts and MathJax can change the height after this point, so align
+        // again once everything has loaded, unless the user has already scrolled.
+        let userScrolled = false;
+        const markUserScrolled = function () {
+            userScrolled = true;
+        };
+        ['wheel', 'touchmove', 'keydown', 'mousedown'].forEach(function (type) {
+            window.addEventListener(type, markUserScrolled, { once: true, passive: true });
+        });
+
+        // Open on the latest message inside the fixed-height chat window.
+        scrollTranscriptToEnd();
+        alignChatToViewportBottom();
+        if (document.readyState === 'complete') {
+            return;
+        }
+        window.addEventListener('load', function () {
+            if (!userScrolled) {
+                scrollTranscriptToEnd();
+                alignChatToViewportBottom();
+            }
+        }, { once: true });
+    }
 });
