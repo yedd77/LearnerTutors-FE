@@ -1192,6 +1192,13 @@ form.mform #fgroup_id_buttonar .felement.fgroup {
     }
 }
 
+/* Manage course materials: dim a paged table while its next page loads. */
+.ragassistant-paged-section[aria-busy="true"] {
+    opacity: 0.55;
+    pointer-events: none;
+    transition: opacity 0.15s ease;
+}
+
 /* Subtle shimmer for the live "Thinking for Xs" indicator. */
 .ragassistant-thinking-shimmer {
     display: inline-block;

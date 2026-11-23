@@ -6,7 +6,7 @@
 defined('MOODLE_INTERNAL') || die();
 
 $plugin->component = 'local_ragassistant';
-$plugin->version   = 2026111900;
+$plugin->version   = 2026112300;
 $plugin->requires  = 2025101600;
 $plugin->maturity  = MATURITY_ALPHA;
 $plugin->release   = '0.4.9 - Per-document suggestion table';

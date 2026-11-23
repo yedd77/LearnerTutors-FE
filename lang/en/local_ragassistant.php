@@ -7,7 +7,7 @@ $string['uploadCardTitle'] = 'Manage Course Materials';
 $string['uploadCardDesc'] = 'Upload and manage learning materials available to the assistant for this course.'; 
 $string['uploadButton'] = 'Manage documents'; 
 $string['chatnopermission'] = 'You do not have permission to use the AI chat in this course.';
-
+ 
 // Upload document form components
 $string['submitdocument'] = 'Upload course material document';
 $string['submitdocumentdesc'] = 'Add the learning materials to become context for the assistant';
@@ -16,6 +16,18 @@ $string['documentfile_help'] = 'Select PDF, DOCX, PPTX, TXT, or Markdown file(s)
 $string['documentreviewtitle'] = 'Review files';
 $string['documentreviewdesc'] = 'Review and add additional notes for each files';
 $string['uploadfilesbutton'] = 'Upload all files';
+$string['uploadfilesbutton_tooltip'] = 'Upload document(s) to be processed';
+$string['disableretrieval_tooltip'] = 'When this document is disabled, the AI will not use it as a reference in future conversations.';
+$string['enableretrieval_tooltip'] = 'When this document is enabled, the AI will use it as a reference in future conversations.';
+$string['indexdocument_tooltip'] = 'Process this document so the AI can use it in conversations.';
+$string['reindexdocument_tooltip'] = 'Process this document again and refresh its indexed content.';
+$string['deletedocument_tooltip'] = 'Permanently delete this document and its indexed content.';
+$string['processingdocument_tooltip'] = 'This document is being processed. Actions will be available when it finishes.';
+$string['generatesuggestion_tooltip'] = 'Generate a suggested question for students from this document.';
+$string['regeneratesuggestion_tooltip'] = 'Replace this suggestion with a newly generated one.';
+$string['generatingsuggestion_tooltip'] = 'This suggestion is being generated.';
+$string['savepolicy_tooltip'] = 'Save the chat settings for this course.';
+$string['cancelupload_tooltip'] = 'Cancel and discard the selected files.';
 $string['lecturernote'] = 'Lecturer note';
 $string['retrieval'] = 'Retrieval';
 $string['uploadedDocuments'] = 'Manage uploaded documents';
@@ -215,6 +227,7 @@ $string['assistantname'] = 'LearnerTutors';
 // Capability names (shown on permission pages and in "no permission" errors).
 $string['ragassistant:useassistant'] = 'Use the LearnerTutors AI chat';
 $string['ragassistant:managedocuments'] = 'Manage LearnerTutors course documents';
+$string['ragassistant:reindexdocuments'] = 'Reindex LearnerTutors course documents';
 $string['nomanagedocuments'] = 'Only lecturers can manage course materials.';
 
 // Study sheet (/notes) PDF download.

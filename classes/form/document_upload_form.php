@@ -95,14 +95,16 @@ class document_upload_form extends \moodleform
         // Add hidden fields and action buttons
         $mform->addElement('hidden', 'courseid', $courseid);
         $mform->setType('courseid', PARAM_INT);
-        $mform->addElement('html', '
+        $mform->addElement('html', ' 
     <div class="ragassistant-actions d-flex justify-content-end gap-2 mt-3">
         <input type="submit" name="submitbutton" id="id_submitbutton"
                class="btn btn-primary"
-               value="' . s(get_string('uploadfilesbutton', 'local_ragassistant')) . '">
+               value="' . s(get_string('uploadfilesbutton', 'local_ragassistant')) . '"
+               title="' . s(get_string('uploadfilesbutton_tooltip', 'local_ragassistant')) . '">
         <input type="submit" name="cancel" id="id_cancel"
                class="btn btn-secondary" formnovalidate
                value="' . s(get_string('cancel')) . '"
+               title="' . s(get_string('cancelupload_tooltip', 'local_ragassistant')) . '"
                data-skip-validation="1" data-cancel="1" onclick="skipClientValidation = true; return true;">
     </div>
 ');
@@ -238,6 +240,7 @@ class document_upload_form extends \moodleform
                 removeButton.className = 'btn btn-outline-danger btn-sm ragassistant-remove-file';
                 removeButton.textContent = 'Remove';
                 removeButton.setAttribute('aria-label', 'Remove ' + name);
+                removeButton.title = 'Remove this file from the upload.';
                 removeButton.addEventListener('click', function(event) {
                     event.preventDefault();
                     event.stopPropagation();

@@ -158,6 +158,9 @@ function local_ragassistant_queue_document_task(int $documentid, string $jobtype
  * @param string $label
  * @param string $class
  * @param string|null $onclick
+ * @param array $extra
+ * @param bool $disabled
+ * @param string|null $tooltip Optional hover text for the button.
  * @return string
  */
 function local_ragassistant_document_action_form(
@@ -168,12 +171,16 @@ function local_ragassistant_document_action_form(
     string $class,
     ?string $onclick = null,
     array $extra = [],
-    bool $disabled = false
+    bool $disabled = false,
+    ?string $tooltip = null
 ): string {
     $attributes = [
         'type' => 'submit',
         'class' => $class,
     ];
+    if ($tooltip !== null) {
+        $attributes['title'] = $tooltip;
+    }
     if ($onclick !== null) {
         $attributes['onclick'] = $onclick;
     }
@@ -217,6 +224,7 @@ $context = context_course::instance($course->id);
 // Send them back to the chat with a notice rather than throwing a permission exception,
 // which on sites with developer debugging shows a full debug page with request data.
 $canmanage = has_capability('local/ragassistant:managedocuments', $context);
+$canreindex = has_capability('local/ragassistant:reindexdocuments', $context);
 if (!$canmanage) {
     redirect(   
         new moodle_url('/local/ragassistant/index.php', ['courseid' => $courseid]),
@@ -302,6 +310,11 @@ if ($action !== '' && $actiondocumentid > 0 && data_submitted()) {
 
                 if ($action === 'index' && !in_array($target->status, ['pending', 'failed'], true)) {
                     throw new moodle_exception('invalidrequest', 'error');
+                }
+
+                // Reindexing is limited to roles above teacher.
+                if ($action === 'reindex') {
+                    require_capability('local/ragassistant:reindexdocuments', $context);
                 }
 
                 if ($action === 'reindex' && !in_array($target->status, ['ready', 'failed'], true)) {
@@ -579,13 +592,24 @@ if ($mform->is_cancelled()) {
     );
 }
 
-echo $OUTPUT->header();
-echo $OUTPUT->heading(get_string('uploadCardTitle', 'local_ragassistant'));
-if ($canupload) {
-    $mform->display();
+// Paging requests from the page script ask for the two paged sections only (as JSON),
+// so changing page does not rebuild the Moodle header, upload form and footer. Access
+// checks above still apply; everything else this script echoes is discarded below.
+$fragment = optional_param('fragment', 0, PARAM_BOOL);
+if ($fragment) {
+    // Read-only from here on, so release the session lock for concurrent requests.
+    \core\session\manager::write_close();
+    ob_start();
 } else {
-    echo $OUTPUT->notification(get_string('uploadnotpermitted', 'local_ragassistant'), 'warning');
+    echo $OUTPUT->header();
+    echo $OUTPUT->heading(get_string('uploadCardTitle', 'local_ragassistant'));
+    if ($canupload) {
+        $mform->display();
+    } else {
+        echo $OUTPUT->notification(get_string('uploadnotpermitted', 'local_ragassistant'), 'warning');
+    }
 }
+$pagedsections = [];
 
 $documents = $DB->get_records('local_ragassistant_documents', ['courseid' => $courseid], 'timecreated DESC');
 echo html_writer::start_div('ragassistant-uploaded-card');
@@ -645,16 +669,23 @@ foreach ($pageddocuments as $document) {
                 (int) $document->id,
                 'index',
                 get_string('indexdocument', 'local_ragassistant'),
-                'btn btn-outline-secondary btn-sm'
+                'btn btn-outline-secondary btn-sm',
+                null,
+                [],
+                false,
+                get_string('indexdocument_tooltip', 'local_ragassistant')
             );
-        } else if ($document->status === 'ready') {
+        } else if ($document->status === 'ready' && $canreindex) {
             $actions[] = local_ragassistant_document_action_form(
                 $courseid,
                 (int) $document->id,
                 'reindex',
                 'Reindex',
                 'btn btn-outline-primary btn-sm',
-                'return confirm("Queue reindexing for this document?");'
+                'return confirm("Queue reindexing for this document?");',
+                [],
+                false,
+                get_string('reindexdocument_tooltip', 'local_ragassistant')
             );
         }
         if ($document->status === 'ready') {
@@ -665,7 +696,9 @@ foreach ($pageddocuments as $document) {
                 $retrievalenabled ? 'Disable retrieval' : 'Enable retrieval',
                 $retrievalenabled ? 'btn btn-outline-warning btn-sm' : 'btn btn-success btn-sm',
                 null,
-                ['enable' => $retrievalenabled ? 0 : 1]
+                ['enable' => $retrievalenabled ? 0 : 1],
+                false,
+                get_string($retrievalenabled ? 'disableretrieval_tooltip' : 'enableretrieval_tooltip', 'local_ragassistant')
             );
         }
         $actions[] = local_ragassistant_document_action_form(
@@ -674,13 +707,17 @@ foreach ($pageddocuments as $document) {
             'delete',
             'Delete',
             'btn btn-outline-danger btn-sm',
-            'return confirm("Delete this document and its indexed content permanently?");'
+            'return confirm("Delete this document and its indexed content permanently?");',
+            [],
+            false,
+            get_string('deletedocument_tooltip', 'local_ragassistant')
         );
     } else if ($active) {
         $actions[] = html_writer::tag('button', 'Processing…', [
             'type' => 'button',
             'class' => 'btn btn-outline-secondary btn-sm',
             'disabled' => 'disabled',
+            'title' => get_string('processingdocument_tooltip', 'local_ragassistant'),
         ]);
     }
 
@@ -735,6 +772,10 @@ if (empty($table->data)) {
     $emptycell->colspan = count($table->head);
     $table->data[] = [$emptycell];
 }
+// The table and its paging bar share a container so the paging script can swap them
+// in place (see $polljs below) instead of reloading the whole page.
+ob_start();
+echo html_writer::start_div('ragassistant-paged-section', ['id' => 'ragassistant-documents-section']);
 echo html_writer::div(
     html_writer::table($table),
     'table-responsive'
@@ -754,6 +795,9 @@ if ($doctotal > $docperpage) {
         'ragassistant-docs-paging'
     );
 }
+echo html_writer::end_div(); // End ragassistant-documents-section.
+$pagedsections['ragassistant-documents-section'] = ob_get_clean();
+echo $pagedsections['ragassistant-documents-section'];
 echo html_writer::end_div();
 
 if ($canmanage) {
@@ -817,13 +861,16 @@ if ($canmanage) {
                     $hassuggestion ? 'Regenerate' : 'Generate',
                     'btn btn-outline-primary btn-sm',
                     $hassuggestion ? 'return confirm("Regenerate only this suggestion?");' : null,
-                    ['slot' => $slot]
+                    ['slot' => $slot],
+                    false,
+                    get_string($hassuggestion ? 'regeneratesuggestion_tooltip' : 'generatesuggestion_tooltip', 'local_ragassistant')
                 );
             } else if ($status === 'generating') {
                 $actioncontent = html_writer::tag('button', 'Generating…', [
                     'type' => 'button',
                     'class' => 'btn btn-outline-secondary btn-sm',
                     'disabled' => 'disabled',
+                    'title' => get_string('generatingsuggestion_tooltip', 'local_ragassistant'),
                 ]);
             } else {
                 $actioncontent = html_writer::span('Available after indexing', 'text-muted');
@@ -867,6 +914,8 @@ if ($canmanage) {
             'class' => 'ragassistant-card-heading',
         ]
     );
+    ob_start();
+    echo html_writer::start_div('ragassistant-paged-section', ['id' => 'ragassistant-suggestions-section']);
     echo html_writer::div(
         html_writer::table($suggestiontable),
         'table-responsive'
@@ -886,6 +935,9 @@ if ($canmanage) {
             'ragassistant-docs-paging'
         );
     }
+    echo html_writer::end_div(); // End ragassistant-suggestions-section.
+    $pagedsections['ragassistant-suggestions-section'] = ob_get_clean();
+    echo $pagedsections['ragassistant-suggestions-section'];
     echo html_writer::end_div();
 
     // Course chat settings card (moved here from the former course settings page).
@@ -923,7 +975,11 @@ if ($canmanage) {
             ['class' => 'ragassistant-policy-option']
         ) .
         html_writer::tag('p', get_string('allowstudentchat_desc', 'local_ragassistant'), ['class' => 'text-muted']) .
-        html_writer::tag('button', get_string('savechanges'), ['type' => 'submit', 'class' => 'btn btn-primary']),
+        html_writer::tag('button', get_string('savechanges'), [
+            'type' => 'submit',
+            'class' => 'btn btn-primary',
+            'title' => get_string('savepolicy_tooltip', 'local_ragassistant'),
+        ]),
         [
             'method' => 'post',
             'action' => (new moodle_url('/local/ragassistant/documents.php', ['courseid' => $courseid]))->out(false),
@@ -931,6 +987,14 @@ if ($canmanage) {
         ]
     );
     echo html_writer::end_div();
+}
+
+if ($fragment) {
+    ob_end_clean();
+    header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store');
+    echo json_encode(['sections' => $pagedsections]);
+    exit;
 }
 
 echo html_writer::div(
@@ -947,6 +1011,11 @@ $statusurl = (new moodle_url('/local/ragassistant/document_status.php', [
 ]))->out(false);
 $polljs = '(function() {
     const url = ' . json_encode($statusurl) . ';
+    const tooltips = ' . json_encode([
+        'generate' => get_string('generatesuggestion_tooltip', 'local_ragassistant'),
+        'regenerate' => get_string('regeneratesuggestion_tooltip', 'local_ragassistant'),
+        'generating' => get_string('generatingsuggestion_tooltip', 'local_ragassistant'),
+    ]) . ';
     const labels = {
         empty: "Not generated",
         generating: "Generating",
@@ -985,6 +1054,7 @@ $polljs = '(function() {
             button.className = "btn btn-outline-secondary btn-sm";
             button.disabled = true;
             button.textContent = "Generating…";
+            button.title = tooltips.generating;
             actionbox.appendChild(button);
         } else if (actionbox.dataset.documentReady === "1") {
             const form = document.createElement("form");
@@ -1006,6 +1076,7 @@ $polljs = '(function() {
             button.type = "submit";
             button.className = "btn btn-outline-primary btn-sm";
             button.textContent = hasText ? "Regenerate" : "Generate";
+            button.title = hasText ? tooltips.regenerate : tooltips.generate;
             if (hasText) {
                 form.addEventListener("submit", function(event) {
                     if (!window.confirm("Regenerate only this suggestion?")) event.preventDefault();
@@ -1083,20 +1154,113 @@ $polljs = '(function() {
                 window.location.reload();
                 return;
             }
-            if (active || activeSuggestions) window.setTimeout(poll, 2500);
+            if (active || activeSuggestions) {
+                window.setTimeout(poll, 2500);
+            } else {
+                polling = false;
+            }
         } catch (error) {
             window.setTimeout(poll, 5000);
         }
     }
 
-    const hasActiveDocuments = document.querySelector(
-        ".ragassistant-processing-status[data-status=\\"pending\\"], " +
-        ".ragassistant-processing-status[data-status=\\"processing\\"]"
-    );
-    const hasGeneratingSuggestions = document.querySelector(
-        ".ragassistant-suggestion-status .text-info"
-    );
-    if (hasActiveDocuments || hasGeneratingSuggestions) poll();
+    // Start polling once; poll() keeps itself going while jobs are active.
+    let polling = false;
+    function startPollingIfActive() {
+        const hasActiveDocuments = document.querySelector(
+            ".ragassistant-processing-status[data-status=\\"pending\\"], " +
+            ".ragassistant-processing-status[data-status=\\"processing\\"]"
+        );
+        const hasGeneratingSuggestions = document.querySelector(
+            ".ragassistant-suggestion-status .text-info"
+        );
+        if (!polling && (hasActiveDocuments || hasGeneratingSuggestions)) {
+            polling = true;
+            poll();
+        }
+    }
+    startPollingIfActive();
+
+    // Paging without a full reload: request only the two paged sections (fragment=1,
+    // JSON) and swap them in place. Both are refreshed together because each section\'s
+    // links carry the other section\'s page number. Falls back to normal navigation.
+    const sectionIds = ["ragassistant-documents-section", "ragassistant-suggestions-section"];
+    let pageRequest = 0;
+    // Short-lived prefetch started on hover, so most clicks find the response ready.
+    const prefetched = new Map();
+    const PREFETCH_TTL = 10000;
+
+    function fetchSections(href) {
+        const cached = prefetched.get(href);
+        if (cached && Date.now() - cached.time < PREFETCH_TTL) {
+            prefetched.delete(href);
+            return cached.promise;
+        }
+        const fragmentUrl = new URL(href, window.location.href);
+        fragmentUrl.searchParams.set("fragment", "1");
+        return fetch(fragmentUrl.toString(), {
+            credentials: "same-origin",
+            headers: {"Accept": "application/json"}
+        }).then(function(response) {
+            if (!response.ok) throw new Error("HTTP " + response.status);
+            return response.json();
+        });
+    }
+
+    function prefetch(href) {
+        const cached = prefetched.get(href);
+        if (cached && Date.now() - cached.time < PREFETCH_TTL) return;
+        const promise = fetchSections(href);
+        promise.catch(function() { prefetched.delete(href); });
+        prefetched.set(href, {promise: promise, time: Date.now()});
+    }
+
+    async function loadPage(href, push) {
+        const requestId = ++pageRequest;
+        const sections = sectionIds
+            .map(function(id) { return document.getElementById(id); })
+            .filter(Boolean);
+        sections.forEach(function(section) { section.setAttribute("aria-busy", "true"); });
+        try {
+            const payload = await fetchSections(href);
+            // A newer click has started; drop this response.
+            if (requestId !== pageRequest) return;
+            const fresh = (payload && payload.sections) || {};
+            const missing = sections.some(function(section) { return !fresh[section.id]; });
+            if (missing) throw new Error("Paged section missing from response");
+            sections.forEach(function(section) {
+                const template = document.createElement("template");
+                template.innerHTML = fresh[section.id].trim();
+                section.replaceWith(template.content.firstElementChild);
+            });
+            // Cached prefetches belong to the old page numbers; drop them.
+            prefetched.clear();
+            if (push) window.history.pushState({ragassistantPage: true}, "", href);
+            startPollingIfActive();
+        } catch (error) {
+            if (requestId === pageRequest) window.location.href = href;
+        }
+    }
+
+    document.addEventListener("pointerover", function(event) {
+        const link = event.target.closest(".ragassistant-paged-section .ragassistant-docs-paging a[href]");
+        if (link) prefetch(link.href);
+    });
+
+    document.addEventListener("click", function(event) {
+        const link = event.target.closest(".ragassistant-paged-section .ragassistant-docs-paging a[href]");
+        if (!link || event.defaultPrevented || event.button !== 0 ||
+                event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) {
+            return;
+        }
+        event.preventDefault();
+        loadPage(link.href, true);
+    });
+
+    // Back/forward between paged views swaps the sections the same way.
+    window.addEventListener("popstate", function() {
+        loadPage(window.location.href, false);
+    });
 })();';
 echo html_writer::script($polljs);
 echo $OUTPUT->footer();

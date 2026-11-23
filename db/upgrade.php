@@ -120,5 +120,11 @@ function xmldb_local_ragassistant_upgrade(int $oldversion): bool
         upgrade_plugin_savepoint(true, 2026111600, 'local', 'ragassistant');
     }
 
+    if ($oldversion < 2026112300) {
+        // New capability local/ragassistant:reindexdocuments (manager only). Moodle
+        // installs capabilities from db/access.php automatically during the upgrade.
+        upgrade_plugin_savepoint(true, 2026112300, 'local', 'ragassistant');
+    }
+
     return true;
 }

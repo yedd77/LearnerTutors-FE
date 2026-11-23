@@ -26,4 +26,14 @@ $capabilities = [
             'manager' => CAP_ALLOW,
         ],
     ],
+    // Reindexing a document is reserved for roles above teacher (manager; site admins
+    // have every capability). Teachers keep the other document actions.
+    'local/ragassistant:reindexdocuments' => [
+        'riskbitmask' => RISK_PERSONAL,
+        'captype' => 'write',
+        'contextlevel' => CONTEXT_COURSE,
+        'archetypes' => [
+            'manager' => CAP_ALLOW,
+        ],
+    ],
 ];
