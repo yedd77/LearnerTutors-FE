@@ -71,6 +71,82 @@ function local_ragassistant_illustration_url($value, string $baseurl): ?string
     return rtrim($baseurl, '/') . '/' . ltrim($url, '/');
 }
 
+/**
+ * Validate the backend's optional "download" field (a study sheet PDF is ready).
+ *
+ * Only the expected keys are passed on, and file_id must be 32 lowercase hex characters.
+ * The file is fetched later through download_sheet.php, never from the backend directly.
+ *
+ * @param mixed $value
+ * @return array|null
+ */
+function local_ragassistant_clean_download($value): ?array
+{
+    if (!is_array($value) || !is_string($value['file_id'] ?? null) ||
+            !preg_match('/^[0-9a-f]{32}$/', $value['file_id'])) {
+        return null;
+    }
+
+    return [
+        'file_id' => $value['file_id'],
+        'filename' => clean_filename((string) ($value['filename'] ?? 'study_sheet.pdf')),
+        'expires_at' => (int) ($value['expires_at'] ?? 0),
+        'ttl_minutes' => (int) ($value['ttl_minutes'] ?? 0),
+        'pages' => (int) ($value['pages'] ?? 1),
+    ];
+}
+
+/**
+ * Read a typed reply to the "search more widely?" question as approve or decline.
+ *
+ * Only short, clear answers count; anything longer or unclear returns null and is sent
+ * as an ordinary chat message.
+ *
+ * @param string $text The student's message.
+ * @return string|null 'approve', 'decline' or null.
+ */
+function local_ragassistant_typed_decision(string $text): ?string
+{
+    $text = core_text::strtolower(trim(preg_replace('/[\s.!,]+/u', ' ', $text)));
+    $approve = ['y', 'yes', 'yes please', 'yeah', 'yep', 'sure', 'ok', 'okay', 'go ahead',
+        'please do', 'do it', 'yes search more widely', 'search more widely'];
+    $decline = ['n', 'no', 'no thanks', 'no thank you', 'nope', 'cancel', 'no cancel', 'stop',
+        'never mind', 'nevermind'];
+    if (in_array($text, $approve, true)) {
+        return 'approve';
+    }
+    if (in_array($text, $decline, true)) {
+        return 'decline';
+    }
+    return null;
+}
+
+/**
+ * Validate the backend's optional "pending_action" field (approve/decline question).
+ *
+ * The token is opaque and signed by the backend; it is passed through unchanged and
+ * only its type and length are checked.
+ *
+ * @param mixed $value
+ * @return array|null
+ */
+function local_ragassistant_clean_pending_action($value): ?array
+{
+    if (!is_array($value) || ($value['type'] ?? '') !== 'expand_notes_search' ||
+            !is_string($value['token'] ?? null) || $value['token'] === '' ||
+            strlen($value['token']) > 4096) {
+        return null;
+    }
+
+    return [
+        'type' => 'expand_notes_search',
+        'token' => $value['token'],
+        'expires_at' => (int) ($value['expires_at'] ?? 0),
+        'approve_label' => clean_param((string) ($value['approve_label'] ?? ''), PARAM_TEXT),
+        'decline_label' => clean_param((string) ($value['decline_label'] ?? ''), PARAM_TEXT),
+    ];
+}
+
 // Input handling and access control setup.
 $courseid = required_param('courseid', PARAM_INT);
 $course = get_course($courseid);
@@ -90,7 +166,7 @@ if (!$canmanage && !$canusechat) {
 // Managers can use chat regardless of the student policy, provided they also
 // have the useassistant capability. Chat must also be enabled site-wide.
 $enabled = (bool) get_config('local_ragassistant', 'enable_chat');
-$allowed = $enabled && $canusechat && ($canmanage || (bool) $policy->allowstudentchat);
+$allowed = course_policy::can_use_chat($courseid, $context);
 
 $pageurl = new moodle_url('/local/ragassistant/index.php', ['courseid' => $courseid]);
 
@@ -106,6 +182,10 @@ $PAGE->set_course($course);
 $PAGE->set_title(get_string('pluginname', 'local_ragassistant'));
 $PAGE->set_heading(format_string($course->fullname));
 $PAGE->requires->js(new moodle_url('/local/ragassistant/chat.js'));
+$PAGE->requires->strings_for_js([
+    'downloadpdf', 'downloadpdfaria', 'downloadavailableuntil', 'downloadbusy',
+    'downloadexpired', 'downloadfailed',
+], 'local_ragassistant');
 $PAGE->requires->css(new moodle_url('/local/ragassistant/styles.css'));
 
 // Set session history if available.
@@ -204,6 +284,19 @@ if (data_submitted() && confirm_sesskey()) {
         $displayquestion = $question;
     }
 
+    // Typed answer to a backend "widen the /notes search?" question. The question's token
+    // is kept in the session (never sent to the browser). The student's next message
+    // answers it when it is a clear yes or no; anything else is an ordinary message and
+    // drops the question. Either way the question can only be answered once.
+    $pendingtoken = '';
+    $pendingdecision = local_ragassistant_typed_decision($question);
+    $savedpending = $SESSION->local_ragassistant_pending[$courseid] ?? null;
+    unset($SESSION->local_ragassistant_pending[$courseid]);
+    if (is_array($savedpending) && $pendingdecision !== null && $toolid === '') {
+        $pendingtoken = (string) ($savedpending['token'] ?? '');
+    }
+    $haspendingdecision = $pendingtoken !== '' && strlen($pendingtoken) <= 4096;
+
     // Check if chat is allowed for the user
     if (!$allowed) {
         $error = $enabled ? get_string('studentchatdisabled', 'local_ragassistant') : get_string('chatdisabledreason', 'local_ragassistant');
@@ -266,6 +359,11 @@ if (data_submitted() && confirm_sesskey()) {
                     $chatrequest['fallback_provider'] = 'ollama';
                     $chatrequest['fallback_model'] = $fallbackmodel;
                 }
+                // The backend requires both fields or neither (422 otherwise).
+                if ($haspendingdecision) {
+                    $chatrequest['pending_action_token'] = $pendingtoken;
+                    $chatrequest['pending_decision'] = $pendingdecision;
+                }
                 $response = $apiclient->post_json('/api/v1/chat', $chatrequest);
             } finally {
                 if ($sessionclosed) {
@@ -286,10 +384,26 @@ if (data_submitted() && confirm_sesskey()) {
                 (new \local_ragassistant\local\api_client())->get_base_url()
             );
 
+            // Optional /notes fields; both are absent for every other command.
+            $download = local_ragassistant_clean_download($response['download'] ?? null);
+            $pendingaction = local_ragassistant_clean_pending_action($response['pending_action'] ?? null);
+
+            // Remember a new "search more widely?" question so the student's next typed
+            // yes/no can answer it. Only the token and expiry are kept, in the session.
+            if ($pendingaction) {
+                $SESSION->local_ragassistant_pending[$courseid] = [
+                    'token' => $pendingaction['token'],
+                    'expires_at' => $pendingaction['expires_at'],
+                ];
+            }
+
             $history[] = [
                 'question' => $displayquestion,
                 'answer' => $answer,
                 'illustration_url' => $illustrationurl,
+                // Kept so the Download PDF button is shown again after a reload. The
+                // approve/decline question is not kept: it is only answerable once.
+                'download' => $download,
                 'sources' => is_array($response['sources'] ?? null)
                     ? $response['sources']
                     : [],
@@ -314,6 +428,7 @@ if (data_submitted() && confirm_sesskey()) {
                     'sources' => is_array($response['sources'] ?? null)
                         ? $response['sources']
                         : [],
+                    'download' => $download,
                 ], JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
                 exit;
             }
@@ -396,7 +511,14 @@ if ($error !== '') {
 if ($canusechat) {
     // Render chat element
     echo html_writer::start_div(
-        'ragassistant-chat-app' . (!empty($history) ? ' ragassistant-chat-active' : '')
+        'ragassistant-chat-app' . (!empty($history) ? ' ragassistant-chat-active' : ''),
+        [
+            // Study sheet PDFs are fetched through this Moodle proxy, never from the backend.
+            'data-download-url' => (new moodle_url('/local/ragassistant/download_sheet.php', [
+                'courseid' => $courseid,
+            ]))->out(false),
+            'data-pdf-icon' => $OUTPUT->image_url('f/pdf')->out(false),
+        ]
     );
 
     // Display the new chat button only when conversation history exists.
@@ -455,7 +577,12 @@ if ($canusechat) {
             ),
             'ragassistant-message ragassistant-message-user'
         );
-        echo html_writer::start_div('ragassistant-message ragassistant-message-assistant');
+        // A saved study sheet download is re-rendered by chat.js (expired state included).
+        $savedownload = local_ragassistant_clean_download($turn['download'] ?? null);
+        echo html_writer::start_div(
+            'ragassistant-message ragassistant-message-assistant',
+            $savedownload ? ['data-download' => json_encode($savedownload)] : []
+        );
         // Header: decorative avatar and the assistant's name, above the answer.
         echo html_writer::div(
             html_writer::tag('div', '✦', ['class' => 'ragassistant-assistant-avatar', 'aria-hidden' => 'true']) .

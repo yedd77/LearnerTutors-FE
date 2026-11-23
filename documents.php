@@ -218,7 +218,7 @@ $context = context_course::instance($course->id);
 // which on sites with developer debugging shows a full debug page with request data.
 $canmanage = has_capability('local/ragassistant:managedocuments', $context);
 if (!$canmanage) {
-    redirect(
+    redirect(   
         new moodle_url('/local/ragassistant/index.php', ['courseid' => $courseid]),
         get_string('nomanagedocuments', 'local_ragassistant'),
         null,

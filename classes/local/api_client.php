@@ -559,6 +559,80 @@ class api_client
     }
 
     /**
+     * Fetch a temporary generated file (a /notes study sheet PDF) from the backend.
+     *
+     * Unlike the JSON helpers this returns the raw status and body, so the caller can
+     * tell "not found" (404) from "expired" (410). The body is never logged.
+     *
+     * @param string $fileid 32 lowercase hex characters (validated here as well).
+     * @param int $courseid Course the file was generated in.
+     * @param int $userid Must be the logged-in user's id; the backend only serves the owner.
+     * @return array{status:int, body:string, filename:string, contenttype:string}
+     */
+    public function get_generated_file(string $fileid, int $courseid, int $userid): array
+    {
+        if (!preg_match('/^[0-9a-f]{32}$/', $fileid)) {
+            throw new \moodle_exception('backendinvalidresponse', 'local_ragassistant');
+        }
+
+        $handle = curl_init(
+            $this->get_base_url() .
+            '/api/v1/generated-files/' . $fileid . '?' .
+            http_build_query(['course_id' => $courseid, 'user_id' => $userid], '', '&', PHP_QUERY_RFC3986)
+        );
+
+        if ($handle === false) {
+            throw new \moodle_exception('backendconnectionfailed', 'local_ragassistant');
+        }
+
+        $headers = [];
+        curl_setopt_array($handle, [
+            CURLOPT_HTTPGET => true,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_CONNECTTIMEOUT => 5,
+            CURLOPT_SSL_VERIFYPEER => true,
+            CURLOPT_SSL_VERIFYHOST => 2,
+            CURLOPT_TIMEOUT => 60,
+            CURLOPT_HTTPHEADER => [
+                'Accept: application/pdf',
+                'X-RAG-API-Key: ' . $this->get_api_key(),
+            ],
+            CURLOPT_HEADERFUNCTION => function ($curl, $line) use (&$headers) {
+                $parts = explode(':', $line, 2);
+                if (count($parts) === 2) {
+                    $headers[strtolower(trim($parts[0]))] = trim($parts[1]);
+                }
+                return strlen($line);
+            },
+        ]);
+
+        $body = curl_exec($handle);
+        $error = curl_error($handle);
+        $status = (int) curl_getinfo($handle, CURLINFO_HTTP_CODE);
+        curl_close($handle);
+
+        if ($body === false || $error !== '') {
+            throw new \moodle_exception('backendconnectionfailed', 'local_ragassistant', '', null, $error);
+        }
+
+        // Filename from Content-Disposition (filename*=UTF-8''... or filename="...").
+        $filename = '';
+        $disposition = $headers['content-disposition'] ?? '';
+        if (preg_match("/filename\\*=UTF-8''([^;]+)/i", $disposition, $m)) {
+            $filename = rawurldecode(trim($m[1], '"'));
+        } else if (preg_match('/filename="?([^";]+)"?/i', $disposition, $m)) {
+            $filename = $m[1];
+        }
+
+        return [
+            'status' => $status,
+            'body' => (string) $body,
+            'filename' => $filename,
+            'contenttype' => strtolower(trim(explode(';', $headers['content-type'] ?? '')[0])),
+        ];
+    }
+
+    /**
      * Validate HTTP status and decode the backend response.
      */
     private function decode_response($body, string $error, int $status): array

@@ -18,6 +18,27 @@ class course_policy {
     }
 
     /**
+     * Whether the current user may use the AI chat in this course: chat must be enabled
+     * site-wide, the user needs useassistant, and students also need the course's
+     * "allow students to use the AI chat" setting (managers are always allowed).
+     *
+     * Shared by the chat page and every endpoint that serves chat output (for example
+     * the study sheet download proxy), so they all apply the same rule.
+     */
+    public static function can_use_chat(int $courseid, \context $context): bool {
+        if (!get_config('local_ragassistant', 'enable_chat')) {
+            return false;
+        }
+        if (!has_capability('local/ragassistant:useassistant', $context)) {
+            return false;
+        }
+        if (has_capability('local/ragassistant:managedocuments', $context)) {
+            return true;
+        }
+        return (bool) self::get($courseid)->allowstudentchat;
+    }
+
+    /**
      * Save a policy row for a course.
      *
      * Student (personal) uploads were removed because the backend no longer indexes them,

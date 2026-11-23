@@ -11,6 +11,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const sendButtonContent = sendButton ? sendButton.innerHTML : '';
     let activeLoadingMessage = null;
     let requestInProgress = false;
+    let runChatRequest = null;   // set below once the composer form is wired up
     let activeThinkingTimer = null;
     const MAXLEN = 4000;
 
@@ -345,6 +346,170 @@ document.addEventListener('DOMContentLoaded', function () {
         content.appendChild(wrapper);
     }
 
+    // Language strings passed from PHP with strings_for_js (English fallback just in case).
+    function str(id, a, fallback) {
+        try {
+            if (window.M && M.util && M.util.get_string) {
+                const value = M.util.get_string(id, 'local_ragassistant', a);
+                if (value && value.indexOf('[[') !== 0) {
+                    return value;
+                }
+            }
+        } catch (error) {
+            // Fall through to the fallback text.
+        }
+        return fallback;
+    }
+
+    function isExpired(expiresAt) {
+        return Number(expiresAt) > 0 && Date.now() / 1000 > Number(expiresAt);
+    }
+
+    function showNotice(container, text, isError) {
+        let notice = container.querySelector('.ragassistant-action-notice');
+        if (!notice) {
+            notice = document.createElement('p');
+            notice.className = 'ragassistant-action-notice';
+            notice.setAttribute('role', 'status');
+            container.appendChild(notice);
+        }
+        notice.classList.toggle('text-danger', !!isError);
+        notice.textContent = text;
+    }
+
+    // "Download PDF" button for a /notes study sheet. The file is fetched through the
+    // Moodle proxy (download_sheet.php), which adds the API key and the user's id on the
+    // server. 404/410 show an inline "expired" notice instead of a broken download.
+    function appendDownload(content, download) {
+        if (!content || !download || typeof download !== 'object' ||
+                !/^[0-9a-f]{32}$/.test(String(download.file_id || ''))) {
+            return;
+        }
+
+        const proxyUrl = chatApp ? chatApp.dataset.downloadUrl : '';
+        const sesskeyInput = form ? form.querySelector('input[name="sesskey"]') : null;
+        const filename = String(download.filename || 'study_sheet.pdf');
+        const expiredText = str('downloadexpired', null,
+            'This study sheet has expired. Send /notes again to create a new one.');
+
+        const box = document.createElement('div');
+        box.className = 'ragassistant-download';
+
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'btn btn-primary ragassistant-download-btn';
+        button.setAttribute('aria-label', str('downloadpdfaria', filename, 'Download PDF: ' + filename));
+        if (chatApp && chatApp.dataset.pdfIcon) {
+            const icon = document.createElement('img');
+            icon.className = 'ragassistant-download-icon';
+            icon.src = chatApp.dataset.pdfIcon;
+            icon.alt = '';
+            icon.setAttribute('aria-hidden', 'true');
+            button.appendChild(icon);
+        }
+        const label = document.createElement('span');
+        label.textContent = str('downloadpdf', null, 'Download PDF');
+        button.appendChild(label);
+
+        const meta = document.createElement('p');
+        meta.className = 'ragassistant-download-meta';
+        const expiresAt = Number(download.expires_at) || 0;
+        const until = expiresAt > 0
+            ? new Date(expiresAt * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            : '';
+        meta.textContent = (until ? str('downloadavailableuntil', until, 'Available until ' + until) + ' · ' : '') +
+            filename;
+
+        box.append(button, meta);
+        content.appendChild(box);
+
+        function markExpired() {
+            button.disabled = true;
+            button.removeAttribute('aria-busy');
+            showNotice(box, expiredText, false);
+        }
+
+        if (isExpired(expiresAt) || !proxyUrl || !sesskeyInput) {
+            markExpired();
+            return;
+        }
+
+        button.addEventListener('click', async function () {
+            if (isExpired(expiresAt)) {
+                markExpired();
+                return;
+            }
+
+            button.disabled = true;
+            button.setAttribute('aria-busy', 'true');
+            label.textContent = str('downloadbusy', null, 'Downloading…');
+
+            try {
+                const url = new URL(proxyUrl, window.location.href);
+                url.searchParams.set('id', download.file_id);
+                url.searchParams.set('sesskey', sesskeyInput.value);
+                const response = await fetch(url.href, { credentials: 'same-origin' });
+
+                if (response.status === 404 || response.status === 410) {
+                    markExpired();
+                    return;
+                }
+                if (!response.ok) {
+                    let message = str('downloadfailed', null,
+                        'The download did not complete. Check your connection and try again.');
+                    try {
+                        const data = await response.json();
+                        if (data && typeof data.message === 'string') {
+                            message = data.message;
+                        }
+                    } catch (error) {
+                        // Not JSON: keep the generic message.
+                    }
+                    const serverError = new Error(message);
+                    serverError.fromServer = true;
+                    throw serverError;
+                }
+
+                const blob = await response.blob();
+                const objectUrl = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = objectUrl;
+                link.download = filename;
+                link.style.display = 'none';
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+                window.setTimeout(function () { URL.revokeObjectURL(objectUrl); }, 10000);
+
+                const notice = box.querySelector('.ragassistant-action-notice');
+                if (notice) {
+                    notice.remove();
+                }
+                button.disabled = false;
+            } catch (error) {
+                // Show the proxy's own message when it sent one; otherwise (a network
+                // error such as "Failed to fetch") show the friendly retry text.
+                showNotice(box, error && error.fromServer ? error.message : str('downloadfailed', null,
+                    'The download did not complete. Check your connection and try again.'), true);
+                button.disabled = false;
+            } finally {
+                button.removeAttribute('aria-busy');
+                label.textContent = str('downloadpdf', null, 'Download PDF');
+            }
+        });
+    }
+
+    // Saved study sheet downloads in the server-rendered history.
+    document.querySelectorAll('.ragassistant-message-assistant[data-download]').forEach(function (message) {
+        let download = null;
+        try {
+            download = JSON.parse(message.dataset.download);
+        } catch (error) {
+            return;
+        }
+        appendDownload(message.querySelector('.ragassistant-message-content'), download);
+    });
+
     function highlightMessageCommand(content) {
         const text = content.textContent;
         const lead = text.match(/^(\s*)(\/[^\s]*)(?=\s|$)/);
@@ -415,6 +580,16 @@ document.addEventListener('DOMContentLoaded', function () {
                 return;
             }
 
+            await runChatRequest(cleanQuestion, originalQuestion, { clearEditor: true });
+        });
+
+        // Send one chat request and render the reply. options.fields adds extra form
+        // fields; options.clearEditor empties the composer once the request is sent.
+        runChatRequest = async function (cleanQuestion, originalQuestion, options) {
+            options = options || {};
+            if (requestInProgress) {
+                return;
+            }
             requestInProgress = true;
 
             // Switch to the conversation layout before measuring where the new message
@@ -426,6 +601,9 @@ document.addEventListener('DOMContentLoaded', function () {
             formData.set('question', cleanQuestion);
             formData.set('display_question', originalQuestion);
             formData.set('ajax', '1');
+            Object.entries(options.fields || {}).forEach(function ([name, value]) {
+                formData.set(name, value);
+            });
 
             // Remove the welcome message when the first real question is sent.
             const welcome = transcript.querySelector(
@@ -457,14 +635,21 @@ document.addEventListener('DOMContentLoaded', function () {
             pinnedMessage = userMessage;
             scrollMessageToViewTop(userMessage);
 
+            // Check a few times a second but only touch the DOM when the shown
+            // second changes, so the counter never skips or stalls a second
+            // because of interval drift.
             const thinkingStartedAt = Date.now();
+            let shownSeconds = 0;
             const thinkingTimer = window.setInterval(function () {
                 const elapsedSeconds = Math.floor(
                     (Date.now() - thinkingStartedAt) / 1000
                 );
-                thinkingLabel.textContent = 'Thinking for ' +
-                    elapsedSeconds + 's';
-            }, 1000);
+                if (elapsedSeconds !== shownSeconds) {
+                    shownSeconds = elapsedSeconds;
+                    thinkingLabel.textContent = 'Thinking for ' +
+                        elapsedSeconds + 's';
+                }
+            }, 250);
             activeThinkingTimer = thinkingTimer;
 
             if (sendButton) {
@@ -473,11 +658,13 @@ document.addEventListener('DOMContentLoaded', function () {
                 sendButton.setAttribute('aria-busy', 'true');
             }
 
-            editor.textContent = '';
-            editor.dispatchEvent(new Event('input', { bubbles: true }));
+            if (options.clearEditor) {
+                editor.textContent = '';
+                editor.dispatchEvent(new Event('input', { bubbles: true }));
 
-            if (toolInput) {
-                toolInput.value = '';
+                if (toolInput) {
+                    toolInput.value = '';
+                }
             }
 
             try {
@@ -513,6 +700,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 );
 
                 appendIllustration(content, result.illustration_url);
+                appendDownload(content, result.download);
                 appendSources(content, result.sources);
 
                 // Show the question at the top of the view with as much of the answer as
@@ -548,7 +736,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 requestInProgress = false;
                 editor.focus();
             }
-        });
+        };
     }
 
     // ---- Text and caret helpers -------------------------------------------

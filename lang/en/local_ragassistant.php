@@ -216,3 +216,12 @@ $string['assistantname'] = 'LearnerTutors';
 $string['ragassistant:useassistant'] = 'Use the LearnerTutors AI chat';
 $string['ragassistant:managedocuments'] = 'Manage LearnerTutors course documents';
 $string['nomanagedocuments'] = 'Only lecturers can manage course materials.';
+
+// Study sheet (/notes) PDF download.
+$string['downloadpdf'] = 'Download PDF';
+$string['downloadpdfaria'] = 'Download PDF: {$a}';
+$string['downloadavailableuntil'] = 'Available until {$a}';
+$string['downloadbusy'] = 'Downloading…';
+$string['downloadexpired'] = 'This study sheet has expired. Send /notes again to create a new one.';
+$string['downloadfailed'] = 'The download did not complete. Check your connection and try again.';
+$string['downloadunavailable'] = 'The study sheet could not be downloaded right now. Try again later.';
