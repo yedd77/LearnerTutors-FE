@@ -137,6 +137,19 @@ $string['reuse_chat_api_key'] = 'Reuse chat provider API key';
 $string['reuse_chat_api_key_desc'] = 'If the provider for image generation is the same as the chat provider, and use the same API key, you can reuse the chat provider API key. ';
 $string['image_provider_api_key'] = 'Image generation provider API key';
 $string['image_provider_api_key_desc'] = 'Enter the API key for the selected image generation provider.';
+// Text embedding model configuration
+$string['embedding_heading'] = 'Text embedding model configuration';
+$string['embedding_heading_desc'] = 'Configure the text embedding model used for document indexing and retrieval.';
+$string['embedding_provider'] = 'Text embedding provider';
+$string['embedding_provider_desc'] = 'Select the provider for the text embedding model.';
+$string['embedding_provider_server'] = 'Use the server setting';
+$string['embedding_change_warning'] = 'Changing the model may reduce RAG performance and will trigger automatic reindexing. This process can consume a significant number of tokens, depending on how many documents have already been uploaded.';
+$string['embedding_reuse_chat_api_key'] = 'Reuse chat provider API key';
+$string['embedding_reuse_chat_api_key_desc'] = 'If the text embedding provider is the same as the chat provider and uses the same API key, you can reuse the chat provider API key.';
+$string['embedding_model'] = 'Text embedding model';
+$string['embedding_model_desc'] = 'Enter the text embedding model identifier corresponding to the selected provider.';
+$string['embedding_provider_api_key'] = 'Text embedding provider API key';
+$string['embedding_provider_api_key_desc'] = 'Enter the API key for the selected text embedding';
 // Local LLM fallback
 $string['fallback_heading'] = 'Local LLM fallback';
 $string['fallback_heading_desc'] = 'Configure the local Ollama model. This model will be run inside local environments when the primary cloud model call fails. The provider is fixed to Ollama.';
@@ -150,6 +163,7 @@ $string['configurationhealth_desc'] = 'Check the connectivity of the RAG system 
 $string['healthcheck_test_server'] = 'Application Server';
 $string['healthcheck_test_llm'] = 'LLM provider and model';
 $string['healthcheck_test_image'] = 'Image generation provider and model';
+$string['healthcheck_test_embedding'] = 'Text embedding provider and model';
 $string['healthcheck_test_fallback'] = 'Local fallback model (Ollama)';
 
 
@@ -223,6 +237,7 @@ $string['healthcheck_savelocked'] = 'Run the configuration tests below. Every ch
 $string['healthcheck_elapsed'] = '{$a} s elapsed. AI checks can take up to a minute.';
 $string['healthcheck_stale'] = 'Settings changed. Run the tests again.';
 $string['healthcheck_notneeded'] = 'Not needed: chat already uses Ollama.';
+$string['healthcheck_embedding_notneeded'] = 'Not needed: the server\'s own embedding setting is used.';
 $string['assistantname'] = 'LearnerTutors';
 // Capability names (shown on permission pages and in "no permission" errors).
 $string['ragassistant:useassistant'] = 'Use the LearnerTutors AI chat';

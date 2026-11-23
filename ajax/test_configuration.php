@@ -155,6 +155,8 @@ function local_ragassistant_healthcheck_overrides(string $rawconfig): array {
     $providers = [
         'llm_provider' => ['openai', 'gemini', 'ollama'],
         'image_provider' => ['openai', 'gemini'],
+        // Blank means "use the server's own embedding setting".
+        'embedding_provider' => ['', 'openai', 'gemini', 'ollama'],
     ];
     foreach ($providers as $name => $allowed) {
         if (isset($config[$name]) && in_array($config[$name], $allowed, true)) {
@@ -162,19 +164,21 @@ function local_ragassistant_healthcheck_overrides(string $rawconfig): array {
         }
     }
 
-    foreach (['llm_model', 'fallback_model', 'image_model'] as $name) {
+    foreach (['llm_model', 'fallback_model', 'image_model', 'embedding_model'] as $name) {
         if (array_key_exists($name, $config) && is_string($config[$name])) {
             $overrides[$name] = core_text::substr(trim(clean_param($config[$name], PARAM_TEXT)), 0, 160);
         }
     }
 
-    if (array_key_exists('reuse_chat_api_key', $config)) {
-        $overrides['reuse_chat_api_key'] = !empty($config['reuse_chat_api_key']);
+    foreach (['reuse_chat_api_key', 'embedding_reuse_chat_api_key'] as $name) {
+        if (array_key_exists($name, $config)) {
+            $overrides[$name] = !empty($config[$name]);
+        }
     }
 
     // Keys the administrator typed but has not saved yet, including the application key.
     // Blank means "use the saved key". Testing never saves anything.
-    foreach (['provider_api_key', 'image_provider_api_key', 'api_key'] as $name) {
+    foreach (['provider_api_key', 'image_provider_api_key', 'embedding_provider_api_key', 'api_key'] as $name) {
         if (isset($config[$name]) && is_string($config[$name])) {
             $value = trim($config[$name]);
             if ($value !== '' && strlen($value) <= 512) {
@@ -212,12 +216,12 @@ try {
     // Only the checks the page asks for run, for example just the ones that failed last
     // time. Every AI check needs the backend, so it re-checks the server too. The backend
     // always tests the LLM, so any AI run also reports the LLM.
-    $alltests = ['server', 'cron', 'llm', 'image', 'fallback'];
+    $alltests = ['server', 'cron', 'llm', 'image', 'embedding', 'fallback'];
     $requested = array_values(array_intersect($alltests, explode(',', optional_param('tests', '', PARAM_TEXT))));
     if (!$requested) {
         $requested = $alltests;
     }
-    $providertests = array_values(array_intersect(['llm', 'image', 'fallback'], $requested));
+    $providertests = array_values(array_intersect(['llm', 'image', 'embedding', 'fallback'], $requested));
     if ($providertests && !in_array('llm', $providertests, true)) {
         array_unshift($providertests, 'llm');
     }
@@ -280,8 +284,8 @@ try {
         }
     }
 
-    // 3-5. Main LLM, image generation and Ollama fallback. The backend runs these
-    // independently and reports pass, fail or skipped for each one.
+    // 3-6. Main LLM, image generation, text embedding and Ollama fallback. The backend
+    // runs these independently and reports pass, fail or skipped for each one.
     if ($providertests) {
         $backendready = isset($results['server']) && $results['server']['status'] === 'pass';
         $llmmodel = $overrides['llm_model'] ?? trim((string) get_config('local_ragassistant', 'chat_model'));
@@ -316,13 +320,21 @@ try {
                 if (!in_array('fallback', $providertests, true)) {
                     $testoverrides['fallback_model'] = '';
                 }
+                // A blank embedding model is valid (the provider's default), so the embedding
+                // check is requested with an explicit flag instead.
+                $testoverrides['test_embedding'] = in_array('embedding', $providertests, true);
                 $response = $client->test_configuration($testoverrides);
                 $reported = (isset($response['results']) && is_array($response['results']))
                     ? $response['results']
                     : $response;
 
-                // The backend reports these checks as llm, fallback_model and image_generation.
-                $backendkeys = ['llm' => 'llm', 'fallback' => 'fallback_model', 'image' => 'image_generation'];
+                // The backend reports these checks as llm, fallback_model, image_generation and embedding.
+                $backendkeys = [
+                    'llm' => 'llm',
+                    'fallback' => 'fallback_model',
+                    'image' => 'image_generation',
+                    'embedding' => 'embedding',
+                ];
                 foreach ($providertests as $test) {
                     $item = $reported[$backendkeys[$test]] ?? null;
                     $status = is_array($item) ? ($item['status'] ?? '') : '';

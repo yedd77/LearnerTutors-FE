@@ -83,7 +83,9 @@ class api_client
      *
      * @param array $overrides Validated unsaved values: llm_provider, llm_model,
      *     fallback_model, image_provider, image_model, reuse_chat_api_key,
-     *     provider_api_key and image_provider_api_key.
+     *     provider_api_key, image_provider_api_key, embedding_provider,
+     *     embedding_model, embedding_reuse_chat_api_key, embedding_provider_api_key
+     *     and test_embedding.
      */
     public function test_configuration(array $overrides = []): array
     {
@@ -91,6 +93,8 @@ class api_client
             ?? trim((string) get_config('local_ragassistant', 'llm_provider'));
         $imageprovider = $overrides['image_provider']
             ?? (trim((string) get_config('local_ragassistant', 'image_provider')) ?: 'openai');
+        $embeddingprovider = $overrides['embedding_provider']
+            ?? trim((string) get_config('local_ragassistant', 'embedding_provider'));
 
         $payload = [
             'llm_provider' => $llmprovider,
@@ -107,6 +111,16 @@ class api_client
             'gemini_api_key' => secret_store::get_provider_api_key('gemini'),
             'openai_image_api_key' => secret_store::get_image_provider_api_key('openai'),
             'gemini_image_api_key' => secret_store::get_image_provider_api_key('gemini'),
+            // Blank provider means "use the server's own embedding setting".
+            'embedding_provider' => $embeddingprovider,
+            'embedding_model' => $overrides['embedding_model']
+                ?? trim((string) get_config('local_ragassistant', 'embedding_model')),
+            'embedding_reuse_chat_api_key' => $overrides['embedding_reuse_chat_api_key']
+                ?? (bool) get_config('local_ragassistant', 'embedding_reuse_chat_api_key'),
+            'openai_embedding_api_key' => secret_store::get_embedding_provider_api_key('openai'),
+            'gemini_embedding_api_key' => secret_store::get_embedding_provider_api_key('gemini'),
+            // The embedding check runs only when asked, so a check that already passed is not repeated.
+            'test_embedding' => !empty($overrides['test_embedding']),
         ];
 
         // A key typed into the settings form but not saved yet applies to the
@@ -116,6 +130,9 @@ class api_client
         }
         if (!empty($overrides['image_provider_api_key']) && in_array($imageprovider, ['openai', 'gemini'], true)) {
             $payload[$imageprovider . '_image_api_key'] = $overrides['image_provider_api_key'];
+        }
+        if (!empty($overrides['embedding_provider_api_key']) && in_array($embeddingprovider, ['openai', 'gemini'], true)) {
+            $payload[$embeddingprovider . '_embedding_api_key'] = $overrides['embedding_provider_api_key'];
         }
 
         return $this->post_json('/api/v1/admin/test-configuration', $payload);
@@ -137,6 +154,9 @@ class api_client
             'image_provider' => trim((string) get_config('local_ragassistant', 'image_provider')) ?: 'openai',
             'image_model' => trim((string) get_config('local_ragassistant', 'image_model')),
             'reuse_chat_api_key' => (bool) get_config('local_ragassistant', 'reuse_chat_api_key'),
+            'embedding_provider' => trim((string) get_config('local_ragassistant', 'embedding_provider')),
+            'embedding_model' => trim((string) get_config('local_ragassistant', 'embedding_model')),
+            'embedding_reuse_chat_api_key' => (bool) get_config('local_ragassistant', 'embedding_reuse_chat_api_key'),
         ];
 
         // Provider keys are included only in the server-to-server sync payload.
@@ -149,11 +169,17 @@ class api_client
             'openai_image_api_key' => secret_store::get_image_provider_api_key('openai'),
             'gemini_image_api_key' => secret_store::get_image_provider_api_key('gemini'),
         ];
+        $embeddingproviderkeys = [
+            'openai_embedding_api_key' => secret_store::get_embedding_provider_api_key('openai'),
+            'gemini_embedding_api_key' => secret_store::get_embedding_provider_api_key('gemini'),
+        ];
         $fingerprintdata = $configuration + [
             'openai_api_key_fingerprint' => hash('sha256', $providerkeys['openai_api_key']),
             'gemini_api_key_fingerprint' => hash('sha256', $providerkeys['gemini_api_key']),
             'openai_image_api_key_fingerprint' => hash('sha256', $imageproviderkeys['openai_image_api_key']),
             'gemini_image_api_key_fingerprint' => hash('sha256', $imageproviderkeys['gemini_image_api_key']),
+            'openai_embedding_api_key_fingerprint' => hash('sha256', $embeddingproviderkeys['openai_embedding_api_key']),
+            'gemini_embedding_api_key_fingerprint' => hash('sha256', $embeddingproviderkeys['gemini_embedding_api_key']),
         ];
         $fingerprint = hash(
             'sha256',
@@ -198,6 +224,14 @@ class api_client
             'gemini_api_key' => secret_store::get_provider_api_key('gemini'),
             'openai_image_api_key' => secret_store::get_image_provider_api_key('openai'),
             'gemini_image_api_key' => secret_store::get_image_provider_api_key('gemini'),
+            // Text embeddings. A blank provider tells the backend to use its own .env
+            // setting. A changed provider or model makes it report reindex_required below.
+            'embedding_provider' => trim((string) get_config('local_ragassistant', 'embedding_provider')),
+            'embedding_model' => trim((string) get_config('local_ragassistant', 'embedding_model')),
+            // Like reuse_chat_api_key for images: embeddings use the chat key (same provider only).
+            'embedding_reuse_chat_api_key' => (bool) get_config('local_ragassistant', 'embedding_reuse_chat_api_key'),
+            'openai_embedding_api_key' => secret_store::get_embedding_provider_api_key('openai'),
+            'gemini_embedding_api_key' => secret_store::get_embedding_provider_api_key('gemini'),
         ];
 
         // A blank key keeps the backend's stored copy, so keys deleted in Moodle are

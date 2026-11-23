@@ -73,10 +73,10 @@ class local_ragassistant_admin_setting_configuration_health extends admin_settin
         global $OUTPUT;
 
         // Each test is one row. The JavaScript module fills in the result and message.
-        // Order: application server, background tasks, then the AI checks with the
-        // local fallback last.
+        // Order: application server, background tasks, then the AI checks in the order of
+        // the settings sections, with the local fallback last.
         $tests = [];
-        foreach (['server', 'cron', 'llm', 'image', 'fallback'] as $key) {
+        foreach (['server', 'cron', 'llm', 'image', 'embedding', 'fallback'] as $key) {
             $label = get_string('healthcheck_test_' . $key, 'local_ragassistant');
             $tests[] = [
                 'key' => $key,
@@ -131,6 +131,7 @@ class local_ragassistant_admin_setting_configuration_health extends admin_settin
                     'savelocked' => get_string('healthcheck_savelocked', 'local_ragassistant'),
                     'stale' => get_string('healthcheck_stale', 'local_ragassistant'),
                     'notneeded' => get_string('healthcheck_notneeded', 'local_ragassistant'),
+                    'embeddingnotneeded' => get_string('healthcheck_embedding_notneeded', 'local_ragassistant'),
                     // The JS fills in {pass}, {fail} and {skipped} for all rows together.
                     'summary' => get_string('healthcheck_summary', 'local_ragassistant',
                         (object) ['pass' => '{pass}', 'fail' => '{fail}', 'skipped' => '{skipped}']),
@@ -155,6 +156,10 @@ class local_ragassistant_admin_setting_configuration_health extends admin_settin
             'image_provider_api_key' => [
                 'openai' => $saved('image_openai_api_key'),
                 'gemini' => $saved('image_gemini_api_key'),
+            ],
+            'embedding_provider_api_key' => [
+                'openai' => $saved('embedding_openai_api_key'),
+                'gemini' => $saved('embedding_gemini_api_key'),
             ],
         ];
     }

@@ -143,6 +143,61 @@ if ($hassiteconfig) {
         ''
     ));
 
+    // Text embeddings are used for document indexing and retrieval, so this section stays
+    // visible when AI chat is off. "Use the server setting" (the default) sends no override
+    // and the backend keeps its own .env choice. Changing the provider or model makes the
+    // backend report reindex_required, and api_client::sync_configuration() then queues a
+    // reindex of every document, because vectors from different models are not comparable.
+    // Once an embedding provider has been saved, warn that changing it costs a full reindex.
+    // Heading descriptions are rendered as Markdown, so the blank line starts a new paragraph.
+    $embeddingdesc = get_string('embedding_heading_desc', 'local_ragassistant');
+    if ((string) get_config('local_ragassistant', 'embedding_provider') !== '') {
+        $embeddingdesc .= "\n" . get_string('embedding_change_warning', 'local_ragassistant');
+    }
+    $settings->add(new admin_setting_heading(
+        'local_ragassistant/embedding_heading',
+        get_string('embedding_heading', 'local_ragassistant'),
+        $embeddingdesc
+    ));
+
+    $settings->add(new admin_setting_configselect(
+        'local_ragassistant/embedding_provider',
+        get_string('embedding_provider', 'local_ragassistant'),
+        get_string('embedding_provider_desc', 'local_ragassistant'),
+        '',
+        [
+            '' => get_string('embedding_provider_server', 'local_ragassistant'),
+            'openai' => 'OpenAI',
+            'gemini' => 'Google Gemini',
+            'ollama' => 'Ollama',
+        ]
+    ));
+
+    $settings->add(new admin_setting_configtext(
+        'local_ragassistant/embedding_model',
+        get_string('embedding_model', 'local_ragassistant'),
+        get_string('embedding_model_desc', 'local_ragassistant'),
+        '',
+        PARAM_TEXT
+    ));
+
+    // Same as the image section: with the same provider as chat, the chat key can be reused.
+    $settings->add(new admin_setting_configcheckbox(
+        'local_ragassistant/embedding_reuse_chat_api_key',
+        get_string('embedding_reuse_chat_api_key', 'local_ragassistant'),
+        get_string('embedding_reuse_chat_api_key_desc', 'local_ragassistant'),
+        0
+    ));
+
+    // Embedding keys are stored separately from the chat and image keys, per provider,
+    // in the same way as the image key (see the encrypted setting class).
+    $settings->add(new local_ragassistant_admin_setting_configencryptedpassword(
+        'local_ragassistant/embedding_provider_api_key',
+        get_string('embedding_provider_api_key', 'local_ragassistant'),
+        get_string('embedding_provider_api_key_desc', 'local_ragassistant'),
+        ''
+    ));
+
      // Local Ollama is used by FastAPI only when the primary cloud model fails.
     $settings->add(new admin_setting_heading(
         'local_ragassistant/fallback_heading',
@@ -183,6 +238,21 @@ if ($hassiteconfig) {
     $settings->hide_if('local_ragassistant/reuse_chat_api_key', 'local_ragassistant/llm_provider', 'eq', 'ollama');
     // A reused chat key replaces the separate image key.
     $settings->hide_if('local_ragassistant/image_provider_api_key', 'local_ragassistant/reuse_chat_api_key', 'checked');
+    // Embeddings: "Use the server setting" needs no model or key here, and Ollama needs no key.
+    // Not chat-only: indexing uses embeddings even when AI chat is off.
+    $settings->hide_if('local_ragassistant/embedding_model', 'local_ragassistant/embedding_provider', 'eq', '');
+    $settings->hide_if('local_ragassistant/embedding_provider_api_key', 'local_ragassistant/embedding_provider', 'eq', '');
+    $settings->hide_if('local_ragassistant/embedding_provider_api_key', 'local_ragassistant/embedding_provider', 'eq', 'ollama');
+    // A reused chat key replaces the separate embedding key. The reuse option needs a chat
+    // key to reuse, so it is hidden with chat off, for Ollama chat, and when embeddings need
+    // no key. Each "Reuse chat provider API key" tick is also hidden while its provider differs
+    // from the chat provider; hide_if() cannot compare two fields, so configuration_health.js
+    // does that part (initReuseVisibility).
+    $settings->hide_if('local_ragassistant/embedding_provider_api_key', 'local_ragassistant/embedding_reuse_chat_api_key', 'checked');
+    $settings->hide_if('local_ragassistant/embedding_reuse_chat_api_key', 'local_ragassistant/enable_chat', 'notchecked');
+    $settings->hide_if('local_ragassistant/embedding_reuse_chat_api_key', 'local_ragassistant/llm_provider', 'eq', 'ollama');
+    $settings->hide_if('local_ragassistant/embedding_reuse_chat_api_key', 'local_ragassistant/embedding_provider', 'eq', '');
+    $settings->hide_if('local_ragassistant/embedding_reuse_chat_api_key', 'local_ragassistant/embedding_provider', 'eq', 'ollama');
 
     $ADMIN->add('localplugins', $settings);
 

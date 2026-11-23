@@ -76,9 +76,10 @@ class local_ragassistant_admin_setting_configencryptedpassword extends admin_set
         );
         $status = $this->get_credential_status();
 
-        // Keep actionable states visible, but avoid a redundant "Configured" badge.
-        // The saved credential remains available without displaying a success badge.
-        if ($status['string'] === 'credentialconfigured') {
+        // Show a badge only when something needs attention (for example a key that cannot be
+        // decrypted). "Configured" is redundant, and "Not configured" is not shown either: the
+        // empty field already invites a key, and the configuration tests report a missing one.
+        if (in_array($status['string'], ['credentialconfigured', 'credentialnotconfigured'], true)) {
             return $html;
         }
 
@@ -149,6 +150,21 @@ class local_ragassistant_admin_setting_configencryptedpassword extends admin_set
                     ? ['string' => 'credentialconfigured', 'class' => 'badge-success']
                     : ['string' => 'credentialnotconfigured', 'class' => 'badge-secondary'];
             }
+
+            if ($settingname === 'embedding_provider_api_key') {
+                $provider = (string) get_config('local_ragassistant', 'embedding_provider');
+                // "Use the server setting" (blank) and Ollama need no key in Moodle.
+                if (!in_array($provider, ['openai', 'gemini'], true)) {
+                    return ['string' => 'credentialnotrequired', 'class' => 'badge-secondary'];
+                }
+                $reuse = (bool) get_config('local_ragassistant', 'embedding_reuse_chat_api_key');
+                $key = ($reuse && $provider === (string) get_config('local_ragassistant', 'llm_provider'))
+                    ? \local_ragassistant\local\secret_store::get_provider_api_key($provider)
+                    : \local_ragassistant\local\secret_store::get_embedding_provider_api_key($provider);
+                return $key !== ''
+                    ? ['string' => 'credentialconfigured', 'class' => 'badge-success']
+                    : ['string' => 'credentialnotconfigured', 'class' => 'badge-secondary'];
+            }
         } catch (\Throwable $exception) {
             // Do not expose decryption errors or credential details in settings HTML.
             // Use error_log() rather than debugging(): with developer debugging and Whoops
@@ -182,6 +198,14 @@ class local_ragassistant_admin_setting_configencryptedpassword extends admin_set
         ) {
             set_config('reuse_chat_api_key', 0, 'local_ragassistant');
         }
+        // The same rule for reusing the chat key for text embeddings.
+        if (
+            $settingname === 'embedding_provider_api_key'
+            && get_config('local_ragassistant', 'embedding_reuse_chat_api_key')
+            && get_config('local_ragassistant', 'embedding_provider') !== get_config('local_ragassistant', 'llm_provider')
+        ) {
+            set_config('embedding_reuse_chat_api_key', 0, 'local_ragassistant');
+        }
 
         if ($value === '') {
             return '';
@@ -205,11 +229,19 @@ class local_ragassistant_admin_setting_configencryptedpassword extends admin_set
             }
             $settingname = 'image_' . $provider . '_api_key';
             $purpose = $settingname;
+        } else if ($settingname === 'embedding_provider_api_key') {
+            $provider = (string) get_config('local_ragassistant', 'embedding_provider');
+            if (!in_array($provider, ['openai', 'gemini'], true)) {
+                return get_string('providerkeynotrequired', 'local_ragassistant');
+            }
+            $settingname = 'embedding_' . $provider . '_api_key';
+            $purpose = $settingname;
         }
 
         $minimumlength = $settingname === 'api_key' ? 32 : 20;
-        if (!in_array($settingname, ['api_key', 'openai_api_key', 'gemini_api_key', 'image_openai_api_key', 'image_gemini_api_key'], true)
-                || strlen($value) < $minimumlength) {
+        $allowed = ['api_key', 'openai_api_key', 'gemini_api_key', 'image_openai_api_key', 'image_gemini_api_key',
+            'embedding_openai_api_key', 'embedding_gemini_api_key'];
+        if (!in_array($settingname, $allowed, true) || strlen($value) < $minimumlength) {
             return get_string(
                 $settingname === 'api_key' ? 'apikeytoolong' : 'providerkeytoolong',
                 'local_ragassistant'
@@ -235,6 +267,8 @@ class local_ragassistant_admin_setting_configencryptedpassword extends admin_set
             'gemini_api_key' => ['openai_api_key', 'openai_api_key'],
             'image_openai_api_key' => ['image_gemini_api_key', 'gemini_image_api_key'],
             'image_gemini_api_key' => ['image_openai_api_key', 'openai_image_api_key'],
+            'embedding_openai_api_key' => ['embedding_gemini_api_key', 'gemini_embedding_api_key'],
+            'embedding_gemini_api_key' => ['embedding_openai_api_key', 'openai_embedding_api_key'],
         ];
         if (isset($replaces[$settingname])) {
             $savedfield = $replaces[$replaces[$settingname][0]][1];

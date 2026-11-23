@@ -162,7 +162,8 @@ final class secret_store {
         return self::decrypt($stored, $name);
     }
     /** Backend request fields for the provider keys Moodle manages. */
-    private const BACKEND_KEY_FIELDS = ['openai_api_key', 'gemini_api_key', 'openai_image_api_key', 'gemini_image_api_key'];
+    private const BACKEND_KEY_FIELDS = ['openai_api_key', 'gemini_api_key', 'openai_image_api_key', 'gemini_image_api_key',
+        'openai_embedding_api_key', 'gemini_embedding_api_key'];
 
     /**
      * Backend key fields deleted in Moodle that the next configuration sync must clear.
@@ -209,6 +210,26 @@ final class secret_store {
             throw new \invalid_parameter_exception('Unsupported image provider.');
         }
         $name = 'image_' . $provider . '_api_key';
+        $stored = (string) get_config('local_ragassistant', $name);
+        if ($stored === '') {
+            return '';
+        }
+        if (!str_starts_with($stored, self::PREFIX)) {
+            $encrypted = self::encrypt($stored, $name);
+            set_config($name, $encrypted, 'local_ragassistant');
+            return $stored;
+        }
+        return self::decrypt($stored, $name);
+    }
+
+    /**
+     * Read an optional Moodle-managed text embedding provider key. Never expose it to a page.
+     */
+    public static function get_embedding_provider_api_key(string $provider): string {
+        if (!in_array($provider, ['openai', 'gemini'], true)) {
+            throw new \invalid_parameter_exception('Unsupported embedding provider.');
+        }
+        $name = 'embedding_' . $provider . '_api_key';
         $stored = (string) get_config('local_ragassistant', $name);
         if ($stored === '') {
             return '';

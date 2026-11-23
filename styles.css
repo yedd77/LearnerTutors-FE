@@ -1192,6 +1192,12 @@ form.mform #fgroup_id_buttonar .felement.fgroup {
     }
 }
 
+/* Plugin settings: a "Reuse chat provider API key" tick whose provider differs from the
+   chat provider (set by configuration_health.js, separate from hide_if()'s own hiding). */
+.ragassistant-reuse-mismatch {
+    display: none !important;
+}
+
 /* Manage course materials: dim a paged table while its next page loads. */
 .ragassistant-paged-section[aria-busy="true"] {
     opacity: 0.55;

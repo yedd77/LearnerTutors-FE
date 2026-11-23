@@ -21,14 +21,23 @@ const STATES = {
 // Settings that the configuration tests cover. Changing any of them while AI chat is
 // enabled means the tests must pass again before the settings can be saved.
 const TESTED_SETTINGS = ['enable_chat', 'api_base_url', 'api_key', 'llm_provider', 'chat_model', 'provider_api_key',
-    'fallback_model', 'image_provider', 'image_model', 'reuse_chat_api_key', 'image_provider_api_key'];
+    'fallback_model', 'image_provider', 'image_model', 'reuse_chat_api_key', 'image_provider_api_key',
+    'embedding_provider', 'embedding_model', 'embedding_reuse_chat_api_key', 'embedding_provider_api_key'];
+
+// Each "Reuse chat provider API key" tick and the provider it compares with the chat provider.
+const REUSE_OPTIONS = [
+    {reuse: 'reuse_chat_api_key', provider: 'image_provider'},
+    {reuse: 'embedding_reuse_chat_api_key', provider: 'embedding_provider'},
+];
 
 // Every check must pass before changed settings can be saved. The local fallback is not
 // required while chat itself uses Ollama, because the fallback is then hidden and unused.
-const ALL_TESTS = ['server', 'cron', 'llm', 'image', 'fallback'];
+// The embedding check is not required while "Use the server setting" is selected, because
+// Moodle then sends no embedding override.
+const ALL_TESTS = ['server', 'cron', 'llm', 'image', 'embedding', 'fallback'];
 
 // Checks that the backend runs. The backend always tests the LLM in the same request.
-const AI_TESTS = ['llm', 'image', 'fallback'];
+const AI_TESTS = ['llm', 'image', 'embedding', 'fallback'];
 
 // Admin setting inputs are named s_<plugin>_<setting>.
 const field = (name) => document.querySelector(`[name="s_local_ragassistant_${name}"]`);
@@ -47,7 +56,8 @@ const initSectionVisibility = () => {
     const panel = document.getElementById('admin-configuration_health');
     // The first setting row of each section that has a heading. The panel's own row
     // anchors the "Configuration Health Checks" heading.
-    const anchors = ['admin-llm_provider', 'admin-image_provider', 'admin-fallback_model', 'admin-configuration_health']
+    const anchors = ['admin-llm_provider', 'admin-image_provider', 'admin-embedding_provider', 'admin-fallback_model',
+        'admin-configuration_health']
         .map((id) => document.getElementById(id))
         .filter((row) => row);
 
@@ -100,7 +110,11 @@ const initSectionVisibility = () => {
 // page only and restored on switching back; saved keys are never sent to the browser, so
 // a status line says whether a key is saved for the selected provider instead.
 const initProviderKeys = (savedkeys, strings) => {
-    [['llm_provider', 'provider_api_key'], ['image_provider', 'image_provider_api_key']].forEach(([providername, keyname]) => {
+    [
+        ['llm_provider', 'provider_api_key'],
+        ['image_provider', 'image_provider_api_key'],
+        ['embedding_provider', 'embedding_provider_api_key'],
+    ].forEach(([providername, keyname]) => {
         const provider = field(providername);
         const key = field(keyname);
         if (!provider || !key) {
@@ -135,42 +149,82 @@ const initProviderKeys = (savedkeys, strings) => {
     });
 };
 
-// "Reuse chat provider API key" needs the same provider for chat and images, and it
-// silently follows the chat key. Untick it when the chat provider or key changes, or when
-// the image provider no longer matches, so the administrator chooses the image key again.
+// "Reuse chat provider API key" (image and text embedding) needs the same provider as chat,
+// and it silently follows the chat key. Untick it when the chat provider or key changes, or
+// when its own provider no longer matches, so the administrator chooses that key again.
 const initReuseRules = () => {
-    const reuse = checkbox('reuse_chat_api_key');
     const chatprovider = field('llm_provider');
-    const imageprovider = field('image_provider');
     const chatkey = field('provider_api_key');
-    if (!reuse) {
+
+    REUSE_OPTIONS.forEach((option) => {
+        const reuse = checkbox(option.reuse);
+        const provider = field(option.provider);
+        if (!reuse) {
+            return;
+        }
+
+        const untick = () => {
+            if (reuse.checked) {
+                reuse.checked = false;
+                notify(reuse, 'change');
+            }
+        };
+
+        if (chatprovider) {
+            chatprovider.addEventListener('change', untick);
+        }
+        if (provider) {
+            provider.addEventListener('change', () => {
+                if (!chatprovider || provider.value !== chatprovider.value) {
+                    untick();
+                }
+            });
+        }
+        if (chatkey) {
+            chatkey.addEventListener('input', () => {
+                if (chatkey.value.trim() !== '') {
+                    untick();
+                }
+            });
+        }
+    });
+};
+
+// Show each "Reuse chat provider API key" tick only while its provider matches the chat
+// provider. hide_if() in settings.php cannot compare two fields, so this adds a separate
+// class; the hide_if() rules (chat off, Ollama, no key needed) still apply on top of it.
+const initReuseVisibility = () => {
+    const chatprovider = field('llm_provider');
+    if (!chatprovider) {
         return;
     }
 
-    const untick = () => {
-        if (reuse.checked) {
-            reuse.checked = false;
-            notify(reuse, 'change');
-        }
+    const sync = () => {
+        REUSE_OPTIONS.forEach((option) => {
+            const reuse = checkbox(option.reuse);
+            const provider = field(option.provider);
+            const row = document.getElementById(`admin-${option.reuse}`);
+            if (!reuse || !provider || !row) {
+                return;
+            }
+            const mismatch = provider.value !== chatprovider.value;
+            row.classList.toggle('ragassistant-reuse-mismatch', mismatch);
+            // A hidden tick must not stay ticked, or it would hide the key field below it.
+            if (mismatch && reuse.checked) {
+                reuse.checked = false;
+                notify(reuse, 'change');
+            }
+        });
     };
 
-    if (chatprovider) {
-        chatprovider.addEventListener('change', untick);
-    }
-    if (imageprovider) {
-        imageprovider.addEventListener('change', () => {
-            if (!chatprovider || imageprovider.value !== chatprovider.value) {
-                untick();
-            }
-        });
-    }
-    if (chatkey) {
-        chatkey.addEventListener('input', () => {
-            if (chatkey.value.trim() !== '') {
-                untick();
-            }
-        });
-    }
+    chatprovider.addEventListener('change', sync);
+    REUSE_OPTIONS.forEach((option) => {
+        const provider = field(option.provider);
+        if (provider) {
+            provider.addEventListener('change', sync);
+        }
+    });
+    sync();
 };
 
 // While AI chat is enabled, changes to tested settings lock "Save changes" until every
@@ -233,6 +287,7 @@ export const init = (option) => {
     initSectionVisibility();
     initProviderKeys(option.keys || {}, strings);
     initReuseRules();
+    initReuseVisibility();
 
     const button = document.getElementById('ragassistant-run-healthcheck');
 
@@ -271,6 +326,10 @@ export const init = (option) => {
         'reuse_chat_api_key': isChecked('reuse_chat_api_key'),
         'provider_api_key': getValue('provider_api_key'),
         'image_provider_api_key': getValue('image_provider_api_key'),
+        'embedding_provider': getValue('embedding_provider'),
+        'embedding_model': getValue('embedding_model'),
+        'embedding_reuse_chat_api_key': isChecked('embedding_reuse_chat_api_key'),
+        'embedding_provider_api_key': getValue('embedding_provider_api_key'),
     });
 
     // Show one test's state. Text is set with textContent, so backend text is never parsed as HTML.
@@ -328,18 +387,37 @@ export const init = (option) => {
     const signature = (test) => {
         const server = [getValue('api_base_url'), getValue('api_key')];
         const reuse = isChecked('reuse_chat_api_key');
+        const embeddingreuse = isChecked('embedding_reuse_chat_api_key');
         const values = {
             server,
             cron: [],
             llm: [...server, getValue('llm_provider'), getValue('chat_model'), getValue('provider_api_key')],
             image: [...server, getValue('image_provider'), getValue('image_model'), getValue('image_provider_api_key'),
                 reuse, ...(reuse ? [getValue('llm_provider'), getValue('provider_api_key')] : [])],
+            embedding: [...server, getValue('embedding_provider'), getValue('embedding_model'),
+                getValue('embedding_provider_api_key'), embeddingreuse,
+                ...(embeddingreuse ? [getValue('llm_provider'), getValue('provider_api_key')] : [])],
             fallback: [...server, getValue('fallback_model')],
         };
         return JSON.stringify(values[test]);
     };
 
-    const requiredTests = () => ALL_TESTS.filter((test) => test !== 'fallback' || getValue('llm_provider') !== 'ollama');
+    // Checks that are not required for the current values, with the message their row shows.
+    const notNeeded = () => {
+        const skipped = {};
+        if (getValue('llm_provider') === 'ollama') {
+            skipped.fallback = strings.notneeded;
+        }
+        if (getValue('embedding_provider') === '') {
+            skipped.embedding = strings.embeddingnotneeded;
+        }
+        return skipped;
+    };
+
+    const requiredTests = () => {
+        const skipped = notNeeded();
+        return ALL_TESTS.filter((test) => !(test in skipped));
+    };
 
     const passedNow = (test) => {
         const row = rowFor(test);
@@ -419,10 +497,13 @@ export const init = (option) => {
             results.setAttribute('aria-busy', 'true');
         }
         torun.forEach((test) => setRow(rowFor(test), 'pending', rowFor(test).dataset.testing));
-        if (!required.includes('fallback')) {
-            setRow(rowFor('fallback'), 'skipped', strings.notneeded);
-            rowFor('fallback').dataset.sig = '';
-        }
+        Object.entries(notNeeded()).forEach(([test, message]) => {
+            const row = rowFor(test);
+            if (row) {
+                setRow(row, 'skipped', message);
+                row.dataset.sig = '';
+            }
+        });
         startRunning();
 
         try {
