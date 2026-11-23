@@ -23,7 +23,6 @@ function local_ragassistant_render_question(string $question): string
         '/explain' => '#1e88e5',
         '/quiz' => '#1e88e5',
         '/studyguide' => '#1e88e5',
-        '/extract' => '#1e88e5',
     ];
 
     if (!preg_match('/^(\s*)(\/[^\s]*)(?=\s|$)/', $question, $matches)) {
@@ -266,17 +265,21 @@ if (data_submitted() && confirm_sesskey()) {
     $question = trim(optional_param('question', '', PARAM_TEXT));
     $toolid = trim(optional_param('tool_id', '', PARAM_ALPHANUMEXT));
     $displayquestion = trim(optional_param('display_question', '', PARAM_TEXT));
+    $commandnames = [
+        'exam_generation' => '/exam',
+        'note_making' => '/notes',
+        'summarization' => '/summarize',
+        'flashcards' => '/flashcards',
+        'concept_explanation' => '/explain',
+        'practice_quiz' => '/quiz',
+        'study_guide' => '/studyguide',
+    ];
+    // Only forward tools that have a slash command here, so a hand-made request
+    // cannot reach a backend tool that was removed from the menu (e.g. /extract).
+    if (!isset($commandnames[$toolid])) {
+        $toolid = '';
+    }
     if ($displayquestion === '' && $toolid !== '') {
-        $commandnames = [
-            'exam_generation' => '/exam',
-            'note_making' => '/notes',
-            'summarization' => '/summarize',
-            'flashcards' => '/flashcards',
-            'concept_explanation' => '/explain',
-            'practice_quiz' => '/quiz',
-            'study_guide' => '/studyguide',
-            'exact_text_extraction' => '/extract',
-        ];
         $displayquestion = ($commandnames[$toolid] ?? '') .
             ($commandnames[$toolid] ?? '' ? ' ' : '') . $question;
     }

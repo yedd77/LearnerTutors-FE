@@ -122,8 +122,7 @@ document.addEventListener('DOMContentLoaded', function () {
         { command: '/flashcards', id: 'flashcards', color: '#1e88e5', label: 'Generate flashcards', description: 'Create question-and-answer cards.' },
         { command: '/explain', id: 'concept_explanation', color: '#1e88e5', label: 'Explain a concept', description: 'Explain a topic step by step.' },
         { command: '/quiz', id: 'practice_quiz', color: '#1e88e5', label: 'Practice quiz', description: 'Generate practice questions.' },
-        { command: '/studyguide', id: 'study_guide', color: '#1e88e5', label: 'Build a study guide', description: 'Organize topics for revision.' },
-        { command: '/extract', id: 'exact_text_extraction', color: '#1e88e5', label: 'Extract exact text', description: 'Find or quote wording from course material.' }
+        { command: '/studyguide', id: 'study_guide', color: '#1e88e5', label: 'Build a study guide', description: 'Organize topics for revision.' }
     ];
     let activeIndex = -1;
     let filtered = [];
