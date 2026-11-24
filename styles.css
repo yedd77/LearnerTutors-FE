@@ -1177,6 +1177,13 @@ form.mform #fgroup_id_buttonar .felement.fgroup {
 
 
 /* Compact document indexing status and background-job progress. */
+.ragassistant-failure-reason {
+    display: block;
+    margin-top: .25rem;
+    max-width: 22rem;
+    overflow-wrap: anywhere;
+}
+
 .ragassistant-documents .ragassistant-processing-status {
     display: flex;
     flex-direction: column;

@@ -25,13 +25,45 @@ class index_document extends \core\task\adhoc_task {
      */
     private function update_progress(int $documentid, string $status, int $progress, string $stage): void {
         global $DB;
-        $DB->update_record('local_ragassistant_documents', (object) [
+        $record = (object) [
             'id' => $documentid,
             'status' => $status,
             'progress' => max(0, min(100, $progress)),
             'stage' => $stage,
             'timemodified' => time(),
-        ]);
+        ];
+        if ($status !== 'failed') {
+            // A new attempt clears the reason of the previous failure.
+            $record->errormessage = null;
+        }
+        $DB->update_record('local_ragassistant_documents', $record);
+    }
+
+    /**
+     * Lecturer-facing reason for a failed indexing job, or '' when there is nothing useful to say.
+     *
+     * The backend's own rejection message is kept as is (for example "PDF exceeds the
+     * 300-page limit."). Connection errors are summarised: their details (host, curl
+     * text) stay in the task log only.
+     *
+     * @param \Throwable $exception
+     * @return string
+     */
+    private function failure_reason(\Throwable $exception): string {
+        if (!$exception instanceof \moodle_exception) {
+            return '';
+        }
+        if ($exception->errorcode === 'backendrequestfailed' && is_string($exception->a)) {
+            return \core_text::substr(trim(clean_param($exception->a, PARAM_TEXT)), 0, 500);
+        }
+        if ($exception->errorcode === 'backendconnectionfailed') {
+            $timedout = stripos((string) $exception->debuginfo, 'timed out') !== false;
+            return get_string($timedout ? 'indexfailedtimeout' : 'indexfailedconnection', 'local_ragassistant');
+        }
+        if ($exception->errorcode === 'storedfilemissing') {
+            return get_string('storedfilemissing', 'local_ragassistant');
+        }
+        return '';
     }
 
     /**
@@ -237,6 +269,9 @@ class index_document extends \core\task\adhoc_task {
                 ]);
             } else {
                 $this->update_progress($documentid, 'failed', 100, 'failed');
+                $reason = $this->failure_reason($exception);
+                $DB->set_field('local_ragassistant_documents', 'errormessage', $reason !== '' ? $reason : null,
+                    ['id' => $documentid]);
             }
             mtrace('RAG Assistant: ' . $jobtype . ' task failed for document ' . $documentid . ': ' .
                 $exception->getMessage());

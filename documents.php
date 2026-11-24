@@ -742,6 +742,16 @@ foreach ($pageddocuments as $document) {
             ['class' => 'text-muted ragassistant-progress-label']
         );
     }
+    if ($document->status === 'failed') {
+        // Why indexing failed (set by the index task), so the lecturer can act on it.
+        $reason = trim((string) ($document->errormessage ?? ''));
+        $statuscontent .= html_writer::tag(
+            'small',
+            $reason !== '' ? get_string('indexfailedreason', 'local_ragassistant', s($reason))
+                : get_string('indexfailedgeneric', 'local_ragassistant'),
+            ['class' => 'text-danger ragassistant-failure-reason']
+        );
+    }
     $status = html_writer::div($statuscontent, 'ragassistant-processing-status', [
         'data-document-id' => (int) $document->id,
         'data-status' => $document->status,

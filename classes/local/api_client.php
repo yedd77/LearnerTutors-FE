@@ -429,7 +429,8 @@ class api_client
                 CURLOPT_POST => true,
                 CURLOPT_RETURNTRANSFER => true,
                 CURLOPT_CONNECTTIMEOUT => 5,
-                CURLOPT_TIMEOUT => 300,
+                // Large documents (hundreds of pages) take minutes to parse and embed.
+                CURLOPT_TIMEOUT => 900,
                 CURLOPT_HTTPHEADER => [
                     'Accept: application/json',
                     'X-RAG-API-Key: ' . $this->get_api_key(),

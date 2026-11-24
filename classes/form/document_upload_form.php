@@ -194,10 +194,17 @@ class document_upload_form extends \moodleform
             });
         }
 
+        // A validation error (too many pages, wrong type, too large) is shown on the
+        // file manager row, so keep that row visible while it has one.
+        function hasUploadError() {
+            const error = document.getElementById('id_error_documents');
+            return !!(error && error.textContent.trim() !== '');
+        }
+
         // Switch from the upload step to the review step.
         function showReviewSection() {
             uploadHeading.style.display = 'none';
-            managerItem.style.display = 'none';
+            managerItem.style.display = hasUploadError() ? '' : 'none';
             reviewHeading.style.display = '';
             reviewContainer.style.display = 'grid';
         }
@@ -427,6 +434,20 @@ JS;
             if ($file->get_filesize() > 20 * 1024 * 1024) {
                 $errors['documents'] = 'File exceeds the 20 MB limit: ' . s($file->get_filename());
                 break;
+            }
+
+            // The backend refuses PDFs over its page limit; say so now rather than after
+            // a failed indexing task. Unreadable counts are left to the backend.
+            if ($extension === 'pdf') {
+                $pages = \local_ragassistant\local\pdf_page_counter::count($file);
+                if ($pages !== null && $pages > \local_ragassistant\local\pdf_page_counter::MAX_PAGES) {
+                    $errors['documents'] = get_string('pdftoomanypages', 'local_ragassistant', (object) [
+                        'filename' => s($file->get_filename()),
+                        'pages' => $pages,
+                        'limit' => \local_ragassistant\local\pdf_page_counter::MAX_PAGES,
+                    ]);
+                    break;
+                }
             }
         }
 
