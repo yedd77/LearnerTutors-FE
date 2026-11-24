@@ -253,3 +253,8 @@ $string['downloadbusy'] = 'Downloading…';
 $string['downloadexpired'] = 'This study sheet has expired. Send /notes again to create a new one.';
 $string['downloadfailed'] = 'The download did not complete. Check your connection and try again.';
 $string['downloadunavailable'] = 'The study sheet could not be downloaded right now. Try again later.';
+// Figures from course documents shown in chat answers.
+$string['figureunavailable'] = 'This figure is no longer available.';
+$string['figuresourcepage'] = '{$a->filename}, p. {$a->page}';
+$string['figurealt'] = 'Figure from {$a}';
+$string['figureopen'] = 'Open the full-size figure in a new tab';

@@ -164,7 +164,7 @@ if ($hassiteconfig) {
         'local_ragassistant/embedding_provider',
         get_string('embedding_provider', 'local_ragassistant'),
         get_string('embedding_provider_desc', 'local_ragassistant'),
-        '',
+        'OpenAI',
         [
             '' => get_string('embedding_provider_server', 'local_ragassistant'),
             'openai' => 'OpenAI',
@@ -177,7 +177,7 @@ if ($hassiteconfig) {
         'local_ragassistant/embedding_model',
         get_string('embedding_model', 'local_ragassistant'),
         get_string('embedding_model_desc', 'local_ragassistant'),
-        '',
+        'text-embedding-3-small',
         PARAM_TEXT
     ));
 

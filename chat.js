@@ -345,6 +345,193 @@ document.addEventListener('DOMContentLoaded', function () {
         content.appendChild(wrapper);
     }
 
+    // At most this many figures are shown per answer; further markers are removed.
+    const MAX_FIGURES_PER_ANSWER = 2;
+
+    // Figures from course documents (the chat response's optional "images" list). Each
+    // "[IMGn]" marker in the rendered answer is replaced with its figure (at most
+    // MAX_FIGURES_PER_ANSWER); figures the answer did not place are not shown. Images load through the Moodle proxy
+    // (document_image.php), never from the backend. Caption, filename and page are document
+    // text, so they are only ever set with textContent.
+    const FIGURE_SKIP = 'pre, code, .ragassistant-sources-details, .ragassistant-illustration-wrap, ' +
+        '.ragassistant-download, .local-ragassistant-figure';
+
+    function figureUrl(image) {
+        const proxyUrl = chatApp ? chatApp.dataset.figureUrl : '';
+        if (!proxyUrl || !/^[0-9a-f]{32}$/.test(String(image.image_id || '')) ||
+                !/^[1-9]\d{0,9}$/.test(String(image.document_id || ''))) {
+            return '';
+        }
+        try {
+            const url = new URL(proxyUrl, window.location.href);
+            url.searchParams.set('id', image.image_id);
+            url.searchParams.set('documentid', image.document_id);
+            return url.href;
+        } catch (error) {
+            return '';
+        }
+    }
+
+    // A figure much taller than it is wide is shown turned 90° clockwise, so it fits
+    // the answer as a landscape image. The image comes from our own proxy (same
+    // origin), so it can be redrawn on a canvas. If that fails, the original stays.
+    const TALL_FIGURE_RATIO = 1.4;
+
+    function rotateIfTall(img) {
+        const width = img.naturalWidth;
+        const height = img.naturalHeight;
+        if (!width || !height || height < width * TALL_FIGURE_RATIO) {
+            return;
+        }
+        try {
+            const canvas = document.createElement('canvas');
+            canvas.width = height;
+            canvas.height = width;
+            const context = canvas.getContext('2d');
+            context.translate(height, 0);
+            context.rotate(Math.PI / 2);
+            context.drawImage(img, 0, 0, width, height);
+            canvas.toBlob(function (blob) {
+                if (!blob) {
+                    return;
+                }
+                const rotatedUrl = URL.createObjectURL(blob);
+                img.addEventListener('load', function () {
+                    URL.revokeObjectURL(rotatedUrl);
+                }, { once: true });
+                const figure = img.closest('.local-ragassistant-figure');
+                if (figure) {
+                    figure.classList.add('local-ragassistant-figure-rotated');
+                }
+                img.src = rotatedUrl;
+            });
+        } catch (e) {
+            // Keep the unrotated image.
+        }
+    }
+
+    function createFigure(image) {
+        const href = figureUrl(image);
+        if (!href) {
+            return null;
+        }
+        const filename = String(image.filename || '');
+        const caption = String(image.caption || '');
+        const page = Number(image.page) > 0 ? Number(image.page) : 0;
+
+        const figure = document.createElement('figure');
+        figure.className = 'local-ragassistant-figure';
+
+        // Clicking the figure opens it full size in a new tab, through the same proxy.
+        const link = document.createElement('a');
+        link.href = href;
+        link.target = '_blank';
+        link.rel = 'noopener';
+        link.title = str('figureopen', null, 'Open the full-size figure in a new tab');
+
+        const img = document.createElement('img');
+        img.src = href;
+        img.alt = caption || (filename ? str('figurealt', filename, 'Figure from ' + filename) : '');
+        img.loading = 'lazy';
+        img.decoding = 'async';
+        // Deleted, disabled or re-indexed documents: a short note instead of a broken image.
+        img.addEventListener('error', function () {
+            const note = document.createElement('p');
+            note.className = 'local-ragassistant-figure-unavailable';
+            note.textContent = str('figureunavailable', null, 'This figure is no longer available.');
+            figure.replaceWith(note);
+        }, { once: true });
+        img.addEventListener('load', function () {
+            rotateIfTall(img);
+        }, { once: true });
+        link.appendChild(img);
+        figure.appendChild(link);
+
+        const source = filename && page
+            ? str('figuresourcepage', { filename: filename, page: page }, filename + ', p. ' + page)
+            : filename;
+        const text = [caption, source].filter(Boolean).join(' · ');
+        if (text) {
+            const figcaption = document.createElement('figcaption');
+            figcaption.textContent = text;
+            figure.appendChild(figcaption);
+        }
+        return figure;
+    }
+
+    // A figure cannot sit inside a paragraph: split the paragraph around it and drop
+    // the parts left empty (a marker on its own line leaves nothing else).
+    function liftOutOfParagraph(figure) {
+        const paragraph = figure.parentElement;
+        if (!paragraph || paragraph.tagName !== 'P') {
+            return;
+        }
+        const after = document.createElement('p');
+        while (figure.nextSibling) {
+            after.appendChild(figure.nextSibling);
+        }
+        paragraph.after(figure);
+        figure.after(after);
+        [paragraph, after].forEach(function (part) {
+            if (part.textContent.trim() === '' && !part.querySelector(':not(br)')) {
+                part.remove();
+            }
+        });
+    }
+
+    function appendFigures(content, images) {
+        if (!content || !Array.isArray(images) || images.length === 0) {
+            return;
+        }
+
+        const byMarker = new Map();
+        images.forEach(function (image) {
+            if (image && typeof image.marker === 'string') {
+                byMarker.set(image.marker, image);
+            }
+        });
+
+        // Collect first, then replace, so the walker is not disturbed.
+        const nodes = [];
+        const walker = document.createTreeWalker(content, NodeFilter.SHOW_TEXT);
+        while (walker.nextNode()) {
+            const node = walker.currentNode;
+            if (/\[IMG\d{1,3}\]/.test(node.nodeValue) && !node.parentElement.closest(FIGURE_SKIP)) {
+                nodes.push(node);
+            }
+        }
+
+        const used = new Set();
+        const placed = [];
+        nodes.forEach(function (node) {
+            const fragment = document.createDocumentFragment();
+            const text = node.nodeValue;
+            let last = 0;
+            for (const match of text.matchAll(/\[(IMG\d{1,3})\]/g)) {
+                fragment.append(text.slice(last, match.index));
+                last = match.index + match[0].length;
+                const image = byMarker.get(match[1]);
+                // Each figure once, at most MAX_FIGURES_PER_ANSWER; markers without a figure
+                // (or over the limit) are removed, never shown raw.
+                if (image && !used.has(match[1]) && placed.length < MAX_FIGURES_PER_ANSWER) {
+                    const figure = createFigure(image);
+                    if (figure) {
+                        used.add(match[1]);
+                        placed.push(figure);
+                        fragment.append(figure);
+                    }
+                }
+            }
+            fragment.append(text.slice(last));
+            node.replaceWith(fragment);
+        });
+        placed.forEach(liftOutOfParagraph);
+
+        // Figures the answer did not place are left out: the model places a marker only
+        // where the figure is relevant (backend prompts/core/figure_reminder.md), so an
+        // unplaced figure is one it judged not to fit the question.
+    }
+
     // Language strings passed from PHP with strings_for_js (English fallback just in case).
     function str(id, a, fallback) {
         try {
@@ -507,6 +694,17 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
         appendDownload(message.querySelector('.ragassistant-message-content'), download);
+    });
+
+    // Saved figures in the server-rendered history, placed the same way as for a new answer.
+    document.querySelectorAll('.ragassistant-message-assistant[data-images]').forEach(function (message) {
+        let images = null;
+        try {
+            images = JSON.parse(message.dataset.images);
+        } catch (error) {
+            return;
+        }
+        appendFigures(message.querySelector('.ragassistant-message-content'), images);
     });
 
     function highlightMessageCommand(content) {
@@ -698,6 +896,8 @@ document.addEventListener('DOMContentLoaded', function () {
                     '.ragassistant-message-content'
                 );
 
+                // Figures first: they replace markers inside the rendered answer.
+                appendFigures(content, result.images);
                 appendIllustration(content, result.illustration_url);
                 appendDownload(content, result.download);
                 appendSources(content, result.sources);

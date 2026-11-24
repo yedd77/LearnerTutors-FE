@@ -609,11 +609,74 @@ class api_client
             throw new \moodle_exception('backendinvalidresponse', 'local_ragassistant');
         }
 
-        $handle = curl_init(
-            $this->get_base_url() .
+        $result = $this->get_binary(
             '/api/v1/generated-files/' . $fileid . '?' .
-            http_build_query(['course_id' => $courseid, 'user_id' => $userid], '', '&', PHP_QUERY_RFC3986)
+                http_build_query(['course_id' => $courseid, 'user_id' => $userid], '', '&', PHP_QUERY_RFC3986),
+            'application/pdf',
+            60
         );
+
+        // Filename from Content-Disposition (filename*=UTF-8''... or filename="...").
+        $filename = '';
+        $disposition = $result['headers']['content-disposition'] ?? '';
+        if (preg_match("/filename\\*=UTF-8''([^;]+)/i", $disposition, $m)) {
+            $filename = rawurldecode(trim($m[1], '"'));
+        } else if (preg_match('/filename="?([^";]+)"?/i', $disposition, $m)) {
+            $filename = $m[1];
+        }
+
+        return [
+            'status' => $result['status'],
+            'body' => $result['body'],
+            'filename' => $filename,
+            'contenttype' => $result['contenttype'],
+        ];
+    }
+
+    /**
+     * Fetch a figure extracted from a course document (a PNG) from the backend.
+     *
+     * The backend serves it only when the image belongs to that course's document and the
+     * document is still searchable; otherwise 404. Returns the raw status and body, which
+     * is never logged.
+     *
+     * @param string $imageid 32 lowercase hex characters (validated here as well).
+     * @param int $courseid Course the document belongs to.
+     * @param int $documentid Moodle document id (local_ragassistant_documents.id).
+     * @return array{status:int, body:string, contenttype:string}
+     */
+    public function get_document_image(string $imageid, int $courseid, int $documentid): array
+    {
+        if (!preg_match('/^[0-9a-f]{32}$/', $imageid) || $courseid <= 0 || $documentid <= 0) {
+            throw new \moodle_exception('backendinvalidresponse', 'local_ragassistant');
+        }
+
+        $result = $this->get_binary(
+            '/api/v1/document-images/' . $imageid . '?' .
+                http_build_query(['course_id' => $courseid, 'document_id' => (string) $documentid],
+                    '', '&', PHP_QUERY_RFC3986),
+            'image/png',
+            30
+        );
+
+        return [
+            'status' => $result['status'],
+            'body' => $result['body'],
+            'contenttype' => $result['contenttype'],
+        ];
+    }
+
+    /**
+     * GET a binary response from the backend with the API key.
+     *
+     * @param string $path Path and query, starting with /api/v1/.
+     * @param string $accept Accept header value.
+     * @param int $timeout Total timeout in seconds.
+     * @return array{status:int, body:string, contenttype:string, headers:array}
+     */
+    private function get_binary(string $path, string $accept, int $timeout): array
+    {
+        $handle = curl_init($this->get_base_url() . $path);
 
         if ($handle === false) {
             throw new \moodle_exception('backendconnectionfailed', 'local_ragassistant');
@@ -626,9 +689,9 @@ class api_client
             CURLOPT_CONNECTTIMEOUT => 5,
             CURLOPT_SSL_VERIFYPEER => true,
             CURLOPT_SSL_VERIFYHOST => 2,
-            CURLOPT_TIMEOUT => 60,
+            CURLOPT_TIMEOUT => $timeout,
             CURLOPT_HTTPHEADER => [
-                'Accept: application/pdf',
+                'Accept: ' . $accept,
                 'X-RAG-API-Key: ' . $this->get_api_key(),
             ],
             CURLOPT_HEADERFUNCTION => function ($curl, $line) use (&$headers) {
@@ -649,20 +712,11 @@ class api_client
             throw new \moodle_exception('backendconnectionfailed', 'local_ragassistant', '', null, $error);
         }
 
-        // Filename from Content-Disposition (filename*=UTF-8''... or filename="...").
-        $filename = '';
-        $disposition = $headers['content-disposition'] ?? '';
-        if (preg_match("/filename\\*=UTF-8''([^;]+)/i", $disposition, $m)) {
-            $filename = rawurldecode(trim($m[1], '"'));
-        } else if (preg_match('/filename="?([^";]+)"?/i', $disposition, $m)) {
-            $filename = $m[1];
-        }
-
         return [
             'status' => $status,
             'body' => (string) $body,
-            'filename' => $filename,
             'contenttype' => strtolower(trim(explode(';', $headers['content-type'] ?? '')[0])),
+            'headers' => $headers,
         ];
     }
 

@@ -96,6 +96,79 @@ function local_ragassistant_clean_download($value): ?array
 }
 
 /**
+ * Keep the valid entries of the backend's optional "images" list (document figures).
+ *
+ * The backend's "path" is dropped: figures are fetched through document_image.php, which
+ * builds the backend URL itself. Caption, filename and page are document text, so they stay
+ * plain strings here and chat.js only ever sets them with textContent.
+ *
+ * @param mixed $value
+ * @return array List of ['marker', 'image_id', 'document_id', 'filename', 'page', 'caption', 'placed'].
+ */
+function local_ragassistant_clean_images($value): array
+{
+    if (!is_array($value)) {
+        return [];
+    }
+
+    $images = [];
+    $markers = [];
+    foreach ($value as $item) {
+        if (!is_array($item)) {
+            continue;
+        }
+        $marker = (string) ($item['marker'] ?? '');
+        $imageid = (string) ($item['image_id'] ?? '');
+        $documentid = (string) ($item['document_id'] ?? '');
+        if (!preg_match('/^IMG\d{1,3}$/', $marker) || isset($markers[$marker]) ||
+                !preg_match('/^[0-9a-f]{32}$/', $imageid) || !preg_match('/^[1-9]\d{0,9}$/', $documentid)) {
+            continue;
+        }
+        $markers[$marker] = true;
+        $page = $item['page'] ?? null;
+        $images[] = [
+            'marker' => $marker,
+            'image_id' => $imageid,
+            'document_id' => $documentid,
+            'filename' => core_text::substr(trim((string) ($item['filename'] ?? '')), 0, 255),
+            'page' => is_numeric($page) && (int) $page > 0 ? (int) $page : null,
+            'caption' => core_text::substr(trim((string) ($item['caption'] ?? '')), 0, 500),
+            'placed' => !empty($item['placed']),
+        ];
+        if (count($images) >= 20) {
+            break;
+        }
+    }
+    return $images;
+}
+
+/**
+ * Render an answer, with each figure marker that stands on its own line made into its own
+ * paragraph so chat.js can put the figure there.
+ *
+ * The backend puts "[IMGn]" on its own line, but Markdown joins single lines into one
+ * paragraph. Only markers of listed images are touched, so answers without figures are
+ * rendered exactly as before.
+ *
+ * @param string $answer Raw Markdown answer.
+ * @param array $images Cleaned images (local_ragassistant_clean_images()).
+ * @param context $context Course context.
+ * @return string HTML.
+ */
+function local_ragassistant_render_answer(string $answer, array $images, context $context): string
+{
+    if ($images) {
+        $markers = array_flip(array_column($images, 'marker'));
+        $answer = preg_replace_callback(
+            '/^([ \t]*)\[(IMG\d{1,3})\][ \t]*$/m',
+            static fn($m) => isset($markers[$m[2]]) ? "\n" . $m[1] . '[' . $m[2] . "]\n" : $m[0],
+            $answer
+        );
+    }
+    return markdown_renderer::render($answer, $context);
+}
+
+/**
  * Read a typed reply to the "search more widely?" question as approve or decline.
  *
  * Only short, clear answers count; anything longer or unclear returns null and is sent
@@ -184,6 +257,7 @@ $PAGE->requires->js(new moodle_url('/local/ragassistant/chat.js'));
 $PAGE->requires->strings_for_js([
     'downloadpdf', 'downloadpdfaria', 'downloadavailableuntil', 'downloadbusy',
     'downloadexpired', 'downloadfailed',
+    'figureunavailable', 'figuresourcepage', 'figurealt', 'figureopen',
 ], 'local_ragassistant');
 $PAGE->requires->css(new moodle_url('/local/ragassistant/styles.css'));
 
@@ -390,6 +464,8 @@ if (data_submitted() && confirm_sesskey()) {
             // Optional /notes fields; both are absent for every other command.
             $download = local_ragassistant_clean_download($response['download'] ?? null);
             $pendingaction = local_ragassistant_clean_pending_action($response['pending_action'] ?? null);
+            // Optional figures from course documents; absent for most answers.
+            $images = local_ragassistant_clean_images($response['images'] ?? null);
 
             // Remember a new "search more widely?" question so the student's next typed
             // yes/no can answer it. Only the token and expiry are kept, in the session.
@@ -407,6 +483,8 @@ if (data_submitted() && confirm_sesskey()) {
                 // Kept so the Download PDF button is shown again after a reload. The
                 // approve/decline question is not kept: it is only answerable once.
                 'download' => $download,
+                // Kept so figures are shown again after a reload (fetched again then).
+                'images' => $images,
                 'sources' => is_array($response['sources'] ?? null)
                     ? $response['sources']
                     : [],
@@ -426,8 +504,9 @@ if (data_submitted() && confirm_sesskey()) {
                     'success' => true,
                     'question' => $question,
                     'display_question' => $displayquestion,
-                    'answer_html' => markdown_renderer::render($answer, $context),
+                    'answer_html' => local_ragassistant_render_answer($answer, $images, $context),
                     'illustration_url' => $illustrationurl,
+                    'images' => $images,
                     'sources' => is_array($response['sources'] ?? null)
                         ? $response['sources']
                         : [],
@@ -521,6 +600,10 @@ if ($canusechat) {
                 'courseid' => $courseid,
             ]))->out(false),
             'data-pdf-icon' => $OUTPUT->image_url('f/pdf')->out(false),
+            // Document figures are loaded through this Moodle proxy, never from the backend.
+            'data-figure-url' => (new moodle_url('/local/ragassistant/document_image.php', [
+                'courseid' => $courseid,
+            ]))->out(false),
         ]
     );
 
@@ -582,9 +665,19 @@ if ($canusechat) {
         );
         // A saved study sheet download is re-rendered by chat.js (expired state included).
         $savedownload = local_ragassistant_clean_download($turn['download'] ?? null);
+        // Saved figures are placed by chat.js too, the same way as for a new answer.
+        $savedimages = local_ragassistant_clean_images($turn['images'] ?? null);
+        $messageattributes = [];
+        if ($savedownload) {
+            $messageattributes['data-download'] = json_encode($savedownload);
+        }
+        if ($savedimages) {
+            $messageattributes['data-images'] = json_encode($savedimages,
+                JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
+        }
         echo html_writer::start_div(
             'ragassistant-message ragassistant-message-assistant',
-            $savedownload ? ['data-download' => json_encode($savedownload)] : []
+            $messageattributes
         );
         // Header: decorative avatar and the assistant's name, above the answer.
         echo html_writer::div(
@@ -593,7 +686,7 @@ if ($canusechat) {
             'ragassistant-assistant-header'
         );
         echo html_writer::start_div('ragassistant-message-content');
-        echo markdown_renderer::render((string) $turn['answer'], $context);
+        echo local_ragassistant_render_answer((string) $turn['answer'], $savedimages, $context);
         if (!empty($turn['illustration_url'])) {
             echo html_writer::div(
                 html_writer::empty_tag('img', [
