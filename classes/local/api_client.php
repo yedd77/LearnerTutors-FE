@@ -590,6 +590,18 @@ class api_client
         $status = (int) curl_getinfo($handle, CURLINFO_HTTP_CODE);
         curl_close($handle);
 
+        // The backend answers 404 "Document not found in this course." when it holds no
+        // chunks for the document, e.g. one whose indexing failed. There is nothing to
+        // delete, which is what was asked. Other 404s (a wrong base URL gives FastAPI's
+        // generic "Not Found") still fail.
+        if ($status === 404 && $error === '' && $body !== false) {
+            $data = json_decode((string) $body, true);
+            $detail = is_array($data) && is_string($data['detail'] ?? null) ? $data['detail'] : '';
+            if (stripos($detail, 'not found in this course') !== false) {
+                return ['document_id' => (string) $documentid, 'deleted_chunks' => 0, 'status' => 'not_indexed'];
+            }
+        }
+
         return $this->decode_response($body, $error, $status);
     }
 

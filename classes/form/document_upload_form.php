@@ -423,6 +423,11 @@ JS;
             return $errors;
         }
 
+        // Fingerprint of each file: Moodle's SHA-1 content hash. The same document
+        // (byte for byte, whatever its name) can be in a course only once.
+        $coursecontextid = (int) $this->_customdata['contextid'];
+        $seen = [];
+
         foreach ($draftfiles as $file) {
             $extension = strtolower(pathinfo($file->get_filename(), PATHINFO_EXTENSION));
 
@@ -449,8 +454,50 @@ JS;
                     break;
                 }
             }
+
+            $hash = $file->get_contenthash();
+            if (isset($seen[$hash])) {
+                $errors['documents'] = get_string('documentduplicateupload', 'local_ragassistant', (object) [
+                    'first' => s($seen[$hash]),
+                    'second' => s($file->get_filename()),
+                ]);
+                break;
+            }
+            $seen[$hash] = $file->get_filename();
+
+            $existing = $this->existing_document($coursecontextid, $hash);
+            if ($existing !== null) {
+                $errors['documents'] = get_string('documentduplicate', 'local_ragassistant', (object) [
+                    'filename' => s($file->get_filename()),
+                    'existing' => s($existing),
+                ]);
+                break;
+            }
         }
 
         return $errors;
+    }
+
+    /**
+     * Name of the course document with this content hash, or null if there is none.
+     *
+     * @param int $contextid course context
+     * @param string $contenthash
+     * @return string|null
+     */
+    private function existing_document(int $contextid, string $contenthash): ?string
+    {
+        global $DB;
+        $sql = "SELECT d.id, d.filename
+                  FROM {files} f
+                  JOIN {local_ragassistant_documents} d ON d.id = f.itemid AND d.contextid = f.contextid
+                 WHERE f.contextid = :contextid
+                   AND f.component = 'local_ragassistant'
+                   AND f.filearea = 'documents'
+                   AND f.contenthash = :contenthash
+                   AND f.filename <> '.'";
+        $records = $DB->get_records_sql($sql, ['contextid' => $contextid, 'contenthash' => $contenthash], 0, 1);
+        $record = reset($records);
+        return $record ? (string) $record->filename : null;
     }
 }
