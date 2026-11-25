@@ -16,13 +16,13 @@ use local_ragassistant\local\markdown_renderer;
 function local_ragassistant_render_question(string $question): string
 {
     $commands = [
-        '/exam' => '#1e88e5',
-        '/notes' => '#1e88e5',
-        '/summarize' => '#1e88e5',
-        '/flashcards' => '#1e88e5',
-        '/explain' => '#1e88e5',
-        '/quiz' => '#1e88e5',
-        '/studyguide' => '#1e88e5',
+        '/exam' => '#270089',
+        '/notes' => '#270089',
+        '/summarize' => '#270089',
+        '/flashcards' => '#270089',
+        '/explain' => '#270089',
+        '/quiz' => '#270089',
+        '/studyguide' => '#270089',
     ];
 
     if (!preg_match('/^(\s*)(\/[^\s]*)(?=\s|$)/', $question, $matches)) {
@@ -291,6 +291,63 @@ function local_ragassistant_clean_quiz($value): ?array
     return $clean;
 }
 
+/**
+ * Validate the backend's optional "flashcards" field (a /flashcards revision deck).
+ *
+ * All or nothing, like the quiz: if any card is malformed the whole deck is dropped and only
+ * the answer text is shown. Every string is plain text; chat.js sets it with textContent.
+ *
+ * @param mixed $value
+ * @return array|null ['title', 'cards' => [['front', 'back', 'source']]]
+ */
+function local_ragassistant_clean_flashcards($value): ?array
+{
+    if (!is_array($value) || !is_array($value['cards'] ?? null)) {
+        return null;
+    }
+    // The backend sends 3-15 cards (5 by default); a little headroom is allowed here.
+    $count = count($value['cards']);
+    if ($count < 1 || $count > 20) {
+        return null;
+    }
+
+    $text = function ($raw, int $max): string {
+        $clean = trim(clean_param(is_scalar($raw) ? (string) $raw : '', PARAM_TEXT));
+        return core_text::strlen($clean) > $max ? '' : $clean;
+    };
+
+    $cards = [];
+    foreach (array_values($value['cards']) as $item) {
+        if (!is_array($item)) {
+            return null;
+        }
+        $front = $text($item['front'] ?? '', 300);
+        $back = $text($item['back'] ?? '', 800);
+        if ($front === '' || $back === '') {
+            return null;
+        }
+
+        $source = '';
+        if (is_array($item['source'] ?? null)) {
+            $source = $text($item['source']['filename'] ?? '', 255);
+            if ($source !== '' && !empty($item['source']['page'])) {
+                $source .= ' · ' . get_string('sourcepage', 'local_ragassistant') . ' ' .
+                    (int) $item['source']['page'];
+            }
+        } else if (is_string($item['source'] ?? null)) {
+            // Already formatted (a deck saved in the session history).
+            $source = $text($item['source'], 300);
+        }
+
+        $cards[] = ['front' => $front, 'back' => $back, 'source' => $source];
+    }
+
+    return [
+        'title' => $text($value['title'] ?? '', 160),
+        'cards' => $cards,
+    ];
+}
+
 // Input handling and access control setup.
 $courseid = required_param('courseid', PARAM_INT);
 $course = get_course($courseid);
@@ -334,6 +391,11 @@ $PAGE->requires->strings_for_js([
     'quiznext', 'quizseescore', 'quizcorrect', 'quizincorrect', 'quizsource', 'quizscorearia',
     'quizverdictexcellent', 'quizverdictgood', 'quizverdictclose', 'quizverdictpractise',
     'quizpercent', 'quizretry',
+    'charactercount',
+    'flashcardsaria', 'flashcardcount', 'flashcardquestion', 'flashcardanswer', 'flashcardfliphint',
+    'flashcardfliphinttouch', 'flashcardprevious', 'flashcardnext', 'flashcardrestart',
+    'flashcardsource', 'flashcardanswershown', 'flashcardquestionshown',
+    'flashcardarialabelquestion', 'flashcardarialabelanswer',
 ], 'local_ragassistant');
 $PAGE->requires->css(new moodle_url('/local/ragassistant/styles.css'));
 
@@ -546,8 +608,11 @@ if (data_submitted() && confirm_sesskey()) {
             $quiz = is_array($response['quiz'] ?? null)
                 ? local_ragassistant_clean_quiz(['id' => random_string(16)] + $response['quiz'])
                 : null;
-            // A quiz reply shows no Sources list under the card.
-            $sources = !$quiz && is_array($response['sources'] ?? null) ? $response['sources'] : [];
+            // Optional /flashcards deck; absent for every other command.
+            $flashcards = local_ragassistant_clean_flashcards($response['flashcards'] ?? null);
+            // A quiz or flashcard reply shows no Sources list: each question or card names its own.
+            $sources = !$quiz && !$flashcards && is_array($response['sources'] ?? null)
+                ? $response['sources'] : [];
 
             // Remember a new "search more widely?" question so the student's next typed
             // yes/no can answer it. Only the token and expiry are kept, in the session.
@@ -569,6 +634,8 @@ if (data_submitted() && confirm_sesskey()) {
                 'images' => $images,
                 // Kept so the quiz card is rebuilt after a reload (it starts again at question 1).
                 'quiz' => $quiz,
+                // Kept so the deck is rebuilt after a reload (it reopens on card 1).
+                'flashcards' => $flashcards,
                 'sources' => $sources,
                 'time' => time(),
             ];
@@ -592,6 +659,7 @@ if (data_submitted() && confirm_sesskey()) {
                     'sources' => $sources,
                     'download' => $download,
                     'quiz' => $quiz,
+                    'flashcards' => $flashcards,
                 ],JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
                 exit;
             }
@@ -770,6 +838,12 @@ if ($canusechat) {
                 $messageattributes['data-quiz-progress'] = json_encode($savedprogress);
             }
         }
+        // A saved flashcard deck is rebuilt by chat.js (on card 1).
+        $savedflashcards = local_ragassistant_clean_flashcards($turn['flashcards'] ?? null);
+        if ($savedflashcards) {
+            $messageattributes['data-flashcards'] = json_encode($savedflashcards,
+                JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
+        }
         if ($savedownload) {
             $messageattributes['data-download'] = json_encode($savedownload);
         }
@@ -803,7 +877,7 @@ if ($canusechat) {
 
         // Display sources of cite if available
         // Quiz replies show no Sources list (also for quizzes saved before that rule).
-        if (!empty($turn['sources']) && !$savedquiz) {
+        if (!empty($turn['sources']) && !$savedquiz && !$savedflashcards) {
             echo html_writer::tag('details', html_writer::tag('summary', get_string('sourcesheading', 'local_ragassistant')) . html_writer::start_tag('ul', ['class' => 'ragassistant-source-list']) . implode('', array_map(function ($source) {
                 $label = (string) ($source['filename'] ?? get_string('unknown', 'local_ragassistant'));
                 if (!empty($source['page'])) {
@@ -851,8 +925,9 @@ if ($canusechat) {
         echo html_writer::start_tag('form', ['method' => 'post', 'action' => $pageurl->out(false), 'class' => 'ragassistant-chat-composer']);
         echo html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'sesskey', 'value' => sesskey()]);
         echo html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'tool_id', 'id' => 'ragassistant-tool-id', 'value' => '']);
-        echo html_writer::tag('label', get_string('yourquestion', 'local_ragassistant'), ['for' => 'ragassistant-question', 'class' => 'sr-only']);
-        echo html_writer::start_div('ragassistant-composer-input-wrap');
+        echo html_writer::tag('label', get_string('yourquestion', 'local_ragassistant'), ['id' => 'ragassistant-question-label', 'class' => 'sr-only']);
+        // One field: the question box with a toolbar (study tools, character count, send) under it.
+        echo html_writer::start_div('ragassistant-composer-input-wrap ragassistant-composer-field');
         echo html_writer::tag('div', '', ['id' => 'ragassistant-command-menu', 'class' => 'ragassistant-command-menu', 'role' => 'listbox', 'aria-label' => 'Available assistant commands', 'hidden' => 'hidden']);
         echo html_writer::tag('div', s($question), [
             'id' => 'ragassistant-question',
@@ -868,8 +943,27 @@ if ($canusechat) {
         ]);
         echo html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'question', 'id' => 'ragassistant-question-value', 'value' => $question]);
 
-        echo html_writer::end_div();
-
+        echo html_writer::start_div('ragassistant-composer-toolbar');
+        // Opens the slash-command menu, so the study tools can be found without knowing "/".
+        echo html_writer::tag('button',
+            html_writer::tag('span', '/', ['class' => 'ragassistant-tools-slash', 'aria-hidden' => 'true']) .
+                get_string('studytools', 'local_ragassistant'),
+            [
+                'type' => 'button',
+                'id' => 'ragassistant-tools-button',
+                'class' => 'ragassistant-tools-button',
+                'aria-haspopup' => 'listbox',
+                'aria-controls' => 'ragassistant-command-menu',
+                'aria-expanded' => 'false',
+            ]
+        );
+        echo html_writer::start_div('ragassistant-composer-actions');
+        // Shown by chat.js only near the 4000 character limit.
+        echo html_writer::tag('span', '', [
+            'id' => 'ragassistant-char-count',
+            'class' => 'ragassistant-char-count',
+            'hidden' => 'hidden',
+        ]);
         $sendicon = $OUTPUT->pix_icon(
             'send',
             "",
@@ -881,6 +975,11 @@ if ($canusechat) {
             'class' => 'btn btn-primary ragassistant-send-button',
             'aria-label' => 'Send question',
         ]);
+        echo html_writer::end_div();
+        echo html_writer::end_div();
+
+        echo html_writer::end_div();
+
         echo html_writer::tag('small', get_string('chatinputhint', 'local_ragassistant'), ['class' => 'text-muted ragassistant-chat-hint']);
         echo html_writer::end_tag('form');
     }

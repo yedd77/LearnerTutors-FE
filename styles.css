@@ -1,9 +1,71 @@
+/* Plugin colour palette: Dark Violet primary (the brand colour #270089), Cool Grey
+   neutrals, with Teal (success), Red (error) and Yellow (warning) as supporting
+   colours. Every colour in this file comes from these variables. #270089 is the 800
+   shade: white text on it is 14.5:1, so it is the button and link colour, and the
+   lighter violets are for tints, borders and decoration. Moodle loads this file on
+   every page, so the names are all prefixed. */
+:root {
+    --ragassistant-violet-900: #1a005c;
+    --ragassistant-violet-800: #270089;
+    --ragassistant-violet-700: #3a0fb0;
+    --ragassistant-violet-600: #5332d4;
+    --ragassistant-violet-500: #6d52e6;
+    --ragassistant-violet-400: #8b77f0;
+    --ragassistant-violet-300: #ab9ef7;
+    --ragassistant-violet-200: #cbc3fb;
+    --ragassistant-violet-100: #e4dffd;
+    --ragassistant-violet-50: #f4f2ff;
+
+    --ragassistant-grey-900: #1f2933;
+    --ragassistant-grey-800: #323f4b;
+    --ragassistant-grey-700: #3e4c59;
+    --ragassistant-grey-600: #52606d;
+    --ragassistant-grey-500: #616e7c;
+    --ragassistant-grey-400: #7b8794;
+    --ragassistant-grey-300: #9aa5b1;
+    --ragassistant-grey-200: #cbd2d9;
+    --ragassistant-grey-100: #e4e7eb;
+    --ragassistant-grey-50: #f5f7fa;
+
+    --ragassistant-teal-800: #0c6b58;
+    --ragassistant-teal-700: #147d64;
+    --ragassistant-teal-600: #199473;
+    --ragassistant-teal-50: #effcf6;
+
+    --ragassistant-red-700: #911111;
+    --ragassistant-red-600: #a61b1b;
+    --ragassistant-red-500: #ba2525;
+    --ragassistant-red-50: #ffeeee;
+
+    --ragassistant-yellow-600: #c99a2e;
+
+    /* Roles. */
+    --ragassistant-primary: var(--ragassistant-violet-800);
+    --ragassistant-primary-hover: var(--ragassistant-violet-900);
+    --ragassistant-primary-strong: var(--ragassistant-violet-800);
+    --ragassistant-primary-light: var(--ragassistant-violet-50);
+    --ragassistant-primary-rgb: 39 0 137;
+    --ragassistant-text: var(--ragassistant-grey-900);
+    --ragassistant-body: var(--ragassistant-grey-800);
+    --ragassistant-muted: var(--ragassistant-grey-600);
+    --ragassistant-placeholder: var(--ragassistant-grey-500);
+    --ragassistant-border: var(--ragassistant-grey-200);
+    --ragassistant-border-subtle: var(--ragassistant-grey-100);
+    --ragassistant-surface: #fff;
+    --ragassistant-background: var(--ragassistant-grey-50);
+    --ragassistant-subtle: var(--ragassistant-grey-100);
+    --ragassistant-user: var(--ragassistant-violet-100);
+    --ragassistant-assistant: var(--ragassistant-surface);
+    --ragassistant-shadow-rgb: 31 41 51;
+    --ragassistant-danger: var(--ragassistant-red-700);
+}
+
 .ragassistant-card,
 .ragassistant-chat-shell {
-    border: 1px solid var(--bs-border-color, #dee2e6);
+    border: 1px solid var(--ragassistant-border);
     border-radius: .75rem;
     padding: 1.25rem;
-    background: var(--bs-body-bg, #fff);
+    background: var(--ragassistant-surface);
 }
 
 .ragassistant-card h3 {
@@ -31,7 +93,7 @@
 
 .ragassistant-chat-welcome {
     border-radius: .5rem;
-    background: var(--bs-secondary-bg, #f8f9fa);
+    background: var(--ragassistant-background);
     padding: 1rem;
     margin-bottom: 1rem;
 }
@@ -130,7 +192,7 @@
 }
 
 .ragassistant-answer {
-    border: 1px solid var(--bs-border-color, #dee2e6);
+    border: 1px solid var(--ragassistant-border);
     border-radius: .75rem;
     padding: 1.25rem;
 }
@@ -168,7 +230,7 @@
     height: 800px;
     padding: 1rem;
     box-sizing: border-box;
-    border: 1px solid var(--bs-border-color, #dee2e6);
+    border: 1px solid var(--ragassistant-border);
     border-radius: 1rem;
     overflow: hidden;
     background: transparent;
@@ -196,7 +258,7 @@
 .blob-1 {
     width: 500px;
     height: 500px;
-    background: #fbcfe8;
+    background: var(--ragassistant-violet-200);
     top: -100px;
     left: 20%;
 }
@@ -204,7 +266,7 @@
 .blob-2 {
     width: 600px;
     height: 600px;
-    background: #bbacdf;
+    background: var(--ragassistant-violet-300);
     bottom: 43px;
     left: 0%;
 }
@@ -212,13 +274,13 @@
 .blob-3 {
     width: 550px;
     height: 550px;
-    background: #bbacdf;
+    background: var(--ragassistant-violet-300);
     top: 30%;
     right: 10%;
 }
 
 .ragassistant-chat-app.ragassistant-chat-active {
-    background: #f7f8f9;
+    background: var(--ragassistant-background);
 }
 
 .ragassistant-chat-active .blob-1 {
@@ -255,7 +317,7 @@
     padding: 1rem .5rem 1rem .25rem;
     /* Thin, quiet scrollbar (Firefox). */
     scrollbar-width: thin;
-    scrollbar-color: rgb(39 0 137 / 25%) transparent;
+    scrollbar-color: rgb(var(--ragassistant-primary-rgb) / 25%) transparent;
     /* Soften the bottom edge where messages scroll under the suggestions/composer. */
     -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 1.5rem), transparent);
     mask-image: linear-gradient(to bottom, #000 calc(100% - 1.5rem), transparent);
@@ -273,16 +335,16 @@
 .ragassistant-chat-transcript::-webkit-scrollbar-thumb {
     border: 2px solid transparent;
     border-radius: 999px;
-    background-color: rgb(39 0 137 / 22%);
+    background-color: rgb(var(--ragassistant-primary-rgb) / 22%);
     background-clip: padding-box;
 }
 
 .ragassistant-chat-transcript:hover::-webkit-scrollbar-thumb {
-    background-color: rgb(39 0 137 / 38%);
+    background-color: rgb(var(--ragassistant-primary-rgb) / 38%);
 }
 
 .ragassistant-chat-transcript::-webkit-scrollbar-thumb:active {
-    background-color: rgb(39 0 137 / 55%);
+    background-color: rgb(var(--ragassistant-primary-rgb) / 55%);
 }
 
 .ragassistant-suggestions,
@@ -305,17 +367,17 @@
     gap: .75rem;
     width: 100%;
     padding: 1rem;
-    border: 1px solid var(--bs-border-color, #dee2e6);
+    border: 1px solid var(--ragassistant-border);
     border-radius: .75rem;
     background: rgb(255 255 255 / 75%);
-    color: var(--bs-body-color, #212529);
+    color: var(--ragassistant-text);
     text-align: left;
     cursor: pointer;
 }
 
 .ragassistant-suggestion-card:hover {
-    background: var(--bs-body-bg, #fff);
-    border-color: var(--ragassistant-primary, #270089);
+    background: var(--ragassistant-surface);
+    border-color: var(--ragassistant-primary);
 }
 
 #id_submitbutton {
@@ -334,8 +396,8 @@
 }
 
 .ragassistant-message-user .ragassistant-message-content {
-    background: #f3ebf2;
-    color: #404040;
+    background: var(--ragassistant-user);
+    color: var(--ragassistant-text);
     border-radius: 1rem 1rem .25rem 1rem;
 }
 
@@ -350,8 +412,9 @@
 
 .ragassistant-message-assistant .ragassistant-message-content {
     grid-column: 2;
-    background: #e4daf5;
-    color: #363636;
+    background: var(--ragassistant-assistant);
+    color: var(--ragassistant-body);
+    border: 1px solid var(--ragassistant-border);
     border-radius: .25rem 1rem 1rem 1rem;
 }
 
@@ -371,7 +434,7 @@
 
 .ragassistant-assistant-name {
     grid-column: 2;
-    color: var(--ragassistant-primary, #270089);
+    color: var(--ragassistant-primary);
     font-size: .875rem;
     font-weight: 600;
     line-height: 1.2;
@@ -395,27 +458,99 @@
     width: 1.75rem;
     height: 1.75rem;
     border-radius: 50%;
-    background: var(--ragassistant-primary, #270089);
+    background: var(--ragassistant-primary);
     color: #fff;
     font-size: .85rem;
     font-weight: 700;
 }
 
+/* Chat composer: one field (question box + toolbar), with the AI disclaimer under it. */
 .ragassistant-chat-composer {
     position: relative;
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: .6rem;
-    border-top: 1px solid var(--bs-border-color, #dee2e6);
-    padding-top: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: .4rem;
 }
 
-.ragassistant-chat-input {
-    align-self: start;
-    height: auto;
-    max-height: 3.25rem;
-    resize: none;
-    border-radius: .7rem;
+.ragassistant-composer-field {
+    border: 1px solid var(--ragassistant-border);
+    border-radius: 1rem;
+    background: var(--ragassistant-surface);
+    box-shadow: 0 1px 2px rgb(var(--ragassistant-shadow-rgb) / 6%);
+    transition: border-color .15s ease, box-shadow .15s ease;
+}
+
+/* The question box itself has no outline; the whole field shows focus instead. */
+.ragassistant-composer-field:focus-within {
+    border-color: var(--ragassistant-primary);
+    box-shadow: 0 0 0 3px rgb(var(--ragassistant-primary-rgb) / 15%);
+}
+
+.ragassistant-composer-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .5rem;
+    padding: .25rem .5rem .5rem;
+}
+
+.ragassistant-tools-button {
+    display: inline-flex;
+    align-items: center;
+    gap: .45rem;
+    min-height: 2.25rem;
+    padding: 0 .7rem 0 .5rem;
+    border: 0;
+    border-radius: .6rem;
+    background: transparent;
+    color: var(--ragassistant-muted);
+    font-size: .875rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color .15s ease, color .15s ease;
+}
+
+.ragassistant-tools-button:hover,
+.ragassistant-tools-button[aria-expanded="true"] {
+    background: var(--ragassistant-primary-light);
+    color: var(--ragassistant-primary);
+}
+
+.ragassistant-tools-button:focus-visible {
+    outline: 2px solid var(--ragassistant-primary);
+    outline-offset: 2px;
+}
+
+/* Key-cap style "/" so the button also teaches the typed shortcut. */
+.ragassistant-tools-slash {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.3rem;
+    height: 1.3rem;
+    border: 1px solid currentColor;
+    border-radius: .35rem;
+    font-size: .75rem;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.ragassistant-composer-actions {
+    display: flex;
+    align-items: center;
+    gap: .6rem;
+    margin-left: auto;
+}
+
+.ragassistant-char-count {
+    color: var(--ragassistant-muted);
+    font-size: .8rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.ragassistant-char-count.is-limit {
+    color: var(--ragassistant-danger);
+    font-weight: 600;
 }
 
 #fitem_id_submitbutton .col-md-9 {
@@ -424,36 +559,92 @@
 }
 
 .ragassistant-send-button {
+    position: relative;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 3rem;
-    height: 3rem;
+    width: 2.25rem;
+    height: 2.25rem;
     padding: 0;
-    background-color: var(--ragassistant-primary, #270089);
+    border-radius: .6rem;
+    background-color: var(--ragassistant-primary);
+    border-color: var(--ragassistant-primary);
     color: #fff;
-    align-self: center;
-    border-radius: 50%;
 }
 
 .ragassistant-send-icon {
-    width: 1.25rem;
-    height: 1.25rem;
+    width: 1.1rem;
+    height: 1.1rem;
+    margin: 0;
 }
 
-.ragassistant-send-button:hover {
-    background-color: #1f006e;
+.ragassistant-send-button:hover:not(:disabled) {
+    background-color: var(--ragassistant-primary-hover);
+    border-color: var(--ragassistant-primary-hover);
     color: #fff;
 }
 
+.ragassistant-send-button:focus-visible {
+    outline: 2px solid var(--ragassistant-primary);
+    outline-offset: 2px;
+}
+
+/* Nothing to send yet: a quiet grey button with a grey arrow. */
 .ragassistant-send-button:disabled {
-    background-color: #4a3b71;
-    color: #fff;
-    opacity: 0.65;
+    background-color: var(--ragassistant-subtle);
+    border-color: var(--ragassistant-subtle);
+    opacity: 1;
+    cursor: not-allowed;
+}
+
+.ragassistant-send-button:disabled .ragassistant-send-icon {
+    filter: brightness(0);
+    opacity: .35;
+}
+
+/* Waiting for an answer: the arrow becomes a spinner. */
+.ragassistant-send-button[aria-busy="true"] {
+    background-color: var(--ragassistant-primary);
+    border-color: var(--ragassistant-primary);
+    cursor: progress;
+}
+
+.ragassistant-send-button[aria-busy="true"] .ragassistant-send-icon {
+    visibility: hidden;
+}
+
+.ragassistant-send-button[aria-busy="true"]::after {
+    content: "";
+    position: absolute;
+    width: 1rem;
+    height: 1rem;
+    border: 2px solid rgb(255 255 255 / 35%);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: ragassistant-send-spin .8s linear infinite;
+}
+
+@keyframes ragassistant-send-spin {
+    to {
+        transform: rotate(360deg);
+    }
 }
 
 .ragassistant-chat-hint {
-    grid-column: 1 / -1;
+    padding: 0 .25rem;
+    font-size: .75rem;
+    text-align: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ragassistant-composer-field,
+    .ragassistant-tools-button {
+        transition: none;
+    }
+
+    .ragassistant-send-button[aria-busy="true"]::after {
+        animation-duration: 2.4s;
+    }
 }
 
 .ragassistant-sources-details {
@@ -472,21 +663,12 @@
 
 .ragassistant-source-list p {
     margin: .25rem 0 0;
-    color: var(--bs-secondary-color, #6c757d);
+    color: var(--ragassistant-muted);
 }
 
 @media (max-width: 575px) {
     .ragassistant-message {
         max-width: 100%;
-    }
-
-    .ragassistant-chat-composer {
-        grid-template-columns: 1fr;
-    }
-
-    .ragassistant-send-button {
-        justify-self: end;
-        color: #fff;
     }
 }
 
@@ -513,21 +695,21 @@
     margin: 0 0 .35rem;
     font-size: 1.1rem;
     font-weight: 650;
-    color: #212529;
+    color: var(--ragassistant-text);
 }
 
 .ragassistant-section-description {
     margin: 0;
-    color: #6c757d;
+    color: var(--ragassistant-muted);
     line-height: 1.5;
 }
 
 .ragassistant-review-wrap {
     overflow: hidden;
     margin-bottom: 1.25rem;
-    border: 1px solid #dce3ea;
+    border: 1px solid var(--ragassistant-border);
     border-radius: .7rem;
-    background: #fff;
+    background: var(--ragassistant-surface);
 }
 
 .ragassistant-review-table {
@@ -539,9 +721,9 @@
 
 .ragassistant-review-table thead th {
     padding: .85rem 1rem;
-    border-bottom: 1px solid #dce3ea;
-    background: #f7f9fc;
-    color: #344054;
+    border-bottom: 1px solid var(--ragassistant-border);
+    background: var(--ragassistant-background);
+    color: var(--ragassistant-text);
     font-size: .82rem;
     font-weight: 700;
     vertical-align: middle;
@@ -549,7 +731,7 @@
 
 .ragassistant-review-table tbody td {
     padding: .85rem 1rem;
-    border-bottom: 1px solid #edf0f3;
+    border-bottom: 1px solid var(--ragassistant-border-subtle);
     vertical-align: middle;
 }
 
@@ -578,7 +760,7 @@
 
     .ragassistant-review-table tbody tr {
         padding: .6rem 0;
-        border-bottom: 1px solid #dce3ea;
+        border-bottom: 1px solid var(--ragassistant-border);
     }
 
     .ragassistant-review-table tbody tr:last-child {
@@ -608,19 +790,8 @@
 /* Main form spacing */
 #page-local-ragassistant-documents .mform,
 #page-local-ragassistant-documents form.mform {
-    --ragassistant-primary: #270089;
-    --ragassistant-primary-light: #edf4ff;
-    --ragassistant-border: #dfe5ee;
-    --ragassistant-text: #253247;
-    --ragassistant-muted: #69778b;
-    --ragassistant-surface: #ffffff;
-    --ragassistant-background: #f7f9fc;
     --ragassistant-radius: 14px;
-    --ragassistant-subtle: #e9e6f3;
     color: var(--ragassistant-text);
-    --ragassistant-user: #fef6fd;
-    --ragassistant-assistant: #efe6fb;
-
 }
 
 /* Section header */
@@ -653,8 +824,8 @@
     align-items: center;
     justify-content: center;
     border-radius: 11px;
-    background: var(--ragassistant-primary-light, #edf4ff);
-    color: var(--ragassistant-primary, #356fba);
+    background: var(--ragassistant-primary-light);
+    color: var(--ragassistant-primary-strong);
     font-size: 0.9rem;
     font-weight: 800;
 }
@@ -666,7 +837,7 @@
 
 .ragassistant-card-title {
     margin: 0 0 6px;
-    color: var(--ragassistant-text, #253247);
+    color: var(--ragassistant-text);
     font-size: 1.08rem;
     font-weight: 700;
     line-height: 1.4;
@@ -674,7 +845,7 @@
 
 .ragassistant-card-description {
     margin: 0;
-    color: var(--ragassistant-muted, #69778b);
+    color: var(--ragassistant-muted);
     font-size: 0.92rem;
     line-height: 1.6;
 }
@@ -684,10 +855,10 @@
     display: block;
     margin: 0 0 12px;
     padding: 20px;
-    border: 1px solid var(--ragassistant-border, #dfe5ee);
+    border: 1px solid var(--ragassistant-border);
     border-radius: var(--ragassistant-radius, 14px);
-    background: var(--ragassistant-surface, #fff);
-    box-shadow: 0 3px 12px rgb(25 45 75 / 4%);
+    background: var(--ragassistant-surface);
+    box-shadow: 0 3px 12px rgb(var(--ragassistant-shadow-rgb) / 4%);
 }
 
 #fitem_id_documents>.col-form-label,
@@ -703,7 +874,7 @@
 #fitem_id_documents .col-form-label {
     display: block;
     margin-bottom: 12px;
-    color: var(--ragassistant-text, #253247);
+    color: var(--ragassistant-text);
     font-weight: 700;
 }
 
@@ -749,10 +920,10 @@
     display: inline-flex;
     align-items: center;
     padding: 7px 11px;
-    border: 1px solid var(--ragassistant-border, #dfe5ee);
+    border: 1px solid var(--ragassistant-border);
     border-radius: 999px;
-    background: var(--ragassistant-background, #f7f9fc);
-    color: var(--ragassistant-muted, #69778b);
+    background: var(--ragassistant-background);
+    color: var(--ragassistant-muted);
     font-size: 0.8rem;
     font-weight: 600;
     line-height: 1.3;
@@ -770,16 +941,16 @@
 .ragassistant-file-card {
     min-width: 0;
     padding: 18px;
-    border: 1px solid var(--ragassistant-border, #dfe5ee);
+    border: 1px solid var(--ragassistant-border);
     border-radius: var(--ragassistant-radius, 14px);
-    background: var(--ragassistant-surface, #fff);
-    box-shadow: 0 3px 12px rgb(25 45 75 / 4%);
+    background: var(--ragassistant-surface);
+    box-shadow: 0 3px 12px rgb(var(--ragassistant-shadow-rgb) / 4%);
     transition: border-color 160ms ease, box-shadow 160ms ease;
 }
 
 .ragassistant-file-card:hover {
-    border-color: #b9cde8;
-    box-shadow: 0 6px 18px rgb(25 45 75 / 7%);
+    border-color: var(--ragassistant-violet-200);
+    box-shadow: 0 6px 18px rgb(var(--ragassistant-shadow-rgb) / 7%);
 }
 
 .ragassistant-file-card-header {
@@ -789,7 +960,7 @@
     min-width: 0;
     margin-bottom: 18px;
     padding-bottom: 15px;
-    border-bottom: 1px solid #edf0f5;
+    border-bottom: 1px solid var(--ragassistant-border-subtle);
 }
 
 .ragassistant-file-icon {
@@ -802,10 +973,10 @@
     overflow: hidden;
     margin-right: .7rem;
     padding: .25rem .4rem;
-    border: 1px solid #d9e6fb;
+    border: 1px solid var(--ragassistant-violet-100);
     border-radius: 9px;
-    background: var(--ragassistant-primary-light, #edf4ff);
-    color: var(--ragassistant-primary, #356fba);
+    background: var(--ragassistant-primary-light);
+    color: var(--ragassistant-primary-strong);
     font-size: 0.67rem;
     font-weight: 800;
     letter-spacing: 0.02em;
@@ -823,14 +994,14 @@
 .ragassistant-filename {
     display: block;
     overflow-wrap: anywhere;
-    color: var(--ragassistant-text, #253247);
+    color: var(--ragassistant-text);
     font-size: 0.94rem;
     font-weight: 700;
     line-height: 1.45;
 }
 
 .ragassistant-file-number {
-    color: var(--ragassistant-muted, #69778b);
+    color: var(--ragassistant-muted);
     font-size: 0.78rem;
 }
 
@@ -844,7 +1015,7 @@
 .ragassistant-note-label {
     display: block;
     margin-bottom: 8px;
-    color: var(--ragassistant-text, #253247);
+    color: var(--ragassistant-text);
     font-size: 0.86rem;
     font-weight: 700;
 }
@@ -854,10 +1025,10 @@
     min-width: 220px;
     min-height: 88px;
     padding: 11px 12px;
-    border: 1px solid #d7dee8;
+    border: 1px solid var(--ragassistant-border);
     border-radius: 9px;
-    background: #fff;
-    color: var(--ragassistant-text, #253247);
+    background: var(--ragassistant-surface);
+    color: var(--ragassistant-text);
     font-size: 0.9rem;
     line-height: 1.55;
     resize: vertical;
@@ -866,13 +1037,13 @@
 }
 
 .ragassistant-note-input::placeholder {
-    color: #98a3b3;
+    color: var(--ragassistant-placeholder);
 }
 
 .ragassistant-note-input:focus {
-    border-color: var(--ragassistant-primary, #356fba);
+    border-color: var(--ragassistant-primary);
     outline: none;
-    box-shadow: 0 0 0 3px rgb(53 111 186 / 13%);
+    box-shadow: 0 0 0 3px rgb(var(--ragassistant-primary-rgb) / 13%);
 }
 
 /* Form validation messages */
@@ -885,20 +1056,20 @@
 #page-local-ragassistant-documents #fgroup_id_buttonar {
     margin-top: 24px;
     padding: 18px 20px;
-    border: 1px solid var(--ragassistant-border, #dfe5ee);
+    border: 1px solid var(--ragassistant-border);
     border-radius: var(--ragassistant-radius, 14px);
-    background: var(--ragassistant-surface, #fff);
+    background: var(--ragassistant-surface);
 }
 
 #page-local-ragassistant-documents #fgroup_id_buttonar .btn-primary {
     padding: 10px 22px;
     border-radius: 9px;
     font-weight: 700;
-    box-shadow: 0 3px 8px rgb(25 45 75 / 10%);
+    box-shadow: 0 3px 8px rgb(var(--ragassistant-shadow-rgb) / 10%);
 }
 
 #page-local-ragassistant-documents #fgroup_id_buttonar .btn-primary:focus {
-    box-shadow: 0 0 0 3px rgb(53 111 186 / 20%);
+    box-shadow: 0 0 0 3px rgb(var(--ragassistant-primary-rgb) / 20%);
 }
 
 /* Responsive layout */
@@ -954,7 +1125,7 @@
     padding: 24px;
     border: none;
     border-radius: 14px;
-    background: #fff;
+    background: var(--ragassistant-surface);
 }
 
 #page-local-ragassistant-documents .ragassistant-uploaded-card {
@@ -977,7 +1148,7 @@
 #page-local-ragassistant-documents #fgroup_id_buttonar {
     margin-top: 20px !important;
     padding-top: 18px !important;
-    border-top: 1px solid #edf0f5 !important;
+    border-top: 1px solid var(--ragassistant-border-subtle) !important;
 }
 
 form.mform #fgroup_id_buttonar>.felement,
@@ -993,24 +1164,23 @@ form.mform #fgroup_id_buttonar .felement.fgroup {
 /* Slash-command autocomplete for the AI chat composer. */
 .ragassistant-composer-input-wrap {
     position: relative;
-    flex: 1 1 auto;
     min-width: 0;
-    align-self: start;
 }
 
 .ragassistant-command-menu {
     position: absolute;
     z-index: 1050;
     right: 0;
-    bottom: calc(100% - 15px);
+    /* Floats just above the composer field. */
+    bottom: calc(100% + .5rem);
     left: 0;
     max-height: 320px;
     overflow-y: auto;
     padding: .35rem;
-    border: 1px solid var(--bs-border-color, #d9e0e8);
+    border: 1px solid var(--ragassistant-border);
     border-radius: .75rem;
-    background: var(--bs-body-bg, #fff);
-    box-shadow: 0 10px 28px rgb(20 35 55 / 16%);
+    background: var(--ragassistant-surface);
+    box-shadow: 0 10px 28px rgb(var(--ragassistant-shadow-rgb) / 16%);
 }
 
 .ragassistant-command-menu[hidden] {
@@ -1026,14 +1196,14 @@ form.mform #fgroup_id_buttonar .felement.fgroup {
     border: 0;
     border-radius: .5rem;
     background: transparent;
-    color: var(--bs-body-color, #212529);
+    color: var(--ragassistant-text);
     text-align: left;
     cursor: pointer;
 }
 
 .ragassistant-command-option:hover,
 .ragassistant-command-option[aria-selected="true"] {
-    background: var(--bs-tertiary-bg, #f1f4f8);
+    background: var(--ragassistant-primary-light);
 }
 
 .ragassistant-command-title {
@@ -1041,35 +1211,44 @@ form.mform #fgroup_id_buttonar .felement.fgroup {
 }
 
 .ragassistant-command-description {
-    color: var(--bs-secondary-color, #6c757d);
+    color: var(--ragassistant-muted);
     font-size: .82rem;
     line-height: 1.4;
 }
 
+/* The question box grows with its text up to 12rem, then scrolls. Its border and
+   focus ring belong to .ragassistant-composer-field. */
 .ragassistant-chat-input {
-    height: 4.5rem;
-    min-height: 4.5rem;
+    display: block;
+    width: 100%;
+    height: auto;
+    min-height: 2.75rem;
     max-height: 12rem;
+    padding: .85rem 1rem .25rem;
     overflow-y: auto;
     white-space: pre-wrap;
     overflow-wrap: anywhere;
-    background: rgb(255 255 255 / 75%);
+    background: transparent;
+    color: var(--ragassistant-text);
+    line-height: 1.5;
     cursor: text;
     border: 0 !important;
+    border-radius: 1rem 1rem 0 0;
     box-shadow: none !important;
 }
 
 .ragassistant-chat-input:focus {
-    background: rgb(255 255 255 / 75%);
+    background: transparent;
     border: 0 !important;
     box-shadow: none !important;
+    outline: none;
 }
 
 .ragassistant-chat-input[data-empty="true"]::before {
     content: attr(data-placeholder);
     float: left;
     height: 0;
-    color: #6c757d;
+    color: var(--ragassistant-muted);
     pointer-events: none;
 }
 
@@ -1079,7 +1258,7 @@ form.mform #fgroup_id_buttonar .felement.fgroup {
 }
 
 .ragassistant-message-error .ragassistant-message-content {
-    color: var(--bs-danger, #dc3545);
+    color: var(--ragassistant-danger);
 }
 
 .ragassistant-illustration-wrap {
@@ -1093,14 +1272,14 @@ form.mform #fgroup_id_buttonar .felement.fgroup {
     max-width: 720px;
     height: auto;
     margin: 0 auto;
-    border: 1px solid var(--bs-border-color, #dee2e6);
+    border: 1px solid var(--ragassistant-border);
     border-radius: .75rem;
-    background: var(--bs-body-bg, #fff)
+    background: var(--ragassistant-surface)
 }
 
 .ragassistant-illustration-wrap figcaption {
     margin-top: .4rem;
-    color: var(--bs-secondary-color, #6c757d);
+    color: var(--ragassistant-muted);
     font-size: .8rem;
     text-align: center
 }
@@ -1137,15 +1316,15 @@ form.mform #fgroup_id_buttonar .felement.fgroup {
     max-height: 220px;
     margin: 0 auto;
     height: auto;
-    border: 1px solid var(--bs-border-color, #dee2e6);
+    border: 1px solid var(--ragassistant-border);
     border-radius: .5rem;
-    background: var(--bs-body-bg, #fff);
+    background: var(--ragassistant-surface);
     cursor: zoom-in;
 }
 
 .local-ragassistant-figure figcaption {
     margin-top: .35rem;
-    color: var(--bs-secondary-color, #6c757d);
+    color: var(--ragassistant-muted);
     font-size: .8rem;
     font-style: italic;
     font-weight: 600;
@@ -1155,7 +1334,7 @@ form.mform #fgroup_id_buttonar .felement.fgroup {
 
 .local-ragassistant-figure-unavailable {
     margin: .5rem 0;
-    color: var(--bs-secondary-color, #6c757d);
+    color: var(--ragassistant-muted);
     font-size: .85rem;
     font-style: italic;
 }
@@ -1173,7 +1352,7 @@ form.mform #fgroup_id_buttonar .felement.fgroup {
 /* Chat generation cancellation control. */
 .ragassistant-stop-button[hidden] { display: none !important; }
 .ragassistant-stop-button { margin-left: 0.5rem; white-space: nowrap; }
-.ragassistant-message-stopped .ragassistant-message-content { color: var(--bs-secondary-color, #6c757d); font-style: italic; }
+.ragassistant-message-stopped .ragassistant-message-content { color: var(--ragassistant-muted); font-style: italic; }
 
 
 /* Compact document indexing status and background-job progress. */
@@ -1196,7 +1375,7 @@ form.mform #fgroup_id_buttonar .felement.fgroup {
     margin: .15rem 0;
     overflow: hidden;
     border-radius: 999px;
-    background: var(--bs-secondary-bg, #e9ecef);
+    background: var(--ragassistant-subtle);
 }
 .ragassistant-document-progress .progress-bar {
     border-radius: 999px;
@@ -1233,8 +1412,8 @@ form.mform #fgroup_id_buttonar .felement.fgroup {
     gap: .45rem;
     padding: .5rem .85rem;
     border-radius: .45rem;
-    background: #f7f8f9;
-    color: var(--bs-body-color, #212529);
+    background: var(--ragassistant-surface);
+    color: var(--ragassistant-text);
     border: none !important;
     font-size: .85rem;
     font-weight: 600;
@@ -1243,7 +1422,7 @@ form.mform #fgroup_id_buttonar .felement.fgroup {
 }
 
 .ragassistant-new-chat-btn:hover {
-    background: #dfdfdf;
+    background: var(--ragassistant-subtle);
 }
 
 .ragassistant-new-chat-btn:focus-visible {
@@ -1280,7 +1459,7 @@ form.mform #fgroup_id_buttonar .felement.fgroup {
 /* Subtle shimmer for the live "Thinking for Xs" indicator. */
 .ragassistant-thinking-shimmer {
     display: inline-block;
-    color: #6b6480;
+    color: var(--ragassistant-muted);
     font-variant-numeric: tabular-nums;
     /* The gradient is 250% of the label's width, so the soft highlight starts
        just left of the text and ends just right of it. The loop restarts
@@ -1288,11 +1467,11 @@ form.mform #fgroup_id_buttonar .felement.fgroup {
        dead time. */
     background-image: linear-gradient(
         90deg,
-        #6b6480 0%,
-        #6b6480 38%,
-        #d9cff0 50%,
-        #6b6480 62%,
-        #6b6480 100%
+        var(--ragassistant-muted) 0%,
+        var(--ragassistant-muted) 38%,
+        var(--ragassistant-violet-300) 50%,
+        var(--ragassistant-muted) 62%,
+        var(--ragassistant-muted) 100%
     );
     background-size: 250% 100%;
     background-repeat: no-repeat;
@@ -1317,7 +1496,7 @@ form.mform #fgroup_id_buttonar .felement.fgroup {
         animation: none;
         background: none;
         -webkit-text-fill-color: currentColor;
-        color: #6b6480;
+        color: var(--ragassistant-muted);
     }
 }
 
@@ -1342,19 +1521,19 @@ form.mform #fgroup_id_buttonar .felement.fgroup {
 }
 
 .ragassistant-download-btn {
-    background-color: var(--ragassistant-primary, #270089);
-    border-color: var(--ragassistant-primary, #270089);
+    background-color: var(--ragassistant-primary);
+    border-color: var(--ragassistant-primary);
     color: #fff;
 }
 
 .ragassistant-download-btn:hover:not(:disabled) {
-    background-color: #1f006e;
-    border-color: #1f006e;
+    background-color: var(--ragassistant-primary-hover);
+    border-color: var(--ragassistant-primary-hover);
     color: #fff;
 }
 
 .ragassistant-download-btn:focus-visible {
-    outline: 3px solid rgb(39 0 137 / 45%);
+    outline: 3px solid rgb(var(--ragassistant-primary-rgb) / 45%);
     outline-offset: 2px;
 }
 
@@ -1372,7 +1551,7 @@ form.mform #fgroup_id_buttonar .felement.fgroup {
 .ragassistant-download-meta {
     flex-basis: 100%;
     margin: 0;
-    color: var(--bs-secondary-color, #6c757d);
+    color: var(--ragassistant-muted);
     font-size: .85rem;
     overflow-wrap: anywhere;
 }
@@ -1392,14 +1571,14 @@ form.mform #fgroup_id_buttonar .felement.fgroup {
 /* /quiz multiple-choice card. */
 .ragassistant-quiz {
     margin-top: 12px;
-    background: #fff;
-    border: 1px solid #d6cbee;
+    background: var(--ragassistant-surface);
+    border: 1px solid var(--ragassistant-grey-200);
     border-radius: 14px;
     padding: 20px 22px;
     display: flex;
     flex-direction: column;
     gap: 16px;
-    color: #1d1d1f;
+    color: var(--ragassistant-grey-900);
 }
 
 .ragassistant-quiz p {
@@ -1421,8 +1600,8 @@ form.mform #fgroup_id_buttonar .felement.fgroup {
 }
 
 .ragassistant-quiz-chip {
-    background: #e3f0fc;
-    color: #0d47a1;
+    background: var(--ragassistant-violet-50);
+    color: var(--ragassistant-primary);
     font-weight: 700;
     font-size: .8125rem;
     padding: 3px 9px;
@@ -1435,7 +1614,7 @@ form.mform #fgroup_id_buttonar .felement.fgroup {
 
 .ragassistant-quiz-meta {
     font-size: .8125rem;
-    color: #4a4a55;
+    color: var(--ragassistant-grey-600);
 }
 
 .ragassistant-quiz-progress {
@@ -1447,19 +1626,19 @@ form.mform #fgroup_id_buttonar .felement.fgroup {
     flex: 1;
     height: 6px;
     border-radius: 3px;
-    background: #e6e1f1;
+    background: var(--ragassistant-grey-100);
 }
 
 .ragassistant-quiz-segment.is-current {
-    background: var(--ragassistant-primary, #270089);
+    background: var(--ragassistant-primary);
 }
 
 .ragassistant-quiz-segment.is-right {
-    background: #2e8b57;
+    background: var(--ragassistant-teal-600);
 }
 
 .ragassistant-quiz-segment.is-wrong {
-    background: #c0392b;
+    background: var(--ragassistant-red-500);
 }
 
 .ragassistant-quiz-body {
@@ -1471,7 +1650,7 @@ form.mform #fgroup_id_buttonar .felement.fgroup {
 .ragassistant-quiz-count {
     font-size: .8125rem;
     font-weight: 600;
-    color: var(--ragassistant-primary, #270089);
+    color: var(--ragassistant-primary);
     text-transform: uppercase;
     letter-spacing: .02em;
 }
@@ -1481,6 +1660,7 @@ form.mform #fgroup_id_buttonar .felement.fgroup {
     font-size: 1.15rem;
     line-height: 1.4;
     font-weight: 650;
+    color: var(--ragassistant-grey-900);
 }
 
 .ragassistant-quiz-question:focus,
@@ -1501,26 +1681,33 @@ form.mform #fgroup_id_buttonar .felement.fgroup {
     width: 100%;
     min-height: 52px;
     padding: 10px 14px;
-    border: 2px solid #d7d2e4;
+    border: 2px solid var(--ragassistant-grey-200);
     border-radius: 12px;
-    background: #fff;
-    color: #1d1d1f;
+    background: var(--ragassistant-surface);
+    color: var(--ragassistant-grey-900);
     text-align: left;
     cursor: pointer;
+    transition: border-color .15s ease, background-color .15s ease;
 }
 
 .ragassistant-quiz-option:hover:not(:disabled) {
-    border-color: #8f7fd6;
+    border-color: var(--ragassistant-violet-300);
+    background: var(--ragassistant-grey-50);
 }
 
 .ragassistant-quiz-option:focus-visible {
-    outline: 3px solid #8f7fd6;
+    outline: 3px solid var(--ragassistant-primary);
     outline-offset: 2px;
 }
 
 .ragassistant-quiz-option:disabled {
     cursor: default;
     opacity: 1;
+}
+
+/* Options that were neither picked nor the answer fade back once the answer is shown. */
+.ragassistant-quiz-option:disabled:not(.is-picked):not(.is-right):not(.is-wrong) {
+    color: var(--ragassistant-grey-600);
 }
 
 .ragassistant-quiz-letter {
@@ -1533,8 +1720,8 @@ form.mform #fgroup_id_buttonar .felement.fgroup {
     justify-content: center;
     font-weight: 700;
     font-size: .875rem;
-    background: #f1edf9;
-    color: var(--ragassistant-primary, #270089);
+    background: var(--ragassistant-violet-50);
+    color: var(--ragassistant-primary);
 }
 
 .ragassistant-quiz-option-text {
@@ -1547,45 +1734,48 @@ form.mform #fgroup_id_buttonar .felement.fgroup {
 }
 
 .ragassistant-quiz-option.is-picked {
-    border-color: var(--ragassistant-primary, #270089);
-    background: #f3eefd;
+    border-color: var(--ragassistant-primary);
+    background: var(--ragassistant-violet-50);
 }
 
 .ragassistant-quiz-option.is-picked .ragassistant-quiz-letter {
-    background: var(--ragassistant-primary, #270089);
+    background: var(--ragassistant-primary);
     color: #fff;
 }
 
 .ragassistant-quiz-option.is-right {
-    border-color: #2e8b57;
-    background: #e8f5ec;
+    border-color: var(--ragassistant-teal-600);
+    background: var(--ragassistant-teal-50);
 }
 
 .ragassistant-quiz-option.is-right .ragassistant-quiz-letter {
-    background: #1b6b35;
+    background: var(--ragassistant-teal-700);
     color: #fff;
 }
 
 .ragassistant-quiz-option.is-right .ragassistant-quiz-mark {
-    color: #1b6b35;
+    color: var(--ragassistant-teal-800);
 }
 
 .ragassistant-quiz-option.is-wrong {
-    border-color: #c0392b;
-    background: #fcebea;
+    border-color: var(--ragassistant-red-500);
+    background: var(--ragassistant-red-50);
 }
 
 .ragassistant-quiz-option.is-wrong .ragassistant-quiz-letter {
-    background: #a3221b;
+    background: var(--ragassistant-red-600);
     color: #fff;
 }
 
 .ragassistant-quiz-option.is-wrong .ragassistant-quiz-mark {
-    color: #a3221b;
+    color: var(--ragassistant-red-700);
 }
 
+/* A left accent bar ties the feedback to its verdict colour; the text inside stays
+   neutral so the explanation is easy to read. */
 .ragassistant-quiz-feedback {
     border-radius: 12px;
+    border-left: 4px solid transparent;
     padding: 12px 14px;
     display: flex;
     flex-direction: column;
@@ -1593,13 +1783,15 @@ form.mform #fgroup_id_buttonar .felement.fgroup {
 }
 
 .ragassistant-quiz-feedback.is-right {
-    background: #e8f5ec;
-    color: #1b6b35;
+    background: var(--ragassistant-teal-50);
+    border-left-color: var(--ragassistant-teal-600);
+    color: var(--ragassistant-teal-800);
 }
 
 .ragassistant-quiz-feedback.is-wrong {
-    background: #fcebea;
-    color: #a3221b;
+    background: var(--ragassistant-red-50);
+    border-left-color: var(--ragassistant-red-500);
+    color: var(--ragassistant-red-700);
 }
 
 .ragassistant-quiz-feedback-title {
@@ -1607,13 +1799,13 @@ form.mform #fgroup_id_buttonar .felement.fgroup {
 }
 
 .ragassistant-quiz-explanation {
-    color: #2b2b2b;
+    color: var(--ragassistant-grey-800);
     font-size: .875rem;
     line-height: 1.55;
 }
 
 .ragassistant-quiz .ragassistant-quiz-source {
-    color: #4a4a55;
+    color: var(--ragassistant-grey-600);
     font-size: .8125rem;
     margin-top: 4px;
 }
@@ -1629,14 +1821,14 @@ form.mform #fgroup_id_buttonar .felement.fgroup {
     padding: 0 22px;
     border-radius: 10px;
     font-weight: 600;
-    background-color: var(--ragassistant-primary, #270089);
-    border-color: var(--ragassistant-primary, #270089);
+    background-color: var(--ragassistant-primary);
+    border-color: var(--ragassistant-primary);
 }
 
 .ragassistant-quiz-btn:disabled {
-    background-color: #d9d4e6;
-    border-color: #d9d4e6;
-    color: #4a4a55;
+    background-color: var(--ragassistant-grey-100);
+    border-color: var(--ragassistant-grey-100);
+    color: var(--ragassistant-grey-600);
     opacity: 1;
 }
 
@@ -1647,7 +1839,10 @@ form.mform #fgroup_id_buttonar .felement.fgroup {
     gap: 22px;
 }
 
+/* The ring is filled in the score band's colour (set by chat.js): teal from 70%,
+   yellow from 50%, red below. */
 .ragassistant-quiz-ring {
+    --ragassistant-quiz-ring-colour: var(--ragassistant-primary);
     width: 120px;
     height: 120px;
     border-radius: 50%;
@@ -1655,16 +1850,28 @@ form.mform #fgroup_id_buttonar .felement.fgroup {
     align-items: center;
     justify-content: center;
     background: conic-gradient(
-        var(--ragassistant-primary, #270089) 0 var(--ragassistant-quiz-pct, 0%),
-        #e6e1f1 var(--ragassistant-quiz-pct, 0%) 100%
+        var(--ragassistant-quiz-ring-colour) 0 var(--ragassistant-quiz-pct, 0%),
+        var(--ragassistant-grey-100) var(--ragassistant-quiz-pct, 0%) 100%
     );
+}
+
+.ragassistant-quiz-ring.is-good {
+    --ragassistant-quiz-ring-colour: var(--ragassistant-teal-600);
+}
+
+.ragassistant-quiz-ring.is-close {
+    --ragassistant-quiz-ring-colour: var(--ragassistant-yellow-600);
+}
+
+.ragassistant-quiz-ring.is-low {
+    --ragassistant-quiz-ring-colour: var(--ragassistant-red-500);
 }
 
 .ragassistant-quiz-ring-inner {
     width: 96px;
     height: 96px;
     border-radius: 50%;
-    background: #fff;
+    background: var(--ragassistant-surface);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1674,12 +1881,13 @@ form.mform #fgroup_id_buttonar .felement.fgroup {
     font-size: 1.9rem;
     font-weight: 750;
     line-height: 1;
+    color: var(--ragassistant-grey-900);
 }
 
 .ragassistant-quiz-total {
     font-size: 1rem;
     font-weight: 600;
-    color: #4a4a55;
+    color: var(--ragassistant-grey-600);
     white-space: pre;
 }
 
@@ -1692,9 +1900,311 @@ form.mform #fgroup_id_buttonar .felement.fgroup {
     margin: 0 0 4px;
     font-size: 1.35rem;
     font-weight: 700;
+    color: var(--ragassistant-grey-900);
 }
 
 .ragassistant-quiz-percent {
-    color: #3d3d45;
+    color: var(--ragassistant-grey-600);
 }
 
+@media (prefers-reduced-motion: reduce) {
+    .ragassistant-quiz-option {
+        transition: none;
+    }
+}
+
+/* /flashcards revision deck (chat.js appendFlashcards). */
+.ragassistant-flashcards {
+    margin-top: 12px;
+    background: var(--ragassistant-surface);
+    border: 1px solid var(--ragassistant-grey-200);
+    border-radius: 14px;
+    padding: 18px 20px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    color: var(--ragassistant-grey-900);
+}
+
+.ragassistant-flashcards p {
+    margin: 0;
+}
+
+.ragassistant-flashcards-title {
+    font-weight: 700;
+}
+
+/* Same segmented bar as the quiz: seen cards fill in, the current one is violet. */
+.ragassistant-flashcards-progress {
+    display: flex;
+    gap: 4px;
+}
+
+.ragassistant-flashcards-segment {
+    flex: 1;
+    height: 6px;
+    border-radius: 3px;
+    background: var(--ragassistant-grey-100);
+}
+
+.ragassistant-flashcards-segment.is-seen {
+    background: var(--ragassistant-violet-200);
+}
+
+.ragassistant-flashcards-segment.is-current {
+    background: var(--ragassistant-primary);
+}
+
+/* The card is a button: click, Enter or Space flips it. */
+.ragassistant-flashcard {
+    display: block;
+    width: 100%;
+    padding: 0;
+    border: 0;
+    border-radius: 16px;
+    background: transparent;
+    perspective: 1200px;
+    cursor: pointer;
+    text-align: left;
+    font: inherit;
+    color: inherit;
+}
+
+.ragassistant-flashcard:focus-visible {
+    outline: 3px solid var(--ragassistant-violet-400);
+    outline-offset: 4px;
+}
+
+/* Both faces share one grid cell, so the card is as tall as its longer side:
+   a long answer makes the card taller instead of scrolling inside it. */
+.ragassistant-flashcard-inner {
+    display: grid;
+    transform-style: preserve-3d;
+    transition: transform .5s cubic-bezier(.2, .7, .2, 1);
+}
+
+.ragassistant-flashcard.is-flipped .ragassistant-flashcard-inner {
+    transform: rotateY(180deg);
+}
+
+.ragassistant-flashcard-face {
+    grid-area: 1 / 1;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-height: 12rem;
+    padding: 20px 22px;
+    border-radius: 16px;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+}
+
+/* Front: the question on a light card. */
+.ragassistant-flashcard-front {
+    background: var(--ragassistant-violet-50);
+    border: 1px solid var(--ragassistant-violet-100);
+    transition: border-color .15s ease;
+}
+
+.ragassistant-flashcard:hover .ragassistant-flashcard-front {
+    border-color: var(--ragassistant-violet-300);
+}
+
+/* Back: the answer on the brand violet, so the side is obvious at a glance. */
+.ragassistant-flashcard-back {
+    background: var(--ragassistant-primary);
+    border: 1px solid var(--ragassistant-primary);
+    color: #fff;
+    transform: rotateY(180deg);
+}
+
+.ragassistant-flashcard-label {
+    font-size: .75rem;
+    font-weight: 700;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: var(--ragassistant-primary);
+}
+
+.ragassistant-flashcard-back .ragassistant-flashcard-label {
+    color: var(--ragassistant-violet-200);
+}
+
+.ragassistant-flashcard-text {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    font-size: 1.2rem;
+    font-weight: 650;
+    line-height: 1.4;
+}
+
+.ragassistant-flashcard-back .ragassistant-flashcard-text {
+    font-size: 1rem;
+    font-weight: 500;
+    line-height: 1.6;
+}
+
+.ragassistant-flashcard-hint {
+    color: var(--ragassistant-grey-600);
+    font-size: .8125rem;
+}
+
+/* One hint, worded for the device: "Click or press Space" with a mouse, "Tap" on touch. */
+.ragassistant-flashcard-hint-touch {
+    display: none;
+}
+
+@media (hover: none) {
+    .ragassistant-flashcard-hint-pointer {
+        display: none;
+    }
+
+    .ragassistant-flashcard-hint-touch {
+        display: inline;
+    }
+}
+
+.ragassistant-flashcard-source {
+    padding-top: 10px;
+    border-top: 1px solid rgb(255 255 255 / 18%);
+    color: var(--ragassistant-violet-200);
+    font-size: .8125rem;
+    overflow-wrap: anywhere;
+}
+
+.ragassistant-flashcard-source[hidden] {
+    display: none;
+}
+
+/* Previous · Card n of N · Next. */
+.ragassistant-flashcards-nav {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 12px;
+}
+
+.ragassistant-flashcards-count {
+    color: var(--ragassistant-grey-600);
+    font-size: .875rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    text-align: center;
+}
+
+.ragassistant-flashcards-step {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: .4rem;
+    min-width: 44px;
+    height: 44px;
+    padding: 0 14px;
+    border: 1px solid var(--ragassistant-grey-200);
+    border-radius: 10px;
+    background: var(--ragassistant-surface);
+    color: var(--ragassistant-grey-800);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+    transition: border-color .15s ease, background-color .15s ease;
+}
+
+.ragassistant-flashcards-step:hover:not(:disabled) {
+    border-color: var(--ragassistant-violet-300);
+    background: var(--ragassistant-grey-50);
+}
+
+.ragassistant-flashcards-step:focus-visible {
+    outline: 3px solid var(--ragassistant-violet-400);
+    outline-offset: 2px;
+}
+
+.ragassistant-flashcards-step:disabled {
+    border-color: var(--ragassistant-grey-100);
+    background: var(--ragassistant-surface);
+    color: var(--ragassistant-grey-300);
+    cursor: not-allowed;
+}
+
+/* Last card: "Start again" is the main action. */
+.ragassistant-flashcards-step.is-restart {
+    border-color: var(--ragassistant-primary);
+    background: var(--ragassistant-primary);
+    color: #fff;
+}
+
+.ragassistant-flashcards-step.is-restart:hover {
+    border-color: var(--ragassistant-primary-hover);
+    background: var(--ragassistant-primary-hover);
+}
+
+@media (max-width: 575px) {
+    .ragassistant-flashcards {
+        padding: 14px;
+    }
+
+    .ragassistant-flashcard-face {
+        min-height: 14rem;
+        padding: 18px;
+    }
+
+    .ragassistant-flashcard-text {
+        font-size: 1.1rem;
+    }
+}
+
+/* No 3D turn for users who reduce motion: the faces simply swap. */
+@media (prefers-reduced-motion: reduce) {
+    .ragassistant-flashcard-inner,
+    .ragassistant-flashcard-front,
+    .ragassistant-flashcards-step {
+        transition: none;
+    }
+}
+
+/* Bootstrap primary colour on the plugin's own pages only (chat, course materials):
+   buttons, outline buttons, links, text-primary/bg-primary and progress bars. */
+[id^="page-local-ragassistant-"] #region-main {
+    --bs-primary: var(--ragassistant-primary);
+    --bs-primary-rgb: 39, 0, 137;
+    --bs-link-color: var(--ragassistant-primary-strong);
+    --bs-link-color-rgb: 39, 0, 137;
+    --bs-link-hover-color: var(--ragassistant-violet-900);
+    --bs-link-hover-color-rgb: 26, 0, 92;
+}
+
+[id^="page-local-ragassistant-"] #region-main .btn-primary {
+    --bs-btn-color: #fff;
+    --bs-btn-bg: var(--ragassistant-primary);
+    --bs-btn-border-color: var(--ragassistant-primary);
+    --bs-btn-hover-color: #fff;
+    --bs-btn-hover-bg: var(--ragassistant-primary-hover);
+    --bs-btn-hover-border-color: var(--ragassistant-primary-hover);
+    --bs-btn-focus-shadow-rgb: 39, 0, 137;
+    --bs-btn-active-color: #fff;
+    --bs-btn-active-bg: var(--ragassistant-violet-900);
+    --bs-btn-active-border-color: var(--ragassistant-violet-900);
+    --bs-btn-disabled-color: #fff;
+    --bs-btn-disabled-bg: var(--ragassistant-primary);
+    --bs-btn-disabled-border-color: var(--ragassistant-primary);
+}
+
+[id^="page-local-ragassistant-"] #region-main .btn-outline-primary {
+    --bs-btn-color: var(--ragassistant-primary-strong);
+    --bs-btn-border-color: var(--ragassistant-primary);
+    --bs-btn-hover-color: #fff;
+    --bs-btn-hover-bg: var(--ragassistant-primary);
+    --bs-btn-hover-border-color: var(--ragassistant-primary);
+    --bs-btn-focus-shadow-rgb: 39, 0, 137;
+    --bs-btn-active-color: #fff;
+    --bs-btn-active-bg: var(--ragassistant-primary-hover);
+    --bs-btn-active-border-color: var(--ragassistant-primary-hover);
+    --bs-btn-disabled-color: var(--ragassistant-primary-strong);
+    --bs-btn-disabled-border-color: var(--ragassistant-primary);
+}
+
+[id^="page-local-ragassistant-"] #region-main .progress {
+    --bs-progress-bar-bg: var(--ragassistant-primary);
+}

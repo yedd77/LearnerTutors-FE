@@ -9,6 +9,11 @@ document.addEventListener('DOMContentLoaded', function () {
     const form = editor ? editor.closest('form') : null;
     const sendButton = form ? form.querySelector('.ragassistant-send-button') : null;
     const sendButtonContent = sendButton ? sendButton.innerHTML : '';
+    const toolsButton = document.getElementById('ragassistant-tools-button');
+    const charCount = document.getElementById('ragassistant-char-count');
+    // True while the command menu was opened with the Study tools button rather than
+    // by typing "/"; the chosen command then goes in front of the text already typed.
+    let menuFromButton = false;
     let activeLoadingMessage = null;
     let requestInProgress = false;
     let runChatRequest = null;   // set below once the composer form is wired up
@@ -116,13 +121,13 @@ document.addEventListener('DOMContentLoaded', function () {
 
 
     const commands = [
-        { command: '/exam', id: 'exam_generation', color: '#1e88e5', label: 'Generate exam questions', description: 'Create exam-style questions from course materials.' },
-        { command: '/notes', id: 'note_making', color: '#1e88e5', label: 'Make revision notes', description: 'Create structured notes for revision.' },
-        { command: '/summarize', id: 'summarization', color: '#1e88e5', label: 'Summarize material', description: 'Summarize relevant course content.' },
-        { command: '/flashcards', id: 'flashcards', color: '#1e88e5', label: 'Generate flashcards', description: 'Create question-and-answer cards.' },
-        { command: '/explain', id: 'concept_explanation', color: '#1e88e5', label: 'Explain a concept', description: 'Explain a topic step by step.' },
-        { command: '/quiz', id: 'practice_quiz', color: '#1e88e5', label: 'Practice quiz', description: 'Generate practice questions.' },
-        { command: '/studyguide', id: 'study_guide', color: '#1e88e5', label: 'Build a study guide', description: 'Organize topics for revision.' }
+        { command: '/exam', id: 'exam_generation', color: '#270089', label: 'Generate exam questions', description: 'Create exam-style questions from course materials.' },
+        { command: '/notes', id: 'note_making', color: '#270089', label: 'Make revision notes', description: 'Create structured notes for revision.' },
+        { command: '/summarize', id: 'summarization', color: '#270089', label: 'Summarize material', description: 'Summarize relevant course content.' },
+        { command: '/flashcards', id: 'flashcards', color: '#270089', label: 'Generate flashcards', description: 'Create question-and-answer cards.' },
+        { command: '/explain', id: 'concept_explanation', color: '#270089', label: 'Explain a concept', description: 'Explain a topic step by step.' },
+        { command: '/quiz', id: 'practice_quiz', color: '#270089', label: 'Practice quiz', description: 'Generate practice questions.' },
+        { command: '/studyguide', id: 'study_guide', color: '#270089', label: 'Build a study guide', description: 'Organize topics for revision.' }
     ];
     let activeIndex = -1;
     let filtered = [];
@@ -995,7 +1000,9 @@ document.addEventListener('DOMContentLoaded', function () {
                         : str('quizverdictpractise', null, 'Keep practising');
 
             const summary = el('div', 'ragassistant-quiz-summary');
-            const ring = el('div', 'ragassistant-quiz-ring');
+            // The ring's colour follows the same bands as the verdict (styles.css).
+            const ring = el('div', 'ragassistant-quiz-ring ' + (percent >= 70 ? 'is-good'
+                : percent >= 50 ? 'is-close' : 'is-low'));
             ring.setAttribute('role', 'img');
             ring.setAttribute('aria-label', str('quizscorearia', { score: points, total: total },
                 'Score ' + points + ' out of ' + total));
@@ -1062,6 +1069,193 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
         appendQuiz(message.querySelector('.ragassistant-message-content'), quiz, saved);
+    });
+
+    // /flashcards deck: one card at a time, question on the front, answer on the back.
+    // The card itself is the only flip control (click, Enter or Space). The row below it
+    // moves between cards (or the arrow keys); a new card always opens on its question, and
+    // on the last card "Next" becomes "Start again". All text is set with textContent.
+    function appendFlashcards(content, deck) {
+        if (!content || !deck || !Array.isArray(deck.cards) || !deck.cards.length) {
+            return;
+        }
+        const cards = deck.cards;
+        const total = cards.length;
+        let index = 0;
+        let flipped = false;
+        const seen = new Set([0]);
+
+        const section = el('section', 'ragassistant-flashcards');
+        section.setAttribute('aria-label', str('flashcardsaria', null, 'Flashcards'));
+        if (deck.title) {
+            section.append(el('p', 'ragassistant-flashcards-title', String(deck.title)));
+        }
+
+        const progress = el('div', 'ragassistant-flashcards-progress');
+        progress.setAttribute('aria-hidden', 'true');
+        const segments = cards.map(function () {
+            return progress.appendChild(el('span', 'ragassistant-flashcards-segment'));
+        });
+
+        const card = el('button', 'ragassistant-flashcard');
+        card.type = 'button';
+        const inner = el('div', 'ragassistant-flashcard-inner');
+
+        // Front: the question, with one hint worded for mouse/keyboard or for touch (CSS picks).
+        const front = el('div', 'ragassistant-flashcard-face ragassistant-flashcard-front');
+        const frontText = el('p', 'ragassistant-flashcard-text');
+        const hint = el('p', 'ragassistant-flashcard-hint');
+        hint.append(
+            el('span', 'ragassistant-flashcard-hint-pointer',
+                str('flashcardfliphint', null, 'Click or press Space to flip')),
+            el('span', 'ragassistant-flashcard-hint-touch', str('flashcardfliphinttouch', null, 'Tap to flip'))
+        );
+        front.append(el('span', 'ragassistant-flashcard-label', str('flashcardquestion', null, 'Question')),
+            frontText, hint);
+
+        // Back: the answer, and its source when the backend sent one.
+        const back = el('div', 'ragassistant-flashcard-face ragassistant-flashcard-back');
+        const backText = el('p', 'ragassistant-flashcard-text');
+        const backSource = el('p', 'ragassistant-flashcard-source');
+        back.append(el('span', 'ragassistant-flashcard-label', str('flashcardanswer', null, 'Answer')),
+            backText, backSource);
+
+        inner.append(front, back);
+        card.appendChild(inner);
+
+        // Announces flips and card changes to screen readers.
+        const live = el('p', 'sr-only');
+        live.setAttribute('aria-live', 'polite');
+
+        // Previous · Card n of N · Next (or Start again on the last card).
+        const nav = el('div', 'ragassistant-flashcards-nav');
+        const prev = el('button', 'ragassistant-flashcards-step', '←');
+        prev.type = 'button';
+        prev.setAttribute('aria-label', str('flashcardprevious', null, 'Previous card'));
+        const count = el('span', 'ragassistant-flashcards-count');
+        const next = el('button', 'ragassistant-flashcards-step');
+        next.type = 'button';
+        nav.append(prev, count, next);
+
+        section.append(progress, card);
+        // A single card needs no navigation.
+        if (total > 1) {
+            section.append(nav);
+        }
+        section.append(live);
+        content.appendChild(section);
+
+        function countLabel() {
+            return str('flashcardcount', { current: index + 1, total: total },
+                'Card ' + (index + 1) + ' of ' + total);
+        }
+
+        function patchData(){
+            const patch = { index: index, flipped: flipped, seen: Array.from(seen) };
+            const url = chtApp ? chatApp.dataset.flaschcardProgressUrl : '';
+            const session = form ? form.query.selector("input[name='sesskey']") : null;
+            if (!url || !session) {
+                return;
+            }
+
+            return fetch(url, {
+                method: 'POST',
+                body: JSON.stringify(patch),
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'same-origin',
+            }).catch(function () {
+                // Ignore fetch errors.
+            });
+        }
+
+        function render() {
+            const item = cards[index];
+            const frontValue = String(item.front || '');
+            const backValue = String(item.back || '');
+            frontText.textContent = frontValue;
+            backText.textContent = backValue;
+            backSource.textContent = item.source
+                ? str('flashcardsource', String(item.source), 'Source: ' + item.source) : '';
+            backSource.hidden = !item.source;
+            count.textContent = countLabel();
+
+            card.classList.toggle('is-flipped', flipped);
+            // Only the visible side is read out.
+            front.setAttribute('aria-hidden', flipped ? 'true' : 'false');
+            back.setAttribute('aria-hidden', flipped ? 'false' : 'true');
+            card.setAttribute('aria-label', flipped
+                ? str('flashcardarialabelanswer', backValue, 'Answer: ' + backValue + '. Show the question')
+                : str('flashcardarialabelquestion', frontValue, 'Question: ' + frontValue + '. Show the answer'));
+
+            segments.forEach(function (segment, i) {
+                segment.classList.toggle('is-current', i === index);
+                segment.classList.toggle('is-seen', i !== index && seen.has(i));
+            });
+
+            prev.disabled = index === 0;
+            const last = index === total - 1;
+            next.classList.toggle('is-restart', last);
+            next.textContent = last ? '↺ ' + str('flashcardrestart', null, 'Start again') : '→';
+            next.setAttribute('aria-label', last
+                ? str('flashcardrestart', null, 'Start again')
+                : str('flashcardnext', null, 'Next card'));
+        }
+
+        function turn() {
+            flipped = !flipped;
+            render();
+            live.textContent = flipped
+                ? str('flashcardanswershown', null, 'Answer shown')
+                : str('flashcardquestionshown', null, 'Question shown');
+        }
+
+        function show(target) {
+            if (target < 0 || target >= total) {
+                return;
+            }
+            index = target;
+            flipped = false;
+            seen.add(index);
+            render();
+            live.textContent = countLabel();
+        }
+
+        card.addEventListener('click', turn);
+        prev.addEventListener('click', function () {
+            show(index - 1);
+        });
+        next.addEventListener('click', function () {
+            if (index === total - 1) {
+                // Start again: back to the first question, with focus on the card.
+                show(0);
+                card.focus();
+            } else {
+                show(index + 1);
+            }
+        });
+        // Arrow keys move between cards while focus is anywhere in this deck.
+        section.addEventListener('keydown', function (event) {
+            if (event.key === 'ArrowLeft') {
+                event.preventDefault();
+                show(index - 1);
+            } else if (event.key === 'ArrowRight') {
+                event.preventDefault();
+                show(index + 1);
+            }
+        });
+
+        render();
+    }
+
+    // Saved flashcard decks in the server-rendered history (they reopen on card 1).
+    document.querySelectorAll('.ragassistant-message-assistant[data-flashcards]').forEach(function (message) {
+        let deck = null;
+        try {
+            deck = JSON.parse(message.dataset.flashcards);
+        } catch (error) {
+            return;
+        }
+        appendFlashcards(message.querySelector('.ragassistant-message-content'), deck);
     });
 
     // Saved study sheet downloads in the server-rendered history.
@@ -1282,6 +1476,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 appendIllustration(content, result.illustration_url);
                 appendDownload(content, result.download);
                 appendQuiz(content, result.quiz);
+                appendFlashcards(content, result.flashcards);
                 appendDecision(content, result.pending_action);
                 appendSources(content, result.sources);
 
@@ -1309,13 +1504,14 @@ document.addEventListener('DOMContentLoaded', function () {
                 activeThinkingTimer = null;
 
                 if (sendButton) {
-                    sendButton.disabled = false;
                     sendButton.innerHTML = sendButtonContent;
                     sendButton.setAttribute('aria-label', 'Send question');
                     sendButton.removeAttribute('aria-busy');
                 }
                 activeLoadingMessage = null;
                 requestInProgress = false;
+                // Send stays disabled until the (now cleared) box has a question again.
+                syncComposerState();
                 editor.focus();
             }
         };
@@ -1365,6 +1561,7 @@ document.addEventListener('DOMContentLoaded', function () {
     function updateHighlight() {
         const text = getText();
         editor.dataset.empty = text === '' ? 'true' : 'false';
+        syncComposerState();
 
         const lead = text.match(/^(\s*)(\/[^\s]*)(?=\s|$)/);
         const item = lead ? commands.find(function (c) { return c.command === lead[2].toLowerCase(); }) : null;
@@ -1404,6 +1601,25 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
+    // Send is only enabled for a question the server would accept (2+ characters) and
+    // never while an answer is on its way. Near the 4000 character limit a counter
+    // appears; at the limit it turns red, because typing is then blocked.
+    function syncComposerState() {
+        const length = getText().trim().length;
+        if (sendButton && !requestInProgress) {
+            sendButton.disabled = length < 2;
+        }
+        if (charCount) {
+            const full = getText().length;
+            charCount.hidden = full < MAXLEN * 0.9;
+            charCount.classList.toggle('is-limit', full >= MAXLEN);
+            if (!charCount.hidden) {
+                charCount.textContent = str('charactercount', { count: full, max: MAXLEN },
+                    full + ' / ' + MAXLEN);
+            }
+        }
+    }
+
     // ---- Command menu ------------------------------------------------------
     function closeMenu() {
         if (menu) {
@@ -1412,13 +1628,22 @@ document.addEventListener('DOMContentLoaded', function () {
         }
         activeIndex = -1;
         filtered = [];
+        menuFromButton = false;
+        if (toolsButton) {
+            toolsButton.setAttribute('aria-expanded', 'false');
+        }
     }
 
     function chooseCommand(item) {
         const value = getText();
         const match = value.match(/(?:^|\s)(\/[^\s]*)$/);
         let next;
-        if (match) {
+        if (menuFromButton) {
+            // Opened from the Study tools button: replace any command already at the
+            // start and keep the rest of the question.
+            const rest = value.replace(/^\s*\/[^\s]*\s*/, '');
+            next = item.command + ' ' + rest;
+        } else if (match) {
             const start = match.index + (match[0].startsWith(' ') ? 1 : 0);
             next = value.slice(0, start) + item.command + ' ';
         } else {
@@ -1434,11 +1659,12 @@ document.addEventListener('DOMContentLoaded', function () {
     function renderMenu() {
         if (!menu) return;
         const match = getText().match(/(?:^|\s)(\/[^\s]*)$/);
-        if (!match) {
+        if (!match && !menuFromButton) {
             closeMenu();
             return;
         }
-        const token = match[1].toLowerCase();
+        // The Study tools button lists every command.
+        const token = match && !menuFromButton ? match[1].toLowerCase() : '/';
         filtered = commands.filter(function (item) {
             return item.command.startsWith(token) || item.label.toLowerCase().includes(token.slice(1));
         });
@@ -1462,14 +1688,35 @@ document.addEventListener('DOMContentLoaded', function () {
             menu.appendChild(button);
         });
         menu.hidden = filtered.length === 0;
+        if (toolsButton) {
+            toolsButton.setAttribute('aria-expanded', menu.hidden ? 'false' : 'true');
+        }
     }
 
     // ---- Events ------------------------------------------------------------
     editor.addEventListener('input', function (event) {
         if (event.isComposing) return;          // don't touch the DOM mid-IME
+        menuFromButton = false;                 // typing goes back to "/" matching
         updateHighlight();
         renderMenu();
     });
+
+    if (toolsButton && menu) {
+        // Keep the caret in the question box, so the menu's keyboard handling still works.
+        toolsButton.addEventListener('mousedown', function (event) {
+            event.preventDefault();
+        });
+        toolsButton.addEventListener('click', function () {
+            if (!menu.hidden) {
+                closeMenu();
+                editor.focus();
+                return;
+            }
+            menuFromButton = true;
+            editor.focus();
+            renderMenu();
+        });
+    }
     editor.addEventListener('compositionend', function () {
         updateHighlight();
         renderMenu();

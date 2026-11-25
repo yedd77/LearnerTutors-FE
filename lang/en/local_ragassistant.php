@@ -286,3 +286,23 @@ $string['quizverdictclose'] = 'Getting there';
 $string['quizverdictexcellent'] = 'Excellent work!';
 $string['quizverdictgood'] = 'Good job!';
 $string['quizverdictpractise'] = 'Keep practising';
+
+// Chat composer.
+$string['charactercount'] = '{$a->count} / {$a->max}';
+$string['studytools'] = 'Study tools';
+
+// /flashcards revision deck.
+$string['flashcardanswer'] = 'Answer';
+$string['flashcardanswershown'] = 'Answer shown';
+$string['flashcardarialabelanswer'] = 'Answer: {$a}. Show the question';
+$string['flashcardarialabelquestion'] = 'Question: {$a}. Show the answer';
+$string['flashcardcount'] = 'Card {$a->current} of {$a->total}';
+$string['flashcardfliphint'] = 'Click or press Space to flip';
+$string['flashcardfliphinttouch'] = 'Tap to flip';
+$string['flashcardnext'] = 'Next card';
+$string['flashcardprevious'] = 'Previous card';
+$string['flashcardquestion'] = 'Question';
+$string['flashcardquestionshown'] = 'Question shown';
+$string['flashcardrestart'] = 'Start again';
+$string['flashcardsaria'] = 'Flashcards';
+$string['flashcardsource'] = 'Source: {$a}';
