@@ -1,6 +1,13 @@
 {
   "version": 2,
   "skills": {
+    "anti-ui-slop": {
+      "source": "davepoon/buildwithclaude",
+      "commit": "4720a3c19a14025a84cc8ba2ceee5fca369f412c",
+      "sourceType": "github",
+      "skillPath": "plugins/all-skills/skills/anti-ui-slop/SKILL.md",
+      "computedHash": "a8c6effa5ff4c44c2f9d810da65eac2d28f155c77c4fbebc3d8191577a3290a5"
+    },
     "frontend-design": {
       "source": "anthropics/skills",
       "commit": "e4bb5d960d87126ff3b3a8af1a104b7db67560ba",

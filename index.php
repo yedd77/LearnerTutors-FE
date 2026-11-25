@@ -204,19 +204,91 @@ function local_ragassistant_typed_decision(string $text): ?string
  */
 function local_ragassistant_clean_pending_action($value): ?array
 {
-    if (!is_array($value) || ($value['type'] ?? '') !== 'expand_notes_search' ||
+    // expand_notes_search: widen a thin /notes search. expand_quiz_scope: broaden a /quiz
+    // topic that is too narrow for a full quiz. Both are answered the same way.
+    $types = ['expand_notes_search', 'expand_quiz_scope'];
+    if (!is_array($value) || !in_array($value['type'] ?? '', $types, true) ||
             !is_string($value['token'] ?? null) || $value['token'] === '' ||
             strlen($value['token']) > 4096) {
         return null;
     }
 
     return [
-        'type' => 'expand_notes_search',
+        'type' => (string) $value['type'],
         'token' => $value['token'],
         'expires_at' => (int) ($value['expires_at'] ?? 0),
         'approve_label' => clean_param((string) ($value['approve_label'] ?? ''), PARAM_TEXT),
         'decline_label' => clean_param((string) ($value['decline_label'] ?? ''), PARAM_TEXT),
     ];
+}
+
+/**
+ * Validate the backend's optional "quiz" field (a /quiz multiple-choice practice quiz).
+ *
+ * All or nothing: if any question is malformed the whole quiz is dropped and only the
+ * answer text is shown. Every string is plain text; chat.js sets it with textContent.
+ *
+ * @param mixed $value
+ * @return array|null ['title', 'questions' => [['question', 'options', 'answer_index',
+ *     'explanation', 'source']]]
+ */
+function local_ragassistant_clean_quiz($value): ?array
+{
+    if (!is_array($value) || !is_array($value['questions'] ?? null)) {
+        return null;
+    }
+    $count = count($value['questions']);
+    if ($count < 1 || $count > 10) {
+        return null;
+    }
+
+    $text = function ($raw, int $max): string {
+        $clean = trim(clean_param(is_scalar($raw) ? (string) $raw : '', PARAM_TEXT));
+        return core_text::strlen($clean) > $max ? '' : $clean;
+    };
+
+    $questions = [];
+    foreach (array_values($value['questions']) as $item) {
+        if (!is_array($item) || !is_array($item['options'] ?? null) || count($item['options']) !== 4) {
+            return null;
+        }
+        $question = $text($item['question'] ?? '', 600);
+        $options = array_map(function ($option) use ($text) {
+            return $text($option, 300);
+        }, array_values($item['options']));
+        $answerindex = $item['answer_index'] ?? null;
+        if ($question === '' || in_array('', $options, true) ||
+                !is_int($answerindex) || $answerindex < 0 || $answerindex > 3) {
+            return null;
+        }
+
+        $source = '';
+        if (is_array($item['source'] ?? null)) {
+            $source = $text($item['source']['filename'] ?? '', 255);
+            if ($source !== '' && !empty($item['source']['page'])) {
+                $source .= ' · ' . get_string('sourcepage', 'local_ragassistant') . ' ' .
+                    (int) $item['source']['page'];
+            }
+        }
+
+        $questions[] = [
+            'question' => $question,
+            'options' => $options,
+            'answer_index' => $answerindex,
+            'explanation' => $text($item['explanation'] ?? '', 800),
+            'source' => $source,
+        ];
+    }
+
+    $clean = [
+        'title' => $text($value['title'] ?? '', 160),
+        'questions' => $questions,
+    ];
+    // Moodle's own id (never the backend's), used to save the attempt's progress.
+    if (\local_ragassistant\local\quiz_progress::valid_id($value['id'] ?? null)) {
+        $clean['id'] = $value['id'];
+    }
+    return $clean;
 }
 
 // Input handling and access control setup.
@@ -258,6 +330,10 @@ $PAGE->requires->strings_for_js([
     'downloadpdf', 'downloadpdfaria', 'downloadavailableuntil', 'downloadbusy',
     'downloadexpired', 'downloadfailed',
     'figureunavailable', 'figuresourcepage', 'figurealt', 'figureopen',
+    'quizaria', 'quizquestionof', 'quizscoresofar', 'quizfinished', 'quizoptions', 'quizcheck',
+    'quiznext', 'quizseescore', 'quizcorrect', 'quizincorrect', 'quizsource', 'quizscorearia',
+    'quizverdictexcellent', 'quizverdictgood', 'quizverdictclose', 'quizverdictpractise',
+    'quizpercent', 'quizretry',
 ], 'local_ragassistant');
 $PAGE->requires->css(new moodle_url('/local/ragassistant/styles.css'));
 
@@ -466,6 +542,12 @@ if (data_submitted() && confirm_sesskey()) {
             $pendingaction = local_ragassistant_clean_pending_action($response['pending_action'] ?? null);
             // Optional figures from course documents; absent for most answers.
             $images = local_ragassistant_clean_images($response['images'] ?? null);
+            // Optional /quiz questions; absent for every other command.
+            $quiz = is_array($response['quiz'] ?? null)
+                ? local_ragassistant_clean_quiz(['id' => random_string(16)] + $response['quiz'])
+                : null;
+            // A quiz reply shows no Sources list under the card.
+            $sources = !$quiz && is_array($response['sources'] ?? null) ? $response['sources'] : [];
 
             // Remember a new "search more widely?" question so the student's next typed
             // yes/no can answer it. Only the token and expiry are kept, in the session.
@@ -485,9 +567,9 @@ if (data_submitted() && confirm_sesskey()) {
                 'download' => $download,
                 // Kept so figures are shown again after a reload (fetched again then).
                 'images' => $images,
-                'sources' => is_array($response['sources'] ?? null)
-                    ? $response['sources']
-                    : [],
+                // Kept so the quiz card is rebuilt after a reload (it starts again at question 1).
+                'quiz' => $quiz,
+                'sources' => $sources,
                 'time' => time(),
             ];
 
@@ -507,11 +589,10 @@ if (data_submitted() && confirm_sesskey()) {
                     'answer_html' => local_ragassistant_render_answer($answer, $images, $context),
                     'illustration_url' => $illustrationurl,
                     'images' => $images,
-                    'sources' => is_array($response['sources'] ?? null)
-                        ? $response['sources']
-                        : [],
+                    'sources' => $sources,
                     'download' => $download,
-                ], JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
+                    'quiz' => $quiz,
+                ],JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
                 exit;
             }
 
@@ -604,6 +685,10 @@ if ($canusechat) {
             'data-figure-url' => (new moodle_url('/local/ragassistant/document_image.php', [
                 'courseid' => $courseid,
             ]))->out(false),
+            // Quiz progress is saved in the chat session history so a reload keeps it.
+            'data-quiz-progress-url' => (new moodle_url('/local/ragassistant/quiz_progress.php', [
+                'courseid' => $courseid,
+            ]))->out(false),
         ]
     );
 
@@ -655,7 +740,7 @@ if ($canusechat) {
     ]);
 
     // Render each turn of the conversation history
-    foreach ($history as $turn) {
+    foreach ($history as $turnindex => $turn) {
         echo html_writer::div(
             html_writer::div(
                 local_ragassistant_render_question((string) $turn['question']),
@@ -667,7 +752,24 @@ if ($canusechat) {
         $savedownload = local_ragassistant_clean_download($turn['download'] ?? null);
         // Saved figures are placed by chat.js too, the same way as for a new answer.
         $savedimages = local_ragassistant_clean_images($turn['images'] ?? null);
+        // A saved quiz is rebuilt by chat.js where the student left it.
+        $savedquiz = local_ragassistant_clean_quiz($turn['quiz'] ?? null);
+        // A quiz saved before quiz ids existed gets one now (kept in the session), so its
+        // progress can be saved from here on.
+        if ($savedquiz && empty($savedquiz['id'])) {
+            $savedquiz['id'] = random_string(16);
+            $history[$turnindex]['quiz']['id'] = $savedquiz['id'];
+        }
         $messageattributes = [];
+        if ($savedquiz) {
+            $messageattributes['data-quiz'] = json_encode($savedquiz,
+                JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
+            $savedprogress = \local_ragassistant\local\quiz_progress::clean(
+                $turn['quiz_progress'] ?? null, count($savedquiz['questions']));
+            if ($savedprogress) {
+                $messageattributes['data-quiz-progress'] = json_encode($savedprogress);
+            }
+        }
         if ($savedownload) {
             $messageattributes['data-download'] = json_encode($savedownload);
         }
@@ -700,7 +802,8 @@ if ($canusechat) {
         }
 
         // Display sources of cite if available
-        if (!empty($turn['sources'])) {
+        // Quiz replies show no Sources list (also for quizzes saved before that rule).
+        if (!empty($turn['sources']) && !$savedquiz) {
             echo html_writer::tag('details', html_writer::tag('summary', get_string('sourcesheading', 'local_ragassistant')) . html_writer::start_tag('ul', ['class' => 'ragassistant-source-list']) . implode('', array_map(function ($source) {
                 $label = (string) ($source['filename'] ?? get_string('unknown', 'local_ragassistant'));
                 if (!empty($source['page'])) {

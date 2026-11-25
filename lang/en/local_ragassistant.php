@@ -265,3 +265,24 @@ $string['figureunavailable'] = 'This figure is no longer available.';
 $string['figuresourcepage'] = '{$a->filename}, p. {$a->page}';
 $string['figurealt'] = 'Figure from {$a}';
 $string['figureopen'] = 'Open the full-size figure in a new tab';
+
+
+// /quiz multiple-choice practice quiz.
+$string['quizaria'] = 'Practice quiz';
+$string['quizcheck'] = 'Check answer';
+$string['quizcorrect'] = 'Correct!';
+$string['quizfinished'] = 'Finished';
+$string['quizincorrect'] = 'Not quite — the answer is {$a}.';
+$string['quiznext'] = 'Next question';
+$string['quizoptions'] = 'Answer options';
+$string['quizpercent'] = '{$a}% correct. Review the ones you missed, then try again.';
+$string['quizquestionof'] = 'Question {$a->current} of {$a->total}';
+$string['quizretry'] = 'Retry quiz';
+$string['quizscorearia'] = 'Score {$a->score} out of {$a->total}';
+$string['quizscoresofar'] = 'Score so far: {$a->score} / {$a->answered}';
+$string['quizseescore'] = 'See my score';
+$string['quizsource'] = 'Source: {$a}';
+$string['quizverdictclose'] = 'Getting there';
+$string['quizverdictexcellent'] = 'Excellent work!';
+$string['quizverdictgood'] = 'Good job!';
+$string['quizverdictpractise'] = 'Keep practising';

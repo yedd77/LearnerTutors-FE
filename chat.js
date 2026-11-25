@@ -685,6 +685,385 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
+    // Yes/No buttons for a backend approve/decline question (/notes "search more widely?",
+    // /quiz "broden the topic?"). A click sends "yes" or "no", exactly as if typed, so
+    // index.php answers it with the token it keeps in the session. Any later request
+    // disables the buttons, because the question can only be answered once.
+    function appendDecision(content, pending) {
+        if (!content || !pending || typeof pending !== 'object') {
+            return;
+        }
+        const box = document.createElement('div');
+        box.className = 'ragassistant-decision';
+
+        const buttons = document.createElement('div');
+        buttons.className = 'ragassistant-decision-buttons';
+        [
+            ['yes', String(pending.approve_label || '') || str('decisionapprove', null, 'Yes'), 'btn btn-primary'],
+            ['no', String(pending.decline_label || '') || str('decisiondecline', null, 'No'), 'btn btn-outline-primary'],
+        ].forEach(function ([reply, label, classes]) {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = classes + ' ragassistant-decision-btn';
+            button.textContent = label;
+            button.addEventListener('click', function () {
+                if (requestInProgress || typeof runChatRequest !== 'function') {
+                    return;
+                }
+                runChatRequest(reply, label, {});
+            });
+            buttons.appendChild(button);
+        });
+
+        const hint = document.createElement('p');
+        hint.className = 'ragassistant-decision-hint';
+        hint.textContent = str('decisionhint', null, 'You can also type “yes” or “no”.');
+
+        box.append(buttons, hint);
+        content.appendChild(box);
+    }
+
+    function disableDecisions() {
+        document.querySelectorAll('.ragassistant-decision-btn').forEach(function (button) {
+            button.disabled = true;
+        });
+        document.querySelectorAll('.ragassistant-decision-hint').forEach(function (hint) {
+            hint.remove();
+        });
+    }
+
+    function shuffled(list) {
+        const copy = list.slice();
+        for (let i = copy.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [copy[i], copy[j]] = [copy[j], copy[i]];
+        }
+        return copy;
+    }
+
+    function el(tag, className, text) {
+        const node = document.createElement(tag);
+        if (className) {
+            node.className = className;
+        }
+        if (text !== undefined) {
+            node.textContent = text;
+        }
+        return node;
+    }
+
+    const QUIZ_LETTERS = ['A', 'B', 'C', 'D'];
+
+    // /quiz multiple-choice card: one question at a time, feedback after each answer,
+    // then the score and Retry (same questions, new order). After every
+    // step the attempt state is saved in the chat session (quiz_progress.php), and
+    // `saved` restores it after a reload. All quiz text is set with textContent.
+    function appendQuiz(content, quiz, saved) {
+        if (!content || !quiz || !Array.isArray(quiz.questions) || !quiz.questions.length) {
+            return;
+        }
+        const questions = quiz.questions;
+        const total = questions.length;
+
+        const section = el('section', 'ragassistant-quiz');
+        section.setAttribute('aria-label', str('quizaria', null, 'Practice quiz'));
+
+        const header = el('div', 'ragassistant-quiz-header');
+        const titleWrap = el('div', 'ragassistant-quiz-title-wrap');
+        if (quiz.title) {
+            titleWrap.append(el('span', 'ragassistant-quiz-title', String(quiz.title)));
+        }
+        const meta = el('span', 'ragassistant-quiz-meta');
+        header.append(titleWrap, meta);
+
+        const progress = el('div', 'ragassistant-quiz-progress');
+        progress.setAttribute('aria-hidden', 'true');
+        const segments = questions.map(function () {
+            const segment = el('span', 'ragassistant-quiz-segment');
+            progress.appendChild(segment);
+            return segment;
+        });
+
+        const body = el('div', 'ragassistant-quiz-body');
+        section.append(header, progress, body);
+        content.appendChild(section);
+
+        // order: question indices in the order asked; optionOrder[q]: option indices shown.
+        let order, optionOrder, position, picked, checked, answers;
+
+        // Save the whole attempt state; a failed save only means a reload starts over.
+        function save() {
+            const url = chatApp ? chatApp.dataset.quizProgressUrl : '';
+            const sesskeyInput = form ? form.querySelector('input[name="sesskey"]') : null;
+            if (!url || !sesskeyInput || !/^[A-Za-z0-9]{16}$/.test(String(quiz.id || ''))) {
+                return;
+            }
+            const data = new FormData();
+            data.set('sesskey', sesskeyInput.value);
+            data.set('quizid', quiz.id);
+            data.set('progress', JSON.stringify({
+                order: order,
+                optionorder: optionOrder,
+                position: position,
+                picked: picked,
+                checked: checked,
+                // Sparse array → explicit nulls, so indices stay per question.
+                answers: Array.from(questions.keys(), i => answers[i] === undefined ? null : answers[i]),
+            }));
+            fetch(url, { method: 'POST', body: data, credentials: 'same-origin', keepalive: true })
+                .catch(function () {
+                    // Ignore: the quiz keeps working, only the saved state is older.
+                });
+        }
+
+        function start(shuffle) {
+            const indices = Array.from(questions.keys());
+            order = shuffle ? shuffled(indices) : indices;
+            optionOrder = questions.map(() => shuffle ? shuffled([0, 1, 2, 3]) : [0, 1, 2, 3]);
+            position = 0;
+            picked = null;
+            checked = false;
+            answers = [];
+            render();
+            if (shuffle) {
+                save();
+            }
+        }
+
+        // Continue a saved attempt (validated again by index.php before it reached the page).
+        function restore(state) {
+            if (!state || !Array.isArray(state.order) || state.order.length !== total ||
+                    !Array.isArray(state.optionorder) || state.optionorder.length !== total) {
+                return false;
+            }
+            order = state.order;
+            optionOrder = state.optionorder;
+            position = Math.min(Math.max(Number(state.position) || 0, 0), total);
+            picked = Number.isInteger(state.picked) ? state.picked : null;
+            checked = state.checked === true && picked !== null;
+            answers = [];
+            (Array.isArray(state.answers) ? state.answers : []).forEach(function (answer, i) {
+                if (Number.isInteger(answer)) {
+                    answers[i] = answer;
+                }
+            });
+            render(false, true);
+            return true;
+        }
+
+        function isRight(questionIndex) {
+            return answers[questionIndex] === questions[questionIndex].answer_index;
+        }
+
+        function score() {
+            return Array.from(questions.keys()).filter(isRight).length;
+        }
+
+        function optionLabel(questionIndex, optionIndex) {
+            const shown = optionOrder[questionIndex].indexOf(optionIndex);
+            return QUIZ_LETTERS[shown] + '. ' + questions[questionIndex].options[optionIndex];
+        }
+
+        function updateProgress() {
+            segments.forEach(function (segment, i) {
+                const questionIndex = order[i];
+                segment.className = 'ragassistant-quiz-segment';
+                if (answers[questionIndex] !== undefined) {
+                    segment.classList.add(isRight(questionIndex) ? 'is-right' : 'is-wrong');
+                } else if (i === position && position < total) {
+                    segment.classList.add('is-current');
+                }
+            });
+            const answered = answers.filter(a => a !== undefined).length;
+            meta.textContent = position >= total
+                ? str('quizfinished', null, 'Finished')
+                : str('quizscoresofar', { score: score(), answered: answered },
+                    'Score so far: ' + score() + ' / ' + answered);
+        }
+
+        function renderQuestion(focusHeading) {
+            const questionIndex = order[position];
+            const item = questions[questionIndex];
+
+            const label = el('p', 'ragassistant-quiz-count', str('quizquestionof',
+                { current: position + 1, total: total },
+                'Question ' + (position + 1) + ' of ' + total));
+            const heading = el('h3', 'ragassistant-quiz-question', item.question);
+            heading.tabIndex = -1;
+
+            const group = el('div', 'ragassistant-quiz-options');
+            group.setAttribute('role', 'group');
+            group.setAttribute('aria-label', str('quizoptions', null, 'Answer options'));
+            optionOrder[questionIndex].forEach(function (optionIndex, shown) {
+                const button = el('button', 'ragassistant-quiz-option');
+                button.type = 'button';
+                button.setAttribute('aria-pressed', picked === optionIndex ? 'true' : 'false');
+                button.append(el('span', 'ragassistant-quiz-letter', QUIZ_LETTERS[shown]),
+                    el('span', 'ragassistant-quiz-option-text', item.options[optionIndex]));
+                if (checked) {
+                    button.disabled = true;
+                    if (optionIndex === item.answer_index) {
+                        button.classList.add('is-right');
+                        button.append(el('span', 'ragassistant-quiz-mark', '✓'));
+                    } else if (optionIndex === picked) {
+                        button.classList.add('is-wrong');
+                        button.append(el('span', 'ragassistant-quiz-mark', '✗'));
+                    }
+                } else if (picked === optionIndex) {
+                    button.classList.add('is-picked');
+                }
+                button.addEventListener('click', function () {
+                    if (!checked) {
+                        picked = optionIndex;
+                        render();
+                        save();
+                        const again = body.querySelectorAll('.ragassistant-quiz-option')[shown];
+                        if (again) {
+                            again.focus();
+                        }
+                    }
+                });
+                group.appendChild(button);
+            });
+
+            const actions = el('div', 'ragassistant-quiz-actions');
+            const parts = [label, heading, group];
+
+            if (checked) {
+                const right = picked === item.answer_index;
+                const feedback = el('div', 'ragassistant-quiz-feedback ' + (right ? 'is-right' : 'is-wrong'));
+                feedback.setAttribute('role', 'status');
+                feedback.append(el('p', 'ragassistant-quiz-feedback-title', right
+                    ? str('quizcorrect', null, 'Correct!')
+                    : str('quizincorrect', optionLabel(questionIndex, item.answer_index),
+                        'Not quite — the answer is ' + optionLabel(questionIndex, item.answer_index) + '.')));
+                if (item.explanation) {
+                    feedback.append(el('p', 'ragassistant-quiz-explanation', item.explanation));
+                }
+                if (item.source) {
+                    feedback.append(el('p', 'ragassistant-quiz-source',
+                        str('quizsource', item.source, 'Source: ' + item.source)));
+                }
+                parts.push(feedback);
+
+                const last = position === total - 1;
+                const next = el('button', 'btn btn-primary ragassistant-quiz-btn', last
+                    ? str('quizseescore', null, 'See my score')
+                    : str('quiznext', null, 'Next question'));
+                next.type = 'button';
+                next.addEventListener('click', function () {
+                    position++;
+                    picked = null;
+                    checked = false;
+                    render(true);
+                    save();
+                });
+                actions.appendChild(next);
+            } else {
+                const check = el('button', 'btn btn-primary ragassistant-quiz-btn',
+                    str('quizcheck', null, 'Check answer'));
+                check.type = 'button';
+                check.disabled = picked === null;
+                check.addEventListener('click', function () {
+                    if (picked === null) {
+                        return;
+                    }
+                    answers[questionIndex] = picked;
+                    checked = true;
+                    render();
+                    save();
+                    const nextButton = body.querySelector('.ragassistant-quiz-actions .btn');
+                    if (nextButton) {
+                        nextButton.focus();
+                    }
+                });
+                actions.appendChild(check);
+            }
+            parts.push(actions);
+            body.replaceChildren(...parts);
+            if (focusHeading) {
+                heading.focus();
+            }
+        }
+
+        function renderResults() {
+            const points = score();
+            const percent = Math.round(points / total * 100);
+            const verdict = percent >= 90 ? str('quizverdictexcellent', null, 'Excellent work!')
+                : percent >= 70 ? str('quizverdictgood', null, 'Good job!')
+                    : percent >= 50 ? str('quizverdictclose', null, 'Getting there')
+                        : str('quizverdictpractise', null, 'Keep practising');
+
+            const summary = el('div', 'ragassistant-quiz-summary');
+            const ring = el('div', 'ragassistant-quiz-ring');
+            ring.setAttribute('role', 'img');
+            ring.setAttribute('aria-label', str('quizscorearia', { score: points, total: total },
+                'Score ' + points + ' out of ' + total));
+            ring.style.setProperty('--ragassistant-quiz-pct', percent + '%');
+            const ringInner = el('div', 'ragassistant-quiz-ring-inner');
+            ringInner.setAttribute('aria-hidden', 'true');
+            ringInner.append(el('span', 'ragassistant-quiz-score', String(points)),
+                el('span', 'ragassistant-quiz-total', ' / ' + total));
+            ring.appendChild(ringInner);
+
+            const words = el('div', 'ragassistant-quiz-verdict-wrap');
+            const verdictHeading = el('h3', 'ragassistant-quiz-verdict', verdict);
+            verdictHeading.tabIndex = -1;
+            words.append(verdictHeading, el('p', 'ragassistant-quiz-percent', str('quizpercent', percent,
+                percent + '% correct. Review the ones you missed, then try again.')));
+            summary.append(ring, words);
+
+            const actions = el('div', 'ragassistant-quiz-actions');
+            const retry = el('button', 'btn btn-primary ragassistant-quiz-btn',
+                str('quizretry', null, 'Retry quiz'));
+            retry.type = 'button';
+            retry.addEventListener('click', function () {
+                start(true);
+                const heading = body.querySelector('.ragassistant-quiz-question');
+                if (heading) {
+                    heading.focus();
+                }
+            });
+            actions.appendChild(retry);
+
+            body.replaceChildren(summary, actions);
+            if (!restoring) {
+                verdictHeading.focus();
+            }
+        }
+
+        // restoring: drawing a saved attempt on page load, so focus is left alone.
+        let restoring = false;
+        function render(focusHeading, isRestore) {
+            restoring = !!isRestore;
+            updateProgress();
+            if (position >= total) {
+                renderResults();
+            } else {
+                renderQuestion(focusHeading);
+            }
+            restoring = false;
+            typesetMath(body);
+        }
+
+        if (!restore(saved)) {
+            start(false);
+        }
+    }
+
+    // Saved quizzes in the server-rendered history, continued where the student left them.
+    document.querySelectorAll('.ragassistant-message-assistant[data-quiz]').forEach(function (message) {
+        let quiz = null;
+        let saved = null;
+        try {
+            quiz = JSON.parse(message.dataset.quiz);
+            saved = message.dataset.quizProgress ? JSON.parse(message.dataset.quizProgress) : null;
+        } catch (error) {
+            return;
+        }
+        appendQuiz(message.querySelector('.ragassistant-message-content'), quiz, saved);
+    });
+
     // Saved study sheet downloads in the server-rendered history.
     document.querySelectorAll('.ragassistant-message-assistant[data-download]').forEach(function (message) {
         let download = null;
@@ -788,6 +1167,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 return;
             }
             requestInProgress = true;
+            // Any new message answers (or drops) an open Yes/No question.
+            disableDecisions();
 
             // Switch to the conversation layout before measuring where the new message
             // goes (as clicking a suggestion card already does).
@@ -900,6 +1281,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 appendFigures(content, result.images);
                 appendIllustration(content, result.illustration_url);
                 appendDownload(content, result.download);
+                appendQuiz(content, result.quiz);
+                appendDecision(content, result.pending_action);
                 appendSources(content, result.sources);
 
                 // Show the question at the top of the view with as much of the answer as
