@@ -170,6 +170,12 @@ class document_upload_form extends \moodleform
         function getFileNames() {
             const names = new Set();
 
+            // When the last file is deleted, Moodle only marks the file manager "fm-noitems"
+            // and hides the old file entries; it does not remove them. Treat it as empty.
+            if (manager.classList.contains('fm-noitems')) {
+                return [];
+            }
+
             manager.querySelectorAll('.fp-file, [data-filename]').forEach(function(node) {
                 const value = node.getAttribute('data-filename') ||
                     (node.querySelector('.fp-filename') &&
@@ -220,17 +226,12 @@ class document_upload_form extends \moodleform
             });
         }
 
-        // A validation error (too many pages, wrong type, too large) is shown on the
-        // file manager row, so keep that row visible while it has one.
-        function hasUploadError() {
-            const error = document.getElementById('id_error_' + config.field);
-            return !!(error && error.textContent.trim() !== '');
-        }
-
-        // Switch from the upload step to the review step.
+        // Show the review cards below the file manager. The upload heading and the file
+        // manager stay visible, so more files can be dragged in or added at any time while
+        // reviewing (the cards update as files are added or removed).
         function showReviewSection() {
-            uploadHeading.style.display = 'none';
-            managerItem.style.display = hasUploadError() ? '' : 'none';
+            uploadHeading.style.display = '';
+            managerItem.style.display = '';
             reviewHeading.style.display = '';
             reviewContainer.style.display = 'grid';
         }
@@ -287,7 +288,14 @@ class document_upload_form extends \moodleform
                     fileNode.click();
 
                     const waitForDeleteButton = function(attempts) {
-                        const selectPanel = document.querySelector('.fp-select');
+                        // Each file manager on the page has its own file panel, and the
+                        // hidden ones are only hidden through their dialog wrapper. Use the
+                        // panel that is actually on screen: the one just opened for this
+                        // file. (The first .fp-select may belong to the other upload form.)
+                        const selectPanel = Array.from(document.querySelectorAll('.fp-select'))
+                            .find(function(panel) {
+                                return panel.getClientRects().length > 0;
+                            });
                         const deleteButton = selectPanel &&
                             selectPanel.querySelector('.fp-file-delete');
                         const panelStyle = selectPanel && window.getComputedStyle(selectPanel);

@@ -1306,6 +1306,19 @@ $polljs = '(function() {
         }
     }
 
+    // Whether either upload form (course material or past exam papers) has files picked
+    // that are not uploaded yet. An emptied file manager is marked fm-noitems but keeps
+    // its old (hidden) file entries, so it is skipped.
+    let reloadPending = false;
+    function uploadInProgress() {
+        return !!document.querySelector(
+            "#fitem_id_documents .filemanager:not(.fm-noitems) .fp-file, " +
+            "#fitem_id_documents .filemanager:not(.fm-noitems) [data-filename], " +
+            "#fitem_id_exampapers .filemanager:not(.fm-noitems) .fp-file, " +
+            "#fitem_id_exampapers .filemanager:not(.fm-noitems) [data-filename]"
+        );
+    }
+
     async function poll() {
         try {
             const response = await fetch(url, {
@@ -1364,8 +1377,16 @@ $polljs = '(function() {
                 if (suggestion.status === "generating") activeSuggestions = true;
             });
 
-            if (completed) {
-                window.location.reload();
+            // A finished job reloads the page to refresh its actions, but never while the
+            // lecturer has files picked in an upload form: that would throw away the files
+            // and notes. The status cells above are already up to date; the reload waits.
+            if (completed || reloadPending) {
+                if (!uploadInProgress()) {
+                    window.location.reload();
+                    return;
+                }
+                reloadPending = true;
+                window.setTimeout(poll, 2500);
                 return;
             }
             if (active || activeSuggestions) {
