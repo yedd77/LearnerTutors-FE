@@ -136,5 +136,22 @@ function xmldb_local_ragassistant_upgrade(int $oldversion): bool
         upgrade_plugin_savepoint(true, 2026112400, 'local', 'ragassistant');
     }
 
+    if ($oldversion < 2026112600) {
+        // Past exam papers: the document's role, and the exam structure the backend detected.
+        // Existing documents are all course material.
+        $table = new xmldb_table('local_ragassistant_documents');
+        $rolefield = new xmldb_field('documentrole', XMLDB_TYPE_CHAR, '20', null, XMLDB_NOTNULL, null,
+            'course_material', 'visibility');
+        $structurefield = new xmldb_field('examstructure', XMLDB_TYPE_TEXT, null, null, null, null, null,
+            'documentrole');
+        if (!$dbman->field_exists($table, $rolefield)) {
+            $dbman->add_field($table, $rolefield);
+        }
+        if (!$dbman->field_exists($table, $structurefield)) {
+            $dbman->add_field($table, $structurefield);
+        }
+        upgrade_plugin_savepoint(true, 2026112600, 'local', 'ragassistant');
+    }
+
     return true;
 }

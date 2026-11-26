@@ -306,3 +306,22 @@ $string['flashcardquestionshown'] = 'Question shown';
 $string['flashcardrestart'] = 'Start again';
 $string['flashcardsaria'] = 'Flashcards';
 $string['flashcardsource'] = 'Source: {$a}';
+
+// Past exam papers: their structure (not their questions) shapes /exam practice papers.
+$string['documentrole_past_exam'] = 'Past exam paper';
+$string['pastexamstructure'] = 'Detected exam structure';
+$string['pastexamenable'] = 'Use for /exam';
+$string['pastexamdisable'] = 'Stop using for /exam';
+$string['pastexamenable_tooltip'] = '/exam practice papers will follow the structure of this past paper.';
+$string['pastexamdisable_tooltip'] = '/exam practice papers will no longer follow the structure of this past paper. The structure is kept.';
+$string['pastexamenabled'] = 'This past paper is now used for /exam practice papers.';
+$string['pastexamdisabled'] = 'This past paper is no longer used for /exam practice papers.';
+$string['pastexamused'] = 'Used for /exam';
+$string['pastexamnotused'] = 'Not used';
+$string['pastexamunsupported'] = 'The assistant server does not support past exam papers yet, so the file was not kept. Ask your administrator to update the server.';
+$string['pastexamupload'] = 'Upload past exam papers';
+$string['pastexamuploaddesc'] = 'Add past exam papers so that /exam practice papers follow your format. Only each paper\'s structure is kept (sections, question types, number of questions, marks and time allowed): the paper is never searchable in the chat, and students never see its questions.';
+$string['pastexamfile'] = 'Past exam paper(s)';
+$string['pastexamfile_help'] = 'Select PDF, DOCX, PPTX, TXT, or Markdown file(s), up to 20 MB. Maximum 20 files per upload. When a student uses /exam, the assistant writes new questions from the course materials in the structure of these papers and gives them a PDF practice paper with no answers. With several past papers, it combines them into one typical structure. Scanned PDFs without text cannot be analysed.';
+$string['pastexamuploadbutton'] = 'Upload past papers';
+$string['pastexamuploadbutton_tooltip'] = 'Upload past exam paper(s) and detect their structure';

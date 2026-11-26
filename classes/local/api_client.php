@@ -374,6 +374,12 @@ class api_client
 
     /**
      * Upload a Moodle stored file for indexing.
+     *
+     * $documentrole must always be the document's saved role (documentrole column), also
+     * when reindexing: a past exam paper sent without 'past_exam' is indexed as course
+     * material, and its questions become searchable in chat.
+     *
+     * @param string $documentrole 'course_material' or 'past_exam' (only the paper's structure is kept, for /exam).
      */
     public function index_file(
         \stored_file $file,
@@ -382,8 +388,12 @@ class api_client
         int $ownerid,
         string $visibility,
         bool $retrievalenabled = true,
-        bool $generatesuggestions = false
+        bool $generatesuggestions = false,
+        string $documentrole = 'course_material'
     ): array {
+        if (!in_array($documentrole, ['course_material', 'past_exam'], true)) {
+            throw new \coding_exception('Invalid document role: ' . $documentrole);
+        }
         // Keep backend indexing and query embedding settings synchronized.
         $this->sync_configuration_if_changed();
         $temp = $file->copy_content_to_temp();
@@ -423,6 +433,7 @@ class api_client
                 'visibility' => $visibility,
                 'retrieval_enabled' => $retrievalenabled ? '1' : '0',
                 'generate_suggestions' => $generatesuggestions ? '1' : '0',
+                'document_role' => $documentrole,
             ];
 
             curl_setopt_array($handle, [

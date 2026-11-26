@@ -426,12 +426,15 @@ if ($allowed) {
             AND s.status = :suggestionready
             AND d.status = :ready
             AND d.retrievalenabled = 1
+            AND d.documentrole = :courserole
             AND (d.visibility = :coursevisibility OR d.userid = :userid OR :canmanage = 1)
           ORDER BY s.id ASC",
         [
             'courseid' => $courseid,
             'suggestionready' => 'ready',
             'ready' => 'ready',
+            // Never from a past exam paper: students must not see its questions.
+            'courserole' => \local_ragassistant\local\past_exam::COURSE_MATERIAL,
             'coursevisibility' => 'course',
             'userid' => $USER->id,
             'canmanage' => $canmanage ? 1 : 0,
@@ -599,7 +602,8 @@ if (data_submitted() && confirm_sesskey()) {
                 (new \local_ragassistant\local\api_client())->get_base_url()
             );
 
-            // Optional /notes fields; both are absent for every other command.
+            // Optional /notes fields; both are absent for every other command. A /exam reply
+            // in a course with past exam papers has the same "download" (a practice paper PDF).
             $download = local_ragassistant_clean_download($response['download'] ?? null);
             $pendingaction = local_ragassistant_clean_pending_action($response['pending_action'] ?? null);
             // Optional figures from course documents; absent for most answers.

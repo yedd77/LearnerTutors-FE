@@ -148,6 +148,18 @@ class index_document extends \core\task\adhoc_task {
             }
 
             $api = new \local_ragassistant\local\api_client();
+            $ispastexam = \local_ragassistant\local\past_exam::is_past_exam($record);
+
+            // Past exam papers have no starter suggestions: they could reveal its questions.
+            if ($ispastexam && ($jobtype === 'suggestions' || $jobtype === 'suggestion_slot')) {
+                $DB->delete_records('local_ragassistant_suggestions', ['documentid' => $documentid]);
+                if ($jobtype === 'suggestions') {
+                    $DB->set_field('local_ragassistant_documents', 'stage', 'complete', ['id' => $documentid]);
+                }
+                mtrace('RAG Assistant: document ' . $documentid . ' is a past exam paper; no suggestions generated.');
+                return;
+            }
+
             if ($jobtype === 'suggestion_slot') {
                 $this->generate_one_suggestion($api, $stored, $record, $slot);
                 return;
@@ -181,9 +193,11 @@ class index_document extends \core\task\adhoc_task {
                 return;
             }
 
-            $this->update_progress($documentid, 'processing', 20, 'indexing document');
+            $this->update_progress($documentid, 'processing', 20,
+                $ispastexam ? 'analysing exam structure' : 'indexing document');
             // Keep the indexing request focused on parsing and embeddings only.
             // The separate suggestion task is queued after the document is ready.
+            // The role is always resent, so reindexing keeps a past paper unsearchable.
             $result = $api->index_file(
                 $stored,
                 $documentid,
@@ -191,8 +205,17 @@ class index_document extends \core\task\adhoc_task {
                 (int) $record->userid,
                 (string) $record->visibility,
                 !empty($record->retrievalenabled),
-                false
+                false,
+                \local_ragassistant\local\past_exam::role_of($record)
             );
+
+            if ($ispastexam) {
+                // Saves the detected structure; no suggestions are made for a past paper.
+                \local_ragassistant\local\past_exam::save_index_result($api, $record, $result);
+                $this->update_progress($documentid, 'ready', 100, 'complete');
+                mtrace('RAG Assistant: analysed past exam paper ' . $documentid . '.');
+                return;
+            }
 
             $this->update_progress($documentid, 'ready', 100, 'complete');
             mtrace('RAG Assistant: indexed document ' . $documentid . ' (' .

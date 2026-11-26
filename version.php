@@ -6,7 +6,7 @@
 defined('MOODLE_INTERNAL') || die();
 
 $plugin->component = 'local_ragassistant';
-$plugin->version   = 2026112400;
+$plugin->version   = 2026112600;
 $plugin->requires  = 2025101600;
 $plugin->maturity  = MATURITY_ALPHA;
-$plugin->release   = '0.5.0 - Indexing failure reasons';
+$plugin->release   = '0.6.0 - Past exam papers';

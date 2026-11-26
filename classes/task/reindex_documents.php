@@ -64,14 +64,35 @@ class reindex_documents extends \core\task\adhoc_task {
                 ]);
 
                 try {
+                    // The role is always resent: without it a past exam paper would be
+                    // indexed as course material and its questions become searchable.
+                    // An unchanged past paper is not analysed again (the backend compares hashes).
                     $result = $api->index_file(
                         $stored,
                         (int) $record->id,
                         (int) $record->courseid,
                         (int) $record->userid,
                         (string) $record->visibility,
-                        !empty($record->retrievalenabled)
+                        !empty($record->retrievalenabled),
+                        false,
+                        \local_ragassistant\local\past_exam::role_of($record)
                     );
+
+                    if (\local_ragassistant\local\past_exam::is_past_exam($record)) {
+                        // Past papers keep their structure and get no starter suggestions.
+                        \local_ragassistant\local\past_exam::save_index_result($api, $record, $result);
+                        $DB->update_record('local_ragassistant_documents', (object) [
+                            'id' => $record->id,
+                            'status' => 'ready',
+                            'progress' => 100,
+                            'stage' => 'complete',
+                            'jobtype' => '',
+                            'timemodified' => time(),
+                        ]);
+                        $success++;
+                        mtrace('RAG Assistant: rebuilt past exam paper ' . $record->id . ' (' . $record->filename . ').');
+                        continue;
+                    }
 
                     $suggestions = $result['suggestions'] ?? [];
                     $cleaned = [];

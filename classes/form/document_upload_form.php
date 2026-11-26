@@ -399,7 +399,23 @@ JS;
     public function validation($data, $files): array
     {
         $errors = parent::validation($data, $files);
-        $draftitemid = (int) ($data['documents'] ?? 0);
+        return $this->check_upload_files($errors, $data, 'documents');
+    }
+
+    /**
+     * Validate every file in a file manager's draft area: type, size, PDF page limit and
+     * duplicates (in this upload or already in the course, whatever their type).
+     *
+     * Shared with past_exam_upload_form, which uses its own file manager field.
+     *
+     * @param array $errors errors found so far
+     * @param array $data submitted form data
+     * @param string $field name of the file manager element
+     * @return array
+     */
+    protected function check_upload_files(array $errors, array $data, string $field): array
+    {
+        $draftitemid = (int) ($data[$field] ?? 0);
         $usercontext = \context_user::instance($GLOBALS['USER']->id);
 
         $draftfiles = get_file_storage()->get_area_files(
@@ -414,12 +430,12 @@ JS;
         $allowed = ['pdf', 'docx', 'pptx', 'txt', 'md'];
 
         if (!$draftfiles) {
-            $errors['documents'] = get_string('required');
+            $errors[$field] = get_string('required');
             return $errors;
         }
 
         if (count($draftfiles) > 20) {
-            $errors['documents'] = 'You can upload a maximum of 20 files at once.';
+            $errors[$field] = 'You can upload a maximum of 20 files at once.';
             return $errors;
         }
 
@@ -432,12 +448,12 @@ JS;
             $extension = strtolower(pathinfo($file->get_filename(), PATHINFO_EXTENSION));
 
             if (!in_array($extension, $allowed, true)) {
-                $errors['documents'] = 'Unsupported file type: ' . s($file->get_filename());
+                $errors[$field] = 'Unsupported file type: ' . s($file->get_filename());
                 break;
             }
 
             if ($file->get_filesize() > 20 * 1024 * 1024) {
-                $errors['documents'] = 'File exceeds the 20 MB limit: ' . s($file->get_filename());
+                $errors[$field] = 'File exceeds the 20 MB limit: ' . s($file->get_filename());
                 break;
             }
 
@@ -446,7 +462,7 @@ JS;
             if ($extension === 'pdf') {
                 $pages = \local_ragassistant\local\pdf_page_counter::count($file);
                 if ($pages !== null && $pages > \local_ragassistant\local\pdf_page_counter::MAX_PAGES) {
-                    $errors['documents'] = get_string('pdftoomanypages', 'local_ragassistant', (object) [
+                    $errors[$field] = get_string('pdftoomanypages', 'local_ragassistant', (object) [
                         'filename' => s($file->get_filename()),
                         'pages' => $pages,
                         'limit' => \local_ragassistant\local\pdf_page_counter::MAX_PAGES,
@@ -457,7 +473,7 @@ JS;
 
             $hash = $file->get_contenthash();
             if (isset($seen[$hash])) {
-                $errors['documents'] = get_string('documentduplicateupload', 'local_ragassistant', (object) [
+                $errors[$field] = get_string('documentduplicateupload', 'local_ragassistant', (object) [
                     'first' => s($seen[$hash]),
                     'second' => s($file->get_filename()),
                 ]);
@@ -467,7 +483,7 @@ JS;
 
             $existing = $this->existing_document($coursecontextid, $hash);
             if ($existing !== null) {
-                $errors['documents'] = get_string('documentduplicate', 'local_ragassistant', (object) [
+                $errors[$field] = get_string('documentduplicate', 'local_ragassistant', (object) [
                     'filename' => s($file->get_filename()),
                     'existing' => s($existing),
                 ]);
@@ -485,7 +501,7 @@ JS;
      * @param string $contenthash
      * @return string|null
      */
-    private function existing_document(int $contextid, string $contenthash): ?string
+    protected function existing_document(int $contextid, string $contenthash): ?string
     {
         global $DB;
         $sql = "SELECT d.id, d.filename

@@ -17,6 +17,8 @@
         <FIELD NAME="errormessage" TYPE="text" NOTNULL="false" COMMENT="Why the last indexing failed, shown to lecturers"/>
         <FIELD NAME="retrievalenabled" TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="1"/>
         <FIELD NAME="visibility" TYPE="char" LENGTH="20" NOTNULL="true" DEFAULT="personal"/>
+        <FIELD NAME="documentrole" TYPE="char" LENGTH="20" NOTNULL="true" DEFAULT="course_material" COMMENT="course_material, or past_exam (only its structure is kept, for /exam)"/>
+        <FIELD NAME="examstructure" TYPE="text" NOTNULL="false" COMMENT="Past exam papers: the structure the backend detected, shown to lecturers"/>
         <FIELD NAME="lecturernote" TYPE="text" NOTNULL="false"/>
         <FIELD NAME="timecreated" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0"/>
         <FIELD NAME="timemodified" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0"/>

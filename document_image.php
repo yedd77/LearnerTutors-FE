@@ -51,7 +51,9 @@ if (!preg_match('/^[0-9a-f]{32}$/', $imageid) || $documentid <= 0) {
 // checks the course and document again; this check does not rely on it.
 $canmanage = has_capability('local/ragassistant:managedocuments', $context);
 $document = $DB->get_record('local_ragassistant_documents', ['id' => $documentid, 'courseid' => $courseid]);
+// A past exam paper is never shown to students (only its structure is used, for /exam).
 if (!$document || $document->status !== 'ready' || empty($document->retrievalenabled) ||
+        \local_ragassistant\local\past_exam::is_past_exam($document) ||
         ($document->visibility !== 'course' && (int) $document->userid !== (int) $USER->id && !$canmanage)) {
     local_ragassistant_image_not_found();
 }

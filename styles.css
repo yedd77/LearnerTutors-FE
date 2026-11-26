@@ -172,6 +172,32 @@
     word-break: break-word;
 }
 
+/* Past exam papers: type badge and the structure /exam will follow. */
+.ragassistant-document-role {
+    margin-top: .25rem;
+}
+
+.ragassistant-exam-structure {
+    margin-top: .5rem;
+    max-width: 28rem;
+    padding: .5rem .65rem;
+    border-left: 3px solid var(--ragassistant-border);
+    border-radius: .25rem;
+    background: rgba(0, 0, 0, .03);
+}
+
+.ragassistant-exam-structure-title {
+    display: block;
+    margin-bottom: .2rem;
+    font-weight: 600;
+}
+
+.ragassistant-exam-structure-text {
+    font-size: .85rem;
+    line-height: 1.45;
+    overflow-wrap: anywhere;
+}
+
 .ragassistant-document-actions {
     display: flex;
     flex-direction: column;
@@ -397,7 +423,8 @@ html:has(.ragassistant-chat-app),
     border-color: var(--ragassistant-primary);
 }
 
-#id_submitbutton {
+#id_submitbutton,
+#id_examsubmitbutton {
     display: block;
     margin-left: auto;
 }
@@ -694,13 +721,13 @@ html:has(.ragassistant-chat-app),
 }
 
 /* Keep Moodle's accepted_types configuration active, but hide its visible type/restriction summary. */
-#fitem_id_documents .filemanager .fp-restrictions,
-#fitem_id_documents .filemanager .acceptedtypes,
-#fitem_id_documents .filemanager .fp-acceptedtypes {
+:is(#fitem_id_documents, #fitem_id_exampapers) .filemanager .fp-restrictions,
+:is(#fitem_id_documents, #fitem_id_exampapers) .filemanager .acceptedtypes,
+:is(#fitem_id_documents, #fitem_id_exampapers) .filemanager .fp-acceptedtypes {
     display: none !important;
 }
 
-#fitem_id_documents .filemanager {
+:is(#fitem_id_documents, #fitem_id_exampapers) .filemanager {
     margin-top: .35rem;
 }
 
@@ -799,7 +826,7 @@ html:has(.ragassistant-chat-app),
 }
 
 /* Hide the displayed accepted file format information only. */
-#fitem_id_documents .form-filetypes-descriptions,
+:is(#fitem_id_documents, #fitem_id_exampapers) .form-filetypes-descriptions,
 .filetypes-descriptions-intro {
     display: none !important;
 }
@@ -868,7 +895,7 @@ html:has(.ragassistant-chat-app),
 }
 
 /* File upload area: Moodle's native filemanager stays functional */
-#fitem_id_documents {
+:is(#fitem_id_documents, #fitem_id_exampapers) {
     display: block;
     margin: 0 0 12px;
     padding: 20px;
@@ -878,50 +905,50 @@ html:has(.ragassistant-chat-app),
     box-shadow: 0 3px 12px rgb(var(--ragassistant-shadow-rgb) / 4%);
 }
 
-#fitem_id_documents>.col-form-label,
-#fitem_id_documents>.col-md-3,
-#fitem_id_documents>.col-md-9,
-#fitem_id_documents>.col-sm-3,
-#fitem_id_documents>.col-sm-9 {
+:is(#fitem_id_documents, #fitem_id_exampapers)>.col-form-label,
+:is(#fitem_id_documents, #fitem_id_exampapers)>.col-md-3,
+:is(#fitem_id_documents, #fitem_id_exampapers)>.col-md-9,
+:is(#fitem_id_documents, #fitem_id_exampapers)>.col-sm-3,
+:is(#fitem_id_documents, #fitem_id_exampapers)>.col-sm-9 {
     width: 100%;
     max-width: 100%;
     flex: 0 0 100%;
 }
 
-#fitem_id_documents .col-form-label {
+:is(#fitem_id_documents, #fitem_id_exampapers) .col-form-label {
     display: block;
     margin-bottom: 12px;
     color: var(--ragassistant-text);
     font-weight: 700;
 }
 
-#fitem_id_documents .form-filetypes-descriptions {
+:is(#fitem_id_documents, #fitem_id_exampapers) .form-filetypes-descriptions {
     display: none !important;
 }
 
 /* Keep Moodle's file restrictions; hide only the displayed format list */
-#fitem_id_documents .filemanager .fp-restrictions,
-#fitem_id_documents .filemanager .fp-acceptedtypes,
-#fitem_id_documents .filemanager .acceptedtypes {
+:is(#fitem_id_documents, #fitem_id_exampapers) .filemanager .fp-restrictions,
+:is(#fitem_id_documents, #fitem_id_exampapers) .filemanager .fp-acceptedtypes,
+:is(#fitem_id_documents, #fitem_id_exampapers) .filemanager .acceptedtypes {
     display: none !important;
 }
 
 /* Moodle filemanager drop area */
-#fitem_id_documents .filemanager {
+:is(#fitem_id_documents, #fitem_id_exampapers) .filemanager {
     width: 100%;
     max-width: 100%;
 }
 
-#fitem_id_documents .filemanager .fm-empty-container,
-#fitem_id_documents .filemanager .dndupload-message {
+:is(#fitem_id_documents, #fitem_id_exampapers) .filemanager .fm-empty-container,
+:is(#fitem_id_documents, #fitem_id_exampapers) .filemanager .dndupload-message {
     border-radius: 10px;
 }
 
-#fitem_id_documents .filemanager .dndupload-message {
+:is(#fitem_id_documents, #fitem_id_exampapers) .filemanager .dndupload-message {
     padding: 24px 16px;
 }
 
-#fitem_id_documents .filemanager .fp-content {
+:is(#fitem_id_documents, #fitem_id_exampapers) .filemanager .fp-content {
     border-radius: 10px;
 }
 
@@ -1064,8 +1091,8 @@ html:has(.ragassistant-chat-app),
 }
 
 /* Form validation messages */
-#fitem_id_documents .form-control-feedback,
-#fitem_id_documents .invalid-feedback {
+:is(#fitem_id_documents, #fitem_id_exampapers) .form-control-feedback,
+:is(#fitem_id_documents, #fitem_id_exampapers) .invalid-feedback {
     margin-top: 8px;
 }
 
@@ -1095,7 +1122,7 @@ html:has(.ragassistant-chat-app),
         gap: 11px;
     }
 
-    #fitem_id_documents {
+    :is(#fitem_id_documents, #fitem_id_exampapers) {
         padding: 14px;
     }
 
@@ -1154,7 +1181,7 @@ html:has(.ragassistant-chat-app),
 }
 
 /* Remove nested card appearance from the file manager */
-#page-local-ragassistant-documents #fitem_id_documents {
+#page-local-ragassistant-documents :is(#fitem_id_documents, #fitem_id_exampapers) {
     padding: 0;
     border: none;
     box-shadow: none;
@@ -2224,4 +2251,9 @@ form.mform #fgroup_id_buttonar .felement.fgroup {
 
 [id^="page-local-ragassistant-"] #region-main .progress {
     --bs-progress-bar-bg: var(--ragassistant-primary);
+}
+
+/* Past exam paper upload: a separate card below the course material upload. */
+#ragassistant-exam-upload-heading {
+    margin-top: 2rem;
 }
