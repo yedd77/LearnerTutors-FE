@@ -153,5 +153,16 @@ function xmldb_local_ragassistant_upgrade(int $oldversion): bool
         upgrade_plugin_savepoint(true, 2026112600, 'local', 'ragassistant');
     }
 
+    if ($oldversion < 2026112601) {
+        // Per-course switch for the /exam command (students only). On by default.
+        $table = new xmldb_table('local_ragassistant_coursecfg');
+        $field = new xmldb_field('allowstudentexam', XMLDB_TYPE_INTEGER, '1', null, XMLDB_NOTNULL, null, '1',
+            'allowstudentchat');
+        if (!$dbman->field_exists($table, $field)) {
+            $dbman->add_field($table, $field);
+        }
+        upgrade_plugin_savepoint(true, 2026112601, 'local', 'ragassistant');
+    }
+
     return true;
 }

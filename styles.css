@@ -192,10 +192,17 @@
     font-weight: 600;
 }
 
-.ragassistant-exam-structure-text {
+.ragassistant-exam-structure-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
     font-size: .85rem;
     line-height: 1.45;
     overflow-wrap: anywhere;
+}
+
+.ragassistant-exam-structure-list li + li {
+    margin-top: .25rem;
 }
 
 .ragassistant-document-actions {
@@ -974,7 +981,7 @@ html:has(.ragassistant-chat-app),
 }
 
 /* Review section */
-#ragassistant-file-review {
+:is(#ragassistant-file-review, #ragassistant-exam-file-review) {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 16px;
@@ -1005,6 +1012,13 @@ html:has(.ragassistant-chat-app),
     margin-bottom: 18px;
     padding-bottom: 15px;
     border-bottom: 1px solid var(--ragassistant-border-subtle);
+}
+
+/* Review cards without a note field (past exam papers): no divider or space below. */
+.ragassistant-file-card-compact .ragassistant-file-card-header {
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: 0;
 }
 
 .ragassistant-file-icon {
@@ -1126,7 +1140,7 @@ html:has(.ragassistant-chat-app),
         padding: 14px;
     }
 
-    #ragassistant-file-review {
+    :is(#ragassistant-file-review, #ragassistant-exam-file-review) {
         grid-template-columns: minmax(0, 1fr);
         gap: 12px;
     }
@@ -2253,7 +2267,29 @@ form.mform #fgroup_id_buttonar .felement.fgroup {
     --bs-progress-bar-bg: var(--ragassistant-primary);
 }
 
-/* Past exam paper upload: a separate card below the course material upload. */
-#ragassistant-exam-upload-heading {
-    margin-top: 2rem;
+/* Past exam paper upload: a separate card, spaced like the other cards. */
+#page-local-ragassistant-documents form.ragassistant-exam-upload-form {
+    margin-top: 1.5rem;
+}
+
+/* Whether /exam currently follows any past paper. */
+.ragassistant-exam-usage {
+    display: inline-block;
+    margin: .6rem 0 0;
+    padding: .3rem .7rem;
+    border-radius: 999px;
+    background: var(--ragassistant-surface, #f3f4f6);
+    color: var(--ragassistant-muted);
+    font-size: .85rem;
+}
+
+.ragassistant-exam-usage-active {
+    background: var(--ragassistant-primary-light);
+    color: var(--ragassistant-primary);
+    font-weight: 600;
+}
+
+/* The status cell capitalises its labels; a failure reason is a sentence. */
+.ragassistant-documents .ragassistant-failure-reason {
+    text-transform: none;
 }

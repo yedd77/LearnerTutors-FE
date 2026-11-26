@@ -255,7 +255,14 @@ if ($action === 'savepolicy' && data_submitted()) {
     require_sesskey();
     require_capability('local/ragassistant:managedocuments', $context);
     $allowchat = (bool) optional_param('allowstudentchat', 0, PARAM_BOOL);
-    \local_ragassistant\local\course_policy::save($courseid, $allowchat);
+    // The /exam setting is only sent when it was shown (examoption). It is saved only while
+    // it applies; otherwise the saved value is kept for when it applies again.
+    $allowexam = null;
+    if (optional_param('examoption', 0, PARAM_BOOL) && $allowchat &&
+            get_config('local_ragassistant', 'enable_chat')) {
+        $allowexam = (bool) optional_param('allowstudentexam', 0, PARAM_BOOL);
+    }
+    \local_ragassistant\local\course_policy::save($courseid, $allowchat, $allowexam);
     redirect(
         new moodle_url('/local/ragassistant/documents.php', ['courseid' => $courseid]),
         get_string('policysaved', 'local_ragassistant'),
@@ -508,9 +515,24 @@ $mform = new \local_ragassistant\form\document_upload_form(
 );
 // Past exam papers have their own upload card. Moodle tells the two forms apart by their
 // class, so only the submitted one returns data.
+// The card says whether /exam currently follows any past paper (ready and switched on).
+$pastexamsinuse = $DB->count_records('local_ragassistant_documents', [
+    'courseid' => $courseid,
+    'documentrole' => \local_ragassistant\local\past_exam::ROLE,
+    'status' => 'ready',
+    'retrievalenabled' => 1,
+]);
 $examform = new \local_ragassistant\form\past_exam_upload_form(
     null,
-    ['courseid' => $courseid, 'contextid' => $context->id, 'canmanage' => $canmanage]
+    [
+        'courseid' => $courseid,
+        'contextid' => $context->id,
+        'canmanage' => $canmanage,
+        'pastexamsinuse' => $pastexamsinuse,
+    ],
+    'post',
+    '',
+    ['class' => 'ragassistant-exam-upload-form']
 );
 
 $data = null;
@@ -640,8 +662,7 @@ if ($fragment) {
     echo $OUTPUT->heading(get_string('uploadCardTitle', 'local_ragassistant'));
     if ($canupload) {
         $mform->display();
-        // Separate card for past exam papers: only their structure is kept, for /exam.
-        $examform->display();
+        // The past exam paper upload card is shown further down, above its own list.
     } else {
         echo $OUTPUT->notification(get_string('uploadnotpermitted', 'local_ragassistant'), 'warning');
     }
@@ -649,243 +670,303 @@ if ($fragment) {
 $pagedsections = [];
 
 $documents = $DB->get_records('local_ragassistant_documents', ['courseid' => $courseid], 'timecreated DESC');
-echo html_writer::start_div('ragassistant-uploaded-card');
-echo html_writer::tag(
-    'div',
-    html_writer::tag(
-        'h4',
-        get_string('uploadedDocuments', 'local_ragassistant'),
-        ['class' => 'ragassistant-card-title']
-    ) .
-    html_writer::tag(
-        'p',
-        get_string('manageUploaded', 'local_ragassistant'),
-        ['class' => 'ragassistant-card-description']
-    ),
-    [
-        'id' => 'ragassistant-uploaded-heading',
-        'class' => 'ragassistant-card-heading',
-    ]
-);
 
-$table = new html_table();
-$table->attributes['class'] = 'generaltable ragassistant-documents';
-$table->head = [
-    get_string('documentname', 'local_ragassistant'),
-    get_string('lecturernote', 'local_ragassistant'),
-    get_string('processingstatus', 'local_ragassistant'),
-    'Retrieval',
-    get_string('actions', 'local_ragassistant'),
+// Two lists, each in its own card with its own paging: course materials (docpage) and past
+// exam papers (exampage). Every paging link keeps the other lists' page numbers.
+$docperpage = 4;
+$pageparams = [
+    'docpage' => optional_param('docpage', 0, PARAM_INT),
+    'exampage' => optional_param('exampage', 0, PARAM_INT),
+    'sugpage' => optional_param('sugpage', 0, PARAM_INT),
+];
+$doclists = [
+    [
+        'sectionid' => 'ragassistant-documents-section',
+        'headingid' => 'ragassistant-uploaded-heading',
+        'pageparam' => 'docpage',
+        'pastexam' => false,
+        'title' => get_string('coursematerialslist', 'local_ragassistant'),
+        'description' => get_string('manageUploaded', 'local_ragassistant'),
+        'empty' => get_string('nodocuments', 'local_ragassistant'),
+    ],
+    [
+        'sectionid' => 'ragassistant-exams-section',
+        'headingid' => 'ragassistant-exams-heading',
+        'pageparam' => 'exampage',
+        'pastexam' => true,
+        'title' => get_string('pastexamlist', 'local_ragassistant'),
+        'description' => get_string('pastexamlistdesc', 'local_ragassistant'),
+        'empty' => get_string('pastexamlistempty', 'local_ragassistant'),
+    ],
 ];
 
-// Paginate the uploaded documents table: 4 documents per page. Only managers reach this
-// page, so every course document is listed. The suggestions table below still uses all.
-$docperpage = 4;
-$doctotal = count($documents);
-$docpage = optional_param('docpage', 0, PARAM_INT);
-$docpage = max(0, min($docpage, max(0, (int) ceil($doctotal / $docperpage) - 1)));
-$pageddocuments = array_slice($documents, $docpage * $docperpage, $docperpage, true);
+// Each list card is captured here and printed below in page order: course material upload,
+// course materials, document suggestions, past exam paper upload, past exam papers, chat settings.
+$listcards = [];
+foreach ($doclists as $doclist) {
+    $listdocuments = array_filter($documents, function ($document) use ($doclist) {
+        return \local_ragassistant\local\past_exam::is_past_exam($document) === $doclist['pastexam'];
+    });
 
-foreach ($pageddocuments as $document) {
-    $isowner = ((int) $document->userid === (int) $USER->id);
-    if (!$canmanage && $document->visibility !== 'course' && !$isowner) {
-        continue;
-    }
-    // Students must not see that a disabled course document exists (name or note).
-    if (!$canmanage && !$isowner && empty($document->retrievalenabled)) {
-        continue;
-    }
-    $retrievalenabled = !empty($document->retrievalenabled);
-    $ispastexam = \local_ragassistant\local\past_exam::is_past_exam($document);
-    $active = in_array($document->status, ['pending', 'processing'], true);
-    $actions = [];
+    ob_start();
+    echo html_writer::start_div('ragassistant-uploaded-card');
+    echo html_writer::tag(
+        'div',
+        html_writer::tag('h4', $doclist['title'], ['class' => 'ragassistant-card-title']) .
+        html_writer::tag('p', $doclist['description'], ['class' => 'ragassistant-card-description']),
+        [
+            'id' => $doclist['headingid'],
+            'class' => 'ragassistant-card-heading',
+        ]
+    );
 
-    if (($canmanage || $isowner) && !$active) {
-        if (in_array($document->status, ['pending', 'failed'], true)) {
+    $table = new html_table();
+    $table->attributes['class'] = 'generaltable ragassistant-documents';
+    // Past papers have no lecturer note, and their toggle decides whether /exam uses them.
+    $table->head = $doclist['pastexam']
+        ? [
+            get_string('documentname', 'local_ragassistant'),
+            get_string('processingstatus', 'local_ragassistant'),
+            get_string('pastexamusedcolumn', 'local_ragassistant'),
+            get_string('actions', 'local_ragassistant'),
+        ]
+        : [
+            get_string('documentname', 'local_ragassistant'),
+            get_string('lecturernote', 'local_ragassistant'),
+            get_string('processingstatus', 'local_ragassistant'),
+            'Retrieval',
+            get_string('actions', 'local_ragassistant'),
+        ];
+
+    // Paginate each table: 4 documents per page. Only managers reach this page, so every
+    // course document is listed.
+    $doctotal = count($listdocuments);
+    $pageparam = $doclist['pageparam'];
+    $pageparams[$pageparam] = max(0, min($pageparams[$pageparam], max(0, (int) ceil($doctotal / $docperpage) - 1)));
+    $pageddocuments = array_slice($listdocuments, $pageparams[$pageparam] * $docperpage, $docperpage, true);
+
+    foreach ($pageddocuments as $document) {
+        $isowner = ((int) $document->userid === (int) $USER->id);
+        if (!$canmanage && $document->visibility !== 'course' && !$isowner) {
+            continue;
+        }
+        // Students must not see that a disabled course document exists (name or note).
+        if (!$canmanage && !$isowner && empty($document->retrievalenabled)) {
+            continue;
+        }
+        $retrievalenabled = !empty($document->retrievalenabled);
+        $ispastexam = \local_ragassistant\local\past_exam::is_past_exam($document);
+        $active = in_array($document->status, ['pending', 'processing'], true);
+        $actions = [];
+
+        if (($canmanage || $isowner) && !$active) {
+            if (in_array($document->status, ['pending', 'failed'], true)) {
+                $actions[] = local_ragassistant_document_action_form(
+                    $courseid,
+                    (int) $document->id,
+                    'index',
+                    get_string('indexdocument', 'local_ragassistant'),
+                    'btn btn-outline-secondary btn-sm',
+                    null,
+                    [],
+                    false,
+                    get_string('indexdocument_tooltip', 'local_ragassistant')
+                );
+            } else if ($document->status === 'ready' && $canreindex) {
+                $actions[] = local_ragassistant_document_action_form(
+                    $courseid,
+                    (int) $document->id,
+                    'reindex',
+                    'Reindex',
+                    'btn btn-outline-primary btn-sm',
+                    'return confirm("Queue reindexing for this document?");',
+                    [],
+                    false,
+                    get_string('reindexdocument_tooltip', 'local_ragassistant')
+                );
+            }
+            if ($document->status === 'ready' && $ispastexam) {
+                // For a past paper the same toggle decides whether /exam follows its structure.
+                $actions[] = local_ragassistant_document_action_form(
+                    $courseid,
+                    (int) $document->id,
+                    'retrieval',
+                    get_string($retrievalenabled ? 'pastexamdisable' : 'pastexamenable', 'local_ragassistant'),
+                    $retrievalenabled ? 'btn btn-outline-warning btn-sm' : 'btn btn-success btn-sm',
+                    null,
+                    ['enable' => $retrievalenabled ? 0 : 1],
+                    false,
+                    get_string($retrievalenabled ? 'pastexamdisable_tooltip' : 'pastexamenable_tooltip', 'local_ragassistant')
+                );
+            } else if ($document->status === 'ready') {
+                $actions[] = local_ragassistant_document_action_form(
+                    $courseid,
+                    (int) $document->id,
+                    'retrieval',
+                    $retrievalenabled ? 'Disable retrieval' : 'Enable retrieval',
+                    $retrievalenabled ? 'btn btn-outline-warning btn-sm' : 'btn btn-success btn-sm',
+                    null,
+                    ['enable' => $retrievalenabled ? 0 : 1],
+                    false,
+                    get_string($retrievalenabled ? 'disableretrieval_tooltip' : 'enableretrieval_tooltip', 'local_ragassistant')
+                );
+            }
             $actions[] = local_ragassistant_document_action_form(
                 $courseid,
                 (int) $document->id,
-                'index',
-                get_string('indexdocument', 'local_ragassistant'),
-                'btn btn-outline-secondary btn-sm',
-                null,
+                'delete',
+                'Delete',
+                'btn btn-outline-danger btn-sm',
+                'return confirm("Delete this document and its indexed content permanently?");',
                 [],
                 false,
-                get_string('indexdocument_tooltip', 'local_ragassistant')
+                get_string('deletedocument_tooltip', 'local_ragassistant')
             );
-        } else if ($document->status === 'ready' && $canreindex) {
-            $actions[] = local_ragassistant_document_action_form(
-                $courseid,
-                (int) $document->id,
-                'reindex',
-                'Reindex',
-                'btn btn-outline-primary btn-sm',
-                'return confirm("Queue reindexing for this document?");',
-                [],
-                false,
-                get_string('reindexdocument_tooltip', 'local_ragassistant')
-            );
+        } else if ($active) {
+            $actions[] = html_writer::tag('button', 'Processing…', [
+                'type' => 'button',
+                'class' => 'btn btn-outline-secondary btn-sm',
+                'disabled' => 'disabled',
+                'title' => get_string('processingdocument_tooltip', 'local_ragassistant'),
+            ]);
         }
-        if ($document->status === 'ready' && $ispastexam) {
-            // For a past paper the same toggle decides whether /exam follows its structure.
-            $actions[] = local_ragassistant_document_action_form(
-                $courseid,
-                (int) $document->id,
-                'retrieval',
-                get_string($retrievalenabled ? 'pastexamdisable' : 'pastexamenable', 'local_ragassistant'),
-                $retrievalenabled ? 'btn btn-outline-warning btn-sm' : 'btn btn-success btn-sm',
-                null,
-                ['enable' => $retrievalenabled ? 0 : 1],
-                false,
-                get_string($retrievalenabled ? 'pastexamdisable_tooltip' : 'pastexamenable_tooltip', 'local_ragassistant')
-            );
-        } else if ($document->status === 'ready') {
-            $actions[] = local_ragassistant_document_action_form(
-                $courseid,
-                (int) $document->id,
-                'retrieval',
-                $retrievalenabled ? 'Disable retrieval' : 'Enable retrieval',
-                $retrievalenabled ? 'btn btn-outline-warning btn-sm' : 'btn btn-success btn-sm',
-                null,
-                ['enable' => $retrievalenabled ? 0 : 1],
-                false,
-                get_string($retrievalenabled ? 'disableretrieval_tooltip' : 'enableretrieval_tooltip', 'local_ragassistant')
-            );
-        }
-        $actions[] = local_ragassistant_document_action_form(
-            $courseid,
-            (int) $document->id,
-            'delete',
-            'Delete',
-            'btn btn-outline-danger btn-sm',
-            'return confirm("Delete this document and its indexed content permanently?");',
-            [],
-            false,
-            get_string('deletedocument_tooltip', 'local_ragassistant')
-        );
-    } else if ($active) {
-        $actions[] = html_writer::tag('button', 'Processing…', [
-            'type' => 'button',
-            'class' => 'btn btn-outline-secondary btn-sm',
-            'disabled' => 'disabled',
-            'title' => get_string('processingdocument_tooltip', 'local_ragassistant'),
+
+        $progress = max(0, min(100, (int) ($document->progress ?? 0)));
+        $statuscontent = html_writer::tag('span', ucfirst($document->status), [
+            'class' => 'ragassistant-status-label',
         ]);
-    }
-
-    $progress = max(0, min(100, (int) ($document->progress ?? 0)));
-    $statuscontent = html_writer::tag('span', ucfirst($document->status), [
-        'class' => 'ragassistant-status-label',
-    ]);
-    if ($active) {
-        $statuscontent .= html_writer::div(
-            html_writer::div('', 'progress-bar', [
-                'role' => 'progressbar',
-                'style' => 'width:' . $progress . '%',
-                'aria-valuenow' => $progress,
-                'aria-valuemin' => 0,
-                'aria-valuemax' => 100,
-            ]),
-            'progress ragassistant-document-progress'
-        );
-        $statuscontent .= html_writer::tag(
-            'small',
-            s(ucfirst((string) ($document->stage ?: 'queued'))) . ' · ' . $progress . '%',
-            ['class' => 'text-muted ragassistant-progress-label']
-        );
-    }
-    if ($document->status === 'failed') {
-        // Why indexing failed (set by the index task), so the lecturer can act on it.
-        $reason = trim((string) ($document->errormessage ?? ''));
-        $statuscontent .= html_writer::tag(
-            'small',
-            $reason !== '' ? get_string('indexfailedreason', 'local_ragassistant', s($reason))
-                : get_string('indexfailedgeneric', 'local_ragassistant'),
-            ['class' => 'text-danger ragassistant-failure-reason']
-        );
-    }
-    $status = html_writer::div($statuscontent, 'ragassistant-processing-status', [
-        'data-document-id' => (int) $document->id,
-        'data-status' => $document->status,
-        'data-progress' => $progress,
-        'data-stage' => (string) ($document->stage ?? ''),
-    ]);
-
-    $namecell = html_writer::span(
-        s($document->filename ?: get_string('pendingfilename', 'local_ragassistant')),
-        'ragassistant-document-name'
-    );
-    if ($ispastexam) {
-        $namecell .= html_writer::div(
-            html_writer::span(get_string('documentrole_past_exam', 'local_ragassistant'), 'badge badge-info bg-info'),
-            'ragassistant-document-role'
-        );
-        // The structure /exam will follow, as detected by the backend (it cannot be fetched again later).
-        $structure = trim((string) ($document->examstructure ?? ''));
-        if ($document->status === 'ready' && $structure !== '') {
-            $namecell .= html_writer::div(
-                html_writer::tag('small', get_string('pastexamstructure', 'local_ragassistant'),
-                    ['class' => 'ragassistant-exam-structure-title']) .
-                html_writer::div(nl2br(s($structure)), 'ragassistant-exam-structure-text'),
-                'ragassistant-exam-structure'
+        if ($active) {
+            $statuscontent .= html_writer::div(
+                html_writer::div('', 'progress-bar', [
+                    'role' => 'progressbar',
+                    'style' => 'width:' . $progress . '%',
+                    'aria-valuenow' => $progress,
+                    'aria-valuemin' => 0,
+                    'aria-valuemax' => 100,
+                ]),
+                'progress ragassistant-document-progress'
+            );
+            $statuscontent .= html_writer::tag(
+                'small',
+                s(ucfirst((string) ($document->stage ?: 'queued'))) . ' · ' . $progress . '%',
+                ['class' => 'text-muted ragassistant-progress-label']
             );
         }
+        if ($document->status === 'failed') {
+            // Why indexing failed (set by the index task), so the lecturer can act on it.
+            $reason = trim((string) ($document->errormessage ?? ''));
+            $statuscontent .= html_writer::tag(
+                'small',
+                $reason !== '' ? get_string('indexfailedreason', 'local_ragassistant', s($reason))
+                    : get_string('indexfailedgeneric', 'local_ragassistant'),
+                ['class' => 'text-danger ragassistant-failure-reason']
+            );
+        }
+        $status = html_writer::div($statuscontent, 'ragassistant-processing-status', [
+            'data-document-id' => (int) $document->id,
+            'data-status' => $document->status,
+            'data-progress' => $progress,
+            'data-stage' => (string) ($document->stage ?? ''),
+        ]);
+
+        $namecell = html_writer::span(
+            s($document->filename ?: get_string('pendingfilename', 'local_ragassistant')),
+            'ragassistant-document-name'
+        );
+        if ($ispastexam) {
+            $namecell .= html_writer::div(
+                html_writer::span(get_string('documentrole_past_exam', 'local_ragassistant'), 'badge badge-info bg-info'),
+                'ragassistant-document-role'
+            );
+            // The structure /exam will follow, as detected by the backend (it cannot be fetched again later).
+            $structure = trim((string) ($document->examstructure ?? ''));
+            if ($document->status === 'ready' && $structure !== '') {
+                // One line per section ("Section A: ...", "Total: ..."): the label is bolded so
+                // the sections and totals can be scanned.
+                $items = '';
+                foreach (preg_split('/\R/', $structure) as $line) {
+                    $line = trim($line);
+                    if ($line === '') {
+                        continue;
+                    }
+                    if (preg_match('/^([^:]{1,40}):\s*(.+)$/u', $line, $parts)) {
+                        $items .= html_writer::tag('li', html_writer::tag('strong', s($parts[1])) . ' ' . s($parts[2]));
+                    } else {
+                        $items .= html_writer::tag('li', s($line));
+                    }
+                }
+                $namecell .= html_writer::div(
+                    html_writer::tag('small', get_string('pastexamstructure', 'local_ragassistant'),
+                        ['class' => 'ragassistant-exam-structure-title']) .
+                    html_writer::tag('ul', $items, ['class' => 'ragassistant-exam-structure-list']),
+                    'ragassistant-exam-structure'
+                );
+            }
+        }
+
+        if ($ispastexam) {
+            // Only a ready past paper shapes /exam; a pending or failed one is not used yet.
+            $retrievalbadge = $retrievalenabled && $document->status === 'ready'
+                ? html_writer::span(get_string('pastexamused', 'local_ragassistant'), 'badge badge-success bg-success')
+                : html_writer::span(get_string('pastexamnotused', 'local_ragassistant'), 'badge badge-secondary bg-secondary');
+        } else {
+            $retrievalbadge = $retrievalenabled
+                ? html_writer::span('Enabled', 'badge badge-success bg-success')
+                : html_writer::span('Disabled', 'badge badge-secondary bg-secondary');
+        }
+
+        $row = [$namecell];
+        if (!$doclist['pastexam']) {
+            $row[] = trim((string) ($document->lecturernote ?? '')) !== ''
+                ? format_text($document->lecturernote, FORMAT_PLAIN, ['para' => false])
+                : get_string('notavailable', 'local_ragassistant');
+        }
+        $row[] = $status;
+        $row[] = $retrievalbadge;
+        $row[] = html_writer::div(implode('', $actions), 'ragassistant-document-actions');
+        $table->data[] = $row;
+
     }
 
-    if ($ispastexam) {
-        $retrievalbadge = $retrievalenabled
-            ? html_writer::span(get_string('pastexamused', 'local_ragassistant'), 'badge badge-success bg-success')
-            : html_writer::span(get_string('pastexamnotused', 'local_ragassistant'), 'badge badge-secondary bg-secondary');
-    } else {
-        $retrievalbadge = $retrievalenabled
-            ? html_writer::span('Enabled', 'badge badge-success bg-success')
-            : html_writer::span('Disabled', 'badge badge-secondary bg-secondary');
+    if (empty($table->data)) {
+        $emptycell = new html_table_cell($doclist['empty']);
+        $emptycell->attributes['class'] = 'ragassistant-empty-cell';
+        $emptycell->colspan = count($table->head);
+        $table->data[] = [$emptycell];
     }
-
-    $table->data[] = [
-        $namecell,
-        trim((string) ($document->lecturernote ?? '')) !== ''
-        ? format_text($document->lecturernote, FORMAT_PLAIN, ['para' => false])
-        : get_string('notavailable', 'local_ragassistant'),
-        $status,
-        $retrievalbadge,
-        html_writer::div(implode('', $actions), 'ragassistant-document-actions'),
-    ];
-
-}
-
-if (empty($table->data)) {
-    $emptycell = new html_table_cell(get_string('nodocuments', 'local_ragassistant'));
-    $emptycell->attributes['class'] = 'ragassistant-empty-cell';
-    $emptycell->colspan = count($table->head);
-    $table->data[] = [$emptycell];
-}
-// The table and its paging bar share a container so the paging script can swap them
-// in place (see $polljs below) instead of reloading the whole page.
-ob_start();
-echo html_writer::start_div('ragassistant-paged-section', ['id' => 'ragassistant-documents-section']);
-echo html_writer::div(
-    html_writer::table($table),
-    'table-responsive'
-);
-if ($doctotal > $docperpage) {
+    // The table and its paging bar share a container so the paging script can swap them
+    // in place (see $polljs below) instead of reloading the whole page.
+    ob_start();
+    echo html_writer::start_div('ragassistant-paged-section', ['id' => $doclist['sectionid']]);
     echo html_writer::div(
-        $OUTPUT->paging_bar(
-            $doctotal,
-            $docpage,
-            $docperpage,
-            new moodle_url('/local/ragassistant/documents.php', [
-                'courseid' => $courseid,
-                'sugpage' => optional_param('sugpage', 0, PARAM_INT),
-            ]),
-            'docpage'
-        ),
-        'ragassistant-docs-paging'
+        html_writer::table($table),
+        'table-responsive'
     );
+    if ($doctotal > $docperpage) {
+        // Keep the other lists on their current page.
+        $otherpages = $pageparams;
+        unset($otherpages[$pageparam]);
+        echo html_writer::div(
+            $OUTPUT->paging_bar(
+                $doctotal,
+                $pageparams[$pageparam],
+                $docperpage,
+                new moodle_url('/local/ragassistant/documents.php', ['courseid' => $courseid] + $otherpages),
+                $pageparam
+            ),
+            'ragassistant-docs-paging'
+        );
+    }
+    echo html_writer::end_div(); // End the paged section.
+    $pagedsections[$doclist['sectionid']] = ob_get_clean();
+    echo $pagedsections[$doclist['sectionid']];
+    echo html_writer::end_div();
+    $listcards[$doclist['sectionid']] = ob_get_clean();
 }
-echo html_writer::end_div(); // End ragassistant-documents-section.
-$pagedsections['ragassistant-documents-section'] = ob_get_clean();
-echo $pagedsections['ragassistant-documents-section'];
-echo html_writer::end_div();
+$docpage = $pageparams['docpage'];
+$exampage = $pageparams['exampage'];
+
+echo $listcards['ragassistant-documents-section'];
 
 if ($canmanage) {
     $suggestiontable = new html_table();
@@ -1021,6 +1102,7 @@ if ($canmanage) {
                 new moodle_url('/local/ragassistant/documents.php', [
                     'courseid' => $courseid,
                     'docpage' => $docpage,
+                    'exampage' => $exampage,
                 ]),
                 'sugpage'
             ),
@@ -1031,7 +1113,15 @@ if ($canmanage) {
     $pagedsections['ragassistant-suggestions-section'] = ob_get_clean();
     echo $pagedsections['ragassistant-suggestions-section'];
     echo html_writer::end_div();
+}
 
+// Past exam papers: their upload card, then their list.
+if (!$fragment && $canupload) {
+    $examform->display();
+}
+echo $listcards['ragassistant-exams-section'];
+
+if ($canmanage) {
     // Course chat settings card (moved here from the former course settings page).
     echo html_writer::start_div('ragassistant-uploaded-card');
     echo html_writer::tag(
@@ -1051,6 +1141,37 @@ if ($canmanage) {
             'class' => 'ragassistant-card-heading',
         ]
     );
+    // "Allow students to use /exam": shown while the AI chat is on site-wide, with or
+    // without past exam papers (/exam generates questions either way). While student chat
+    // is unticked it is hidden (the script below shows it again when the box is ticked),
+    // and the saved value is kept.
+    $examoption = '';
+    if (get_config('local_ragassistant', 'enable_chat')) {
+        $examoption = html_writer::div(
+            html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'examoption', 'value' => '1']) .
+            html_writer::tag(
+                'label',
+                html_writer::empty_tag('input', [
+                    'type' => 'checkbox',
+                    'name' => 'allowstudentexam',
+                    'value' => '1',
+                    'checked' => !isset($policy->allowstudentexam) || !empty($policy->allowstudentexam)
+                        ? 'checked' : null,
+                ]) . ' ' . get_string('allowstudentexam', 'local_ragassistant'),
+                ['class' => 'ragassistant-policy-option']
+            ) .
+            html_writer::tag('p', get_string('allowstudentexam_desc', 'local_ragassistant'), ['class' => 'text-muted']),
+            'ragassistant-exam-option',
+            ['id' => 'ragassistant-exam-option', 'hidden' => empty($policy->allowstudentchat) ? 'hidden' : null]
+        ) .
+        html_writer::script('(function() {
+            var chat = document.querySelector(".ragassistant-policy-form input[name=\'allowstudentchat\']");
+            var option = document.getElementById("ragassistant-exam-option");
+            if (!chat || !option) return;
+            chat.addEventListener("change", function() { option.hidden = !chat.checked; });
+        })();');
+    }
+
     echo html_writer::tag(
         'form',
         html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'sesskey', 'value' => sesskey()]) .
@@ -1067,6 +1188,7 @@ if ($canmanage) {
             ['class' => 'ragassistant-policy-option']
         ) .
         html_writer::tag('p', get_string('allowstudentchat_desc', 'local_ragassistant'), ['class' => 'text-muted']) .
+        $examoption .
         html_writer::tag('button', get_string('savechanges'), [
             'type' => 'submit',
             'class' => 'btn btn-primary',
@@ -1273,10 +1395,11 @@ $polljs = '(function() {
     }
     startPollingIfActive();
 
-    // Paging without a full reload: request only the two paged sections (fragment=1,
-    // JSON) and swap them in place. Both are refreshed together because each section\'s
+    // Paging without a full reload: request only the paged sections (fragment=1,
+    // JSON) and swap them in place. All are refreshed together because each section\'s
     // links carry the other section\'s page number. Falls back to normal navigation.
-    const sectionIds = ["ragassistant-documents-section", "ragassistant-suggestions-section"];
+    const sectionIds = ["ragassistant-documents-section", "ragassistant-exams-section",
+        "ragassistant-suggestions-section"];
     let pageRequest = 0;
     // Short-lived prefetch started on hover, so most clicks find the response ready.
     const prefetched = new Map();

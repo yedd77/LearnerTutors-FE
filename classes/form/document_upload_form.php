@@ -111,27 +111,53 @@ class document_upload_form extends \moodleform
 
         // Add JavaScript for per-file notes if user can manage documents.
         if ($canmanage) {
-            $this->add_per_file_notes_javascript();
+            $this->add_review_javascript([
+                'field' => 'documents',
+                'uploadHeadingId' => 'ragassistant-upload-heading',
+                'reviewHeadingId' => 'ragassistant-review-heading',
+                'reviewId' => 'ragassistant-file-review',
+                'notesInputName' => 'filenotes',
+                'itemLabel' => 'Document',
+            ]);
         }
     }
 
-    // Client-side JavaScript to handle per-file notes and the upload-to-review transition.
-    private function add_per_file_notes_javascript(): void
+    /**
+     * Client-side JavaScript for the upload-to-review transition: once files are picked,
+     * the file manager is replaced by one card per file, with an optional note for each.
+     *
+     * Shared with past_exam_upload_form, which passes its own element ids and no notes.
+     *
+     * @param array $config field (file manager element name), uploadHeadingId, reviewHeadingId,
+     *        reviewId, notesInputName (hidden field for per-file notes, or null for no notes)
+     *        and itemLabel (shown as "<itemLabel> 1", "<itemLabel> 2", ...).
+     */
+    protected function add_review_javascript(array $config): void
     {
         $js = <<<'JS'
-(function() {
+(function(config) {
     function initialiseReview() {
-        const reviewContainer = document.getElementById('ragassistant-file-review');
-        const reviewHeading = document.getElementById('ragassistant-review-heading');
-        const uploadHeading = document.getElementById('ragassistant-upload-heading');
-        const notesInput = document.querySelector('input[name="filenotes"]');
-        const manager = document.querySelector('#fitem_id_documents .filemanager');
+        const reviewContainer = document.getElementById(config.reviewId);
+        const reviewHeading = document.getElementById(config.reviewHeadingId);
+        const uploadHeading = document.getElementById(config.uploadHeadingId);
+        // Per-file notes are optional (past exam papers have none).
+        const notesInput = config.notesInputName
+            ? document.querySelector('input[name="' + config.notesInputName + '"]')
+            : null;
+        const manager = document.querySelector('#fitem_id_' + config.field + ' .filemanager');
 
-        const managerItem = document.getElementById('fitem_id_documents');
+        const managerItem = document.getElementById('fitem_id_' + config.field);
 
         if (!reviewContainer || !reviewHeading || !uploadHeading ||
-            !notesInput || !manager || !managerItem) {
+            (config.notesInputName && !notesInput) || !manager || !managerItem) {
             return;
+        }
+
+        // Write the notes to the hidden form field, when this form has notes.
+        function syncNotes() {
+            if (notesInput) {
+                notesInput.value = JSON.stringify(notes);
+            }
         }
 
         // Keep the notes when the review cards are re-rendered.
@@ -197,7 +223,7 @@ class document_upload_form extends \moodleform
         // A validation error (too many pages, wrong type, too large) is shown on the
         // file manager row, so keep that row visible while it has one.
         function hasUploadError() {
-            const error = document.getElementById('id_error_documents');
+            const error = document.getElementById('id_error_' + config.field);
             return !!(error && error.textContent.trim() !== '');
         }
 
@@ -222,7 +248,7 @@ class document_upload_form extends \moodleform
             names.forEach(function(name, index) {
                 // Create the file card.
                 const card = document.createElement('article');
-                card.className = 'ragassistant-file-card';
+                card.className = notesInput ? 'ragassistant-file-card' : 'ragassistant-file-card ragassistant-file-card-compact';
 
                 // Card header.
                 const header = document.createElement('div');
@@ -240,7 +266,7 @@ class document_upload_form extends \moodleform
 
                 const fileNumber = document.createElement('span');
                 fileNumber.className = 'ragassistant-file-number';
-                fileNumber.textContent = 'Document ' + (index + 1);
+                fileNumber.textContent = config.itemLabel + ' ' + (index + 1);
 
                 const removeButton = document.createElement('button');
                 removeButton.type = 'button';
@@ -291,29 +317,32 @@ class document_upload_form extends \moodleform
                 header.appendChild(fileDetails);
                 header.appendChild(removeButton);
 
-                // Lecturer note field.
-                const noteLabel = document.createElement('label');
-                noteLabel.className = 'ragassistant-note-label';
-                noteLabel.textContent = 'Lecturer note';
-
-                const textarea = document.createElement('textarea');
-                textarea.className = 'form-control ragassistant-note-input';
-                textarea.rows = 3;
-                textarea.maxLength = 2000;
-                textarea.addEventListener('input', function() {
-                    notes[name] = textarea.value;
-                    notesInput.value = JSON.stringify(notes);
-                });
-
-                // Assemble the card.
                 card.appendChild(header);
-                card.appendChild(noteLabel);
-                card.appendChild(textarea);
+
+                // Lecturer note field, when this form has notes.
+                if (notesInput) {
+                    const noteLabel = document.createElement('label');
+                    noteLabel.className = 'ragassistant-note-label';
+                    noteLabel.textContent = 'Lecturer note';
+
+                    const textarea = document.createElement('textarea');
+                    textarea.className = 'form-control ragassistant-note-input';
+                    textarea.rows = 3;
+                    textarea.maxLength = 2000;
+                    textarea.addEventListener('input', function() {
+                        notes[name] = textarea.value;
+                        syncNotes();
+                    });
+
+                    card.appendChild(noteLabel);
+                    card.appendChild(textarea);
+                }
+
                 reviewContainer.appendChild(card);
             });
 
             // Synchronise notes with the hidden form field.
-            notesInput.value = JSON.stringify(notes);
+            syncNotes();
         }
 
         // Wait until the list of files stays stable before switching sections.
@@ -332,7 +361,7 @@ class document_upload_form extends \moodleform
                 reviewHeading.style.display = 'none';
                 reviewContainer.style.display = 'none';
 
-                notesInput.value = JSON.stringify(notes);
+                syncNotes();
                 return;
             }
 
@@ -389,9 +418,11 @@ class document_upload_form extends \moodleform
     } else {
         initialiseReview();
     }
-})();
+})(__RAGASSISTANT_REVIEW_CONFIG__);
 JS;
 
+        $json = json_encode($config, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP);
+        $js = str_replace('__RAGASSISTANT_REVIEW_CONFIG__', $json, $js);
         $this->_form->addElement('html', html_writer::script($js));
     }
 

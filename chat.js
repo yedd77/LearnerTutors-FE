@@ -128,7 +128,14 @@ document.addEventListener('DOMContentLoaded', function () {
         { command: '/explain', id: 'concept_explanation', color: '#270089', label: 'Explain a concept', description: 'Explain a topic step by step.' },
         { command: '/quiz', id: 'practice_quiz', color: '#270089', label: 'Practice quiz', description: 'Generate practice questions.' },
         { command: '/studyguide', id: 'study_guide', color: '#270089', label: 'Build a study guide', description: 'Organize topics for revision.' }
-    ];
+    ].filter(function (item) {
+        // Commands the course turned off (for example /exam) are left out of the menu.
+        // index.php refuses them too, so this only keeps the menu honest.
+        const disabled = chatApp && chatApp.dataset.disabledCommands
+            ? chatApp.dataset.disabledCommands.split(',')
+            : [];
+        return disabled.indexOf(item.id) === -1;
+    });
     let activeIndex = -1;
     let filtered = [];
 

@@ -24,6 +24,15 @@ class past_exam_upload_form extends document_upload_form
     {
         $mform = $this->_form;
         $courseid = (int) $this->_customdata['courseid'];
+        $inuse = (int) ($this->_customdata['pastexamsinuse'] ?? 0);
+
+        // Whether /exam currently follows any past paper, so the lecturer knows what
+        // students get today before uploading more.
+        $usage = $inuse > 0
+            ? html_writer::tag('p', get_string('pastexamsinuse', 'local_ragassistant', $inuse),
+                ['class' => 'ragassistant-exam-usage ragassistant-exam-usage-active'])
+            : html_writer::tag('p', get_string('pastexamsnone', 'local_ragassistant'),
+                ['class' => 'ragassistant-exam-usage']);
 
         $mform->addElement(
             'html',
@@ -38,7 +47,8 @@ class past_exam_upload_form extends document_upload_form
                     'p',
                     get_string('pastexamuploaddesc', 'local_ragassistant'),
                     ['class' => 'ragassistant-card-description']
-                ),
+                ) .
+                $usage,
                 [
                     'id' => 'ragassistant-exam-upload-heading',
                     'class' => 'ragassistant-card-heading',
@@ -60,6 +70,34 @@ class past_exam_upload_form extends document_upload_form
         );
         $mform->addHelpButton('exampapers', 'pastexamfile', 'local_ragassistant');
 
+        // Review step, as on the course material card: once papers are picked they are
+        // listed one card each (with Remove) until the lecturer uploads them.
+        $mform->addElement(
+            'html',
+            html_writer::tag(
+                'div',
+                html_writer::tag(
+                    'h4',
+                    get_string('pastexamreviewtitle', 'local_ragassistant'),
+                    ['class' => 'ragassistant-card-title']
+                ) .
+                html_writer::tag(
+                    'p',
+                    get_string('pastexamreviewdesc', 'local_ragassistant'),
+                    ['class' => 'ragassistant-card-description']
+                ),
+                [
+                    'id' => 'ragassistant-exam-review-heading',
+                    'class' => 'ragassistant-card-heading',
+                    'style' => 'display:none;',
+                ]
+            )
+        );
+        $mform->addElement(
+            'html',
+            '<div id="ragassistant-exam-file-review" class="ragassistant-review-grid" style="display:none;"></div>'
+        );
+
         $mform->addElement('hidden', 'courseid', $courseid);
         $mform->setType('courseid', PARAM_INT);
         $mform->addElement('html', '
@@ -70,6 +108,16 @@ class past_exam_upload_form extends document_upload_form
                title="' . s(get_string('pastexamuploadbutton_tooltip', 'local_ragassistant')) . '">
     </div>
 ');
+
+        // Same upload-to-review script as the course material card; past papers have no notes.
+        $this->add_review_javascript([
+            'field' => 'exampapers',
+            'uploadHeadingId' => 'ragassistant-exam-upload-heading',
+            'reviewHeadingId' => 'ragassistant-exam-review-heading',
+            'reviewId' => 'ragassistant-exam-file-review',
+            'notesInputName' => null,
+            'itemLabel' => get_string('pastexamreviewitem', 'local_ragassistant'),
+        ]);
     }
 
     /**

@@ -169,6 +169,32 @@ function local_ragassistant_render_answer(string $answer, array $images, context
 }
 
 /**
+ * How a message without a selected tool would reach the backend's /exam tool, if at all.
+ *
+ * The backend picks a tool from the text when Moodle sends no tool_id: a leading "/exam",
+ * or a request such as "create mock exam questions on ...". This mirrors that routing
+ * (Z:\app\prompt_router.py, route_message() and _PATTERN_ROUTES), so a course that turned
+ * /exam off for students can stop both. Keep the pattern in step with the backend's.
+ *
+ * @param string $question The message as typed.
+ * @return string 'command' for a leading /exam, 'pattern' for an exam request in words, or ''.
+ */
+function local_ragassistant_exam_route(string $question): string
+{
+    $text = core_text::strtolower(trim($question));
+    $first = preg_split('/\s+/', $text, 2)[0] ?? '';
+    if ($first === '/exam') {
+        return 'command';
+    }
+    if (preg_match('/\b(?:create|generate|make|write|prepare|design)\b.{0,70}' .
+            '\b(?:exam questions?|examination questions?|mock exam|exam paper|' .
+            'mcqs?|multiple.choice questions?|test questions?)\b/u', $text)) {
+        return 'pattern';
+    }
+    return '';
+}
+
+/**
  * Read a typed reply to the "search more widely?" question as approve or decline.
  *
  * Only short, clear answers count; anything longer or unclear returns null and is sent
@@ -368,6 +394,8 @@ if (!$canmanage && !$canusechat) {
 // have the useassistant capability. Chat must also be enabled site-wide.
 $enabled = (bool) get_config('local_ragassistant', 'enable_chat');
 $allowed = course_policy::can_use_chat($courseid, $context);
+// The course can turn /exam off for students, with or without past exam papers.
+$examallowed = $allowed && course_policy::can_use_exam($courseid, $context);
 
 $pageurl = new moodle_url('/local/ragassistant/index.php', ['courseid' => $courseid]);
 
@@ -519,6 +547,11 @@ if (data_submitted() && confirm_sesskey()) {
     if (!$allowed) {
         $error = $enabled ? get_string('studentchatdisabled', 'local_ragassistant') : get_string('chatdisabledreason', 'local_ragassistant');
 
+        // /exam is turned off for students in this course: refuse the menu tool and a typed /exam.
+    } else if (!$examallowed &&
+            ($toolid === 'exam_generation' || local_ragassistant_exam_route($question) === 'command')) {
+        $error = get_string('examdisabled', 'local_ragassistant');
+
         // Validate question length between 2 and 4000 characters
     } else if (core_text::strlen($question) < 2) {
         $error = get_string('questionrequired', 'local_ragassistant');
@@ -560,13 +593,21 @@ if (data_submitted() && confirm_sesskey()) {
 
                 // Retrieve the answer from the RAG Assistant API.
                 $provider = trim((string) get_config('local_ragassistant', 'llm_provider'));
+                // With /exam turned off, a request in words ("make mock exam questions...")
+                // is pinned to the ordinary chat tool, so the backend does not route it to
+                // /exam itself. The student gets a normal answer instead of a practice paper.
+                $sendtoolid = $toolid;
+                if (!$examallowed && $sendtoolid === '' && !$haspendingdecision &&
+                        local_ragassistant_exam_route($question) === 'pattern') {
+                    $sendtoolid = 'ask';
+                }
                 $chatrequest = [
                     'question' => $question,
                     'course_id' => (int) $course->id,
                     'user_id' => (int) $USER->id,
                     'include_course_documents' => true,
                     'history' => $conversationhistory,
-                    'tool_id' => $toolid !== '' ? $toolid : null,
+                    'tool_id' => $sendtoolid !== '' ? $sendtoolid : null,
                     'provider' => $provider,
                     'model' => trim((string) get_config('local_ragassistant', 'chat_model')),
                 ];
@@ -761,6 +802,8 @@ if ($canusechat) {
             'data-quiz-progress-url' => (new moodle_url('/local/ragassistant/quiz_progress.php', [
                 'courseid' => $courseid,
             ]))->out(false),
+            // Commands chat.js leaves out of the menu. The server refuses them as well.
+            'data-disabled-commands' => $examallowed ? '' : 'exam_generation',
         ]
     );
 
